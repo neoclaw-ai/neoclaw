@@ -1,6 +1,15 @@
-.DS_store
+.DS_Store
 
 .env
 private/
 
 CLAUDE.local.md
+.gocache/
+.gomodcache/
+.gopath/
+bin/
+dist/
+*.test
+*.out
+coverage.out
+*.coverprofile

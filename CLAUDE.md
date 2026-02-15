@@ -16,3 +16,7 @@ A better version of OpenClaw. A lightweight personal AI assistant.
 2. Keep configuration easy for the user. Prefer sensible defaults without requiring the user to explicitly configure when possible. 
 3. Security first by default. File writes isolated to a single working directory. User approves all URLs that are accessing. 
 4. Optimize for lower token costs and efficient token usage. Do not make LLM calls when local processing will suffice. 
+
+## Repository
+- Canonical GitHub URL: https://github.com/machinae/betterclaw
+- Go module path must be: github.com/machinae/betterclaw
