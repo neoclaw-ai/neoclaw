@@ -1,2 +1,6 @@
+.DS_store
+
 .env
 private/
+
+CLAUDE.local.md
