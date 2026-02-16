@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -40,5 +42,29 @@ func TestPromptFlagParsing(t *testing.T) {
 	got := strings.TrimSpace(out.String())
 	if got != "hello" {
 		t.Fatalf("expected output %q, got %q", "hello", got)
+	}
+}
+
+func TestServeLoadsDefaultsAndBootstraps(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	t.Setenv("BETTERCLAW_HOME", dataDir)
+
+	cmd := NewRootCmd()
+	out := &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	cmd.SetArgs([]string{"serve"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute serve: %v", err)
+	}
+
+	if !strings.Contains(out.String(), "starting server...") {
+		t.Fatalf("expected serve output to include startup message, got %q", out.String())
+	}
+
+	agentFile := filepath.Join(dataDir, "agents", "default", "AGENT.md")
+	if _, err := os.Stat(agentFile); err != nil {
+		t.Fatalf("expected bootstrap file %q to exist: %v", agentFile, err)
 	}
 }

@@ -20,3 +20,6 @@ A better version of OpenClaw. A lightweight personal AI assistant.
 ## Repository
 - Canonical GitHub URL: https://github.com/machinae/betterclaw
 - Go module path must be: github.com/machinae/betterclaw
+
+## Formatting Policy
+- After editing Go files, always run `gofmt` on changed files before running tests or builds.

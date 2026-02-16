@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 
+	"github.com/machinae/betterclaw/internal/bootstrap"
+	"github.com/machinae/betterclaw/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +26,22 @@ func newServeCmd() *cobra.Command {
 		Use:   "serve",
 		Short: "Start the server",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, err := fmt.Fprintln(cmd.OutOrStdout(), "starting server...")
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			if err := bootstrap.Initialize(cfg); err != nil {
+				return err
+			}
+
+			_, err = fmt.Fprintf(
+				cmd.OutOrStdout(),
+				"starting server... agent=%s provider=%s model=%s data_dir=%s\n",
+				cfg.Agent,
+				cfg.LLM.Provider,
+				cfg.LLM.Model,
+				cfg.DataDir,
+			)
 			return err
 		},
 	}
