@@ -28,7 +28,29 @@ const (
 
 // ExecuteTool enforces permission checks and executes the tool when allowed.
 func ExecuteTool(ctx context.Context, approver Approver, tool tools.Tool, args map[string]any, description string) (*tools.ToolResult, error) {
-	if tool.Permission() == tools.RequiresApproval {
+	permission := tool.Permission()
+	if permission == tools.RequiresApproval {
+		switch t := tool.(type) {
+		case tools.RunCommandTool:
+			requiresApproval, err := t.RequiresApprovalForArgs(args)
+			if err != nil {
+				return nil, err
+			}
+			if !requiresApproval {
+				permission = tools.AutoApprove
+			}
+		case *tools.RunCommandTool:
+			requiresApproval, err := t.RequiresApprovalForArgs(args)
+			if err != nil {
+				return nil, err
+			}
+			if !requiresApproval {
+				permission = tools.AutoApprove
+			}
+		}
+	}
+
+	if permission == tools.RequiresApproval {
 		if approver == nil {
 			return nil, fmt.Errorf("tool %q requires approval but no approver is configured", tool.Name())
 		}

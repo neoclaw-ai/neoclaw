@@ -49,37 +49,29 @@ func (t RunCommandTool) Permission() Permission {
 	return RequiresApproval
 }
 
-func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*ToolResult, error) {
-	command, err := stringArg(args, "command")
+// RequiresApprovalForArgs resolves approval behavior for this specific command.
+// Allowlisted binaries are auto-approved; all others require an approval prompt.
+func (t RunCommandTool) RequiresApprovalForArgs(args map[string]any) (bool, error) {
+	command, _, err := t.validateArgs(args)
 	if err != nil {
-		return nil, err
-	}
-	if strings.TrimSpace(t.WorkspaceDir) == "" {
-		return nil, errors.New("workspace directory is required")
+		return true, err
 	}
 
 	bin, err := firstCommandToken(command)
 	if err != nil {
-		return nil, err
-	}
-	if err := checkAllowedBinary(t.AllowedBinsPath, bin); err != nil {
-		return nil, err
+		return true, err
 	}
 
-	workdir := t.WorkspaceDir
-	if raw, ok := args["workdir"]; ok {
-		value, ok := raw.(string)
-		if !ok {
-			return nil, fmt.Errorf("argument %q must be a string", "workdir")
-		}
-		value = strings.TrimSpace(value)
-		if value != "" {
-			wd, err := resolveWorkspacePath(t.WorkspaceDir, value)
-			if err != nil {
-				return nil, err
-			}
-			workdir = wd
-		}
+	if isAllowedBinary(t.AllowedBinsPath, bin) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*ToolResult, error) {
+	command, workdir, err := t.validateArgs(args)
+	if err != nil {
+		return nil, err
 	}
 
 	timeout := t.Timeout
@@ -130,6 +122,34 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 	return result, nil
 }
 
+func (t RunCommandTool) validateArgs(args map[string]any) (string, string, error) {
+	command, err := stringArg(args, "command")
+	if err != nil {
+		return "", "", err
+	}
+	if strings.TrimSpace(t.WorkspaceDir) == "" {
+		return "", "", errors.New("workspace directory is required")
+	}
+
+	workdir := t.WorkspaceDir
+	if raw, ok := args["workdir"]; ok {
+		value, ok := raw.(string)
+		if !ok {
+			return "", "", fmt.Errorf("argument %q must be a string", "workdir")
+		}
+		value = strings.TrimSpace(value)
+		if value != "" {
+			wd, err := resolveWorkspacePath(t.WorkspaceDir, value)
+			if err != nil {
+				return "", "", err
+			}
+			workdir = wd
+		}
+	}
+
+	return command, workdir, nil
+}
+
 func firstCommandToken(command string) (string, error) {
 	fields := strings.Fields(command)
 	if len(fields) == 0 {
@@ -164,27 +184,27 @@ func isEnvAssignment(token string) bool {
 	return true
 }
 
-func checkAllowedBinary(allowedBinsPath, bin string) error {
+func isAllowedBinary(allowedBinsPath, bin string) bool {
 	if strings.TrimSpace(allowedBinsPath) == "" {
-		return fmt.Errorf("allowed bins path is required")
+		return false
 	}
 
 	raw, err := os.ReadFile(allowedBinsPath)
 	if err != nil {
-		return fmt.Errorf("read allowed bins file: %w", err)
+		return false
 	}
 
 	var allowed []string
 	if err := json.Unmarshal(raw, &allowed); err != nil {
-		return fmt.Errorf("parse allowed bins file: %w", err)
+		return false
 	}
 
 	target := filepath.Base(strings.TrimSpace(bin))
 	for _, candidate := range allowed {
 		if filepath.Base(strings.TrimSpace(candidate)) == target {
-			return nil
+			return true
 		}
 	}
 
-	return fmt.Errorf("binary %q is not allowed", target)
+	return false
 }

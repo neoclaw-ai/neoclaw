@@ -3,6 +3,8 @@ package approval
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -67,6 +69,27 @@ func TestExecuteTool_RequiresApprovalMissingApprover(t *testing.T) {
 	}
 }
 
+func TestExecuteTool_ArgResolvedAutoApproveSkipsPrompt(t *testing.T) {
+	workspace := t.TempDir()
+	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
+	if err := os.WriteFile(allowedPath, []byte("[\"pwd\"]\n"), 0o644); err != nil {
+		t.Fatalf("write allowed bins: %v", err)
+	}
+
+	tool := tools.RunCommandTool{
+		WorkspaceDir:    workspace,
+		AllowedBinsPath: allowedPath,
+	}
+
+	res, err := ExecuteTool(context.Background(), nil, tool, map[string]any{"command": "pwd"}, "Run: pwd")
+	if err != nil {
+		t.Fatalf("execute tool: %v", err)
+	}
+	if strings.TrimSpace(res.Output) != workspace {
+		t.Fatalf("expected pwd output %q, got %q", workspace, strings.TrimSpace(res.Output))
+	}
+}
+
 type fakeTool struct {
 	permission tools.Permission
 	output     string
@@ -78,6 +101,24 @@ func (t fakeTool) Schema() map[string]any       { return map[string]any{"type": 
 func (t fakeTool) Permission() tools.Permission { return t.permission }
 func (t fakeTool) Execute(_ context.Context, _ map[string]any) (*tools.ToolResult, error) {
 	return &tools.ToolResult{Output: t.output}, nil
+}
+
+func TestExecuteTool_RunCommandNonAllowlistedRequiresApprover(t *testing.T) {
+	workspace := t.TempDir()
+	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
+	if err := os.WriteFile(allowedPath, []byte("[\"pwd\"]\n"), 0o644); err != nil {
+		t.Fatalf("write allowed bins: %v", err)
+	}
+
+	tool := tools.RunCommandTool{
+		WorkspaceDir:    workspace,
+		AllowedBinsPath: allowedPath,
+	}
+
+	_, err := ExecuteTool(context.Background(), nil, tool, map[string]any{"command": "echo hello"}, "Run: echo hello")
+	if err == nil || !strings.Contains(err.Error(), "requires approval") {
+		t.Fatalf("expected missing approver error for non-allowlisted command, got %v", err)
+	}
 }
 
 type fakeApprover struct {

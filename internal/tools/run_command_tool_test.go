@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestRunCommand_AllowlistEnforced(t *testing.T) {
+func TestRunCommand_NonAllowlistedBinaryStillExecutes(t *testing.T) {
 	workspace := t.TempDir()
 	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
 	if err := os.WriteFile(allowedPath, []byte("[\"echo\"]\n"), 0o644); err != nil {
@@ -20,9 +20,12 @@ func TestRunCommand_AllowlistEnforced(t *testing.T) {
 		WorkspaceDir:    workspace,
 		AllowedBinsPath: allowedPath,
 	}
-	_, err := tool.Execute(context.Background(), map[string]any{"command": "cat /etc/hosts"})
-	if err == nil || !strings.Contains(err.Error(), "is not allowed") {
-		t.Fatalf("expected allowlist rejection, got %v", err)
+	res, err := tool.Execute(context.Background(), map[string]any{"command": "pwd"})
+	if err != nil {
+		t.Fatalf("expected execution to proceed even when not allowlisted, got %v", err)
+	}
+	if strings.TrimSpace(res.Output) == "" {
+		t.Fatalf("expected command output")
 	}
 }
 
@@ -118,6 +121,35 @@ func TestRunCommand_TruncationMetadata(t *testing.T) {
 	}
 	if res.FullOutputPath == "" {
 		t.Fatalf("expected full output path")
+	}
+}
+
+func TestRunCommand_RequiresApprovalForArgs(t *testing.T) {
+	workspace := t.TempDir()
+	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
+	if err := os.WriteFile(allowedPath, []byte("[\"pwd\"]\n"), 0o644); err != nil {
+		t.Fatalf("write allowed bins: %v", err)
+	}
+
+	tool := RunCommandTool{
+		WorkspaceDir:    workspace,
+		AllowedBinsPath: allowedPath,
+	}
+
+	requiresApproval, err := tool.RequiresApprovalForArgs(map[string]any{"command": "pwd"})
+	if err != nil {
+		t.Fatalf("permission for allowlisted command: %v", err)
+	}
+	if requiresApproval {
+		t.Fatalf("expected allowlisted command to skip approval")
+	}
+
+	requiresApproval, err = tool.RequiresApprovalForArgs(map[string]any{"command": "echo hi"})
+	if err != nil {
+		t.Fatalf("permission for non-allowlisted command: %v", err)
+	}
+	if !requiresApproval {
+		t.Fatalf("expected non-allowlisted command to require approval")
 	}
 }
 
