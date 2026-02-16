@@ -1,12 +1,13 @@
 module github.com/machinae/betterclaw
 
-go 1.22
+go 1.24.0
 
 require (
 	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/lmittmann/tint v1.1.3
 	github.com/spf13/cobra v1.8.1
-	golang.org/x/sys v0.29.0
+	golang.org/x/sys v0.41.0
+	golang.org/x/term v0.40.0
 )
 
 require (

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/lmittmann/tint"
+	"golang.org/x/term"
 )
 
 var logger = slog.New(newHandler())
@@ -24,11 +25,7 @@ func isTerminal(f *os.File) bool {
 	if f == nil {
 		return false
 	}
-	info, err := f.Stat()
-	if err != nil {
-		return false
-	}
-	return (info.Mode() & os.ModeCharDevice) != 0
+	return term.IsTerminal(int(f.Fd()))
 }
 
 // Logger returns the process logger.
