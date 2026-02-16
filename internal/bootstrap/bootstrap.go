@@ -50,6 +50,7 @@ func Initialize(cfg *config.Config) error {
 		path    string
 		content string
 	}{
+		{path: filepath.Join(cfg.DataDir, "config.toml"), content: defaultConfigTOML()},
 		{path: filepath.Join(cfg.DataDir, "allowed_domains.json"), content: defaultAllowedDomainsJSON()},
 		{path: filepath.Join(cfg.DataDir, "allowed_bins.json"), content: defaultAllowedBinsJSON()},
 		{path: filepath.Join(cfg.DataDir, "costs.jsonl"), content: ""},
@@ -102,4 +103,17 @@ func defaultAllowedBinsJSON() string {
 		return "[]\n"
 	}
 	return string(b) + "\n"
+}
+
+func defaultConfigTOML() string {
+	return `[llm.default]
+api_key = "$ANTHROPIC_API_KEY"
+provider = "anthropic"
+model = "claude-sonnet-4-5-20250514"
+
+[channels.telegram]
+enabled = true
+token = ""
+allowed_users = []
+`
 }

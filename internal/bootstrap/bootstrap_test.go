@@ -21,6 +21,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 	}
 
 	requiredPaths := []string{
+		filepath.Join(dataDir, "config.toml"),
 		filepath.Join(dataDir, "allowed_domains.json"),
 		filepath.Join(dataDir, "allowed_bins.json"),
 		filepath.Join(dataDir, "costs.jsonl"),
@@ -51,6 +52,16 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		t.Fatalf("expected bootstrap allowed domains file to contain default domains, got %q", domains)
 	}
 
+	configPath := filepath.Join(dataDir, "config.toml")
+	configRaw, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read config file: %v", err)
+	}
+	configText := string(configRaw)
+	if !strings.Contains(configText, "[llm.default]") || !strings.Contains(configText, "[channels.telegram]") {
+		t.Fatalf("expected bootstrap config to contain minimal sections, got %q", configText)
+	}
+
 	binsPath := filepath.Join(dataDir, "allowed_bins.json")
 	binsRaw, err := os.ReadFile(binsPath)
 	if err != nil {
@@ -78,6 +89,11 @@ func TestInitializeIsIdempotent(t *testing.T) {
 	if err := os.WriteFile(jobsPath, customContent, 0o644); err != nil {
 		t.Fatalf("seed custom jobs content: %v", err)
 	}
+	configPath := filepath.Join(dataDir, "config.toml")
+	customConfig := []byte("[llm.default]\napi_key = \"keep-me\"\nprovider = \"anthropic\"\nmodel = \"claude-sonnet-4-5-20250514\"\n")
+	if err := os.WriteFile(configPath, customConfig, 0o644); err != nil {
+		t.Fatalf("seed custom config content: %v", err)
+	}
 
 	if err := Initialize(cfg); err != nil {
 		t.Fatalf("second initialize: %v", err)
@@ -89,5 +105,13 @@ func TestInitializeIsIdempotent(t *testing.T) {
 	}
 	if string(got) != string(customContent) {
 		t.Fatalf("expected existing file content to remain unchanged")
+	}
+
+	configGot, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read config file: %v", err)
+	}
+	if string(configGot) != string(customConfig) {
+		t.Fatalf("expected existing config content to remain unchanged")
 	}
 }

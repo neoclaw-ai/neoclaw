@@ -16,6 +16,13 @@ func NewRootCmd() *cobra.Command {
 		// Let main handle fatal error rendering through structured logs.
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			return bootstrap.Initialize(cfg)
+		},
 	}
 
 	root.AddCommand(newServeCmd())
@@ -31,9 +38,6 @@ func newServeCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := config.Load()
 			if err != nil {
-				return err
-			}
-			if err := bootstrap.Initialize(cfg); err != nil {
 				return err
 			}
 			if err := config.ValidateStartup(cfg); err != nil {
