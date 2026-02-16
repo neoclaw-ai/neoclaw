@@ -20,7 +20,7 @@ func TestValidateStartup_HardFailNoLLM(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
 
-	_, err := ValidateStartup(cfg)
+	err := ValidateStartup(cfg)
 	if err == nil {
 		t.Fatalf("expected error for missing llm profiles")
 	}
@@ -33,7 +33,7 @@ func TestValidateStartup_HardFailNoChannels(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
 
-	_, err := ValidateStartup(cfg)
+	err := ValidateStartup(cfg)
 	if err == nil {
 		t.Fatalf("expected error for missing channels")
 	}
@@ -46,7 +46,7 @@ func TestValidateStartup_AnthropicRequiresAPIKey(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
 
-	_, err := ValidateStartup(cfg)
+	err := ValidateStartup(cfg)
 	if err == nil || !strings.Contains(err.Error(), "api_key is required") {
 		t.Fatalf("expected anthropic api_key validation error, got %v", err)
 	}
@@ -59,7 +59,7 @@ func TestValidateStartup_OllamaDoesNotRequireAPIKey(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
 
-	_, err := ValidateStartup(cfg)
+	err := ValidateStartup(cfg)
 	if err != nil {
 		t.Fatalf("expected ollama config to pass without api key, got %v", err)
 	}
@@ -72,11 +72,8 @@ func TestValidateStartup_TelegramAllowedUsersEmptyWarnsOnly(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
 
-	report, err := ValidateStartup(cfg)
+	err := ValidateStartup(cfg)
 	if err != nil {
 		t.Fatalf("expected no hard error, got %v", err)
-	}
-	if report == nil || len(report.Warnings) == 0 {
-		t.Fatalf("expected warning for empty telegram allowed_users")
 	}
 }

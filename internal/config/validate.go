@@ -3,17 +3,14 @@ package config
 import (
 	"errors"
 	"fmt"
-	"os"
 	"runtime"
+
+	"github.com/machinae/betterclaw/internal/logging"
 )
 
 // Validatable is implemented by config sections that can self-validate.
 type Validatable interface {
 	Validate() error
-}
-
-type ValidationReport struct {
-	Warnings []string
 }
 
 func (c LLMProviderConfig) Validate() error {
@@ -59,10 +56,9 @@ func (c WebConfig) Validate() error {
 	return nil
 }
 
-// ValidateStartup validates startup configuration and returns warning messages.
-func ValidateStartup(cfg *Config) (*ValidationReport, error) {
+// ValidateStartup validates startup configuration and logs warning-level issues.
+func ValidateStartup(cfg *Config) error {
 	var errs []error
-	report := &ValidationReport{}
 
 	if len(cfg.LLM) == 0 {
 		errs = append(errs, errors.New("at least one llm.* profile is required"))
@@ -91,18 +87,16 @@ func ValidateStartup(cfg *Config) (*ValidationReport, error) {
 			errs = append(errs, fmt.Errorf("channels.%s: %w", name, err))
 		}
 		if name == defaultTelegramChannel && chCfg.Enabled && len(chCfg.AllowedUsers) == 0 {
-			report.Warnings = append(report.Warnings, "channels.telegram.allowed_users is empty")
+			logging.Logger().Warn("channels.telegram.allowed_users is empty. You will not be able to use Telegram until you set this value")
 		}
 	}
 
 	if runtime.GOOS == "linux" {
-		if _, err := os.Stat("/sys/kernel/security/landlock"); err != nil {
-			report.Warnings = append(report.Warnings, "landlock is unavailable on this host")
-		}
+		logging.Logger().Warn("landlock availability check is deferred; not enforced at startup in MVP")
 	}
 
 	if len(errs) > 0 {
-		return report, errors.Join(errs...)
+		return errors.Join(errs...)
 	}
-	return report, nil
+	return nil
 }

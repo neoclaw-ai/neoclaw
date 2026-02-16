@@ -33,13 +33,7 @@ func newServeCmd() *cobra.Command {
 			if err := bootstrap.Initialize(cfg); err != nil {
 				return err
 			}
-			report, err := config.ValidateStartup(cfg)
-			if report != nil {
-				for _, warning := range report.Warnings {
-					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", warning)
-				}
-			}
-			if err != nil {
+			if err := config.ValidateStartup(cfg); err != nil {
 				return err
 			}
 
@@ -68,13 +62,7 @@ func newPromptCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			report, err := config.ValidateStartup(cfg)
-			if report != nil {
-				for _, warning := range report.Warnings {
-					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", warning)
-				}
-			}
-			if err != nil {
+			if err := config.ValidateStartup(cfg); err != nil {
 				return err
 			}
 
