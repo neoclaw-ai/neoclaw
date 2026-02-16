@@ -121,9 +121,6 @@ func Load() (*Config, error) {
 	cfg.DataDir = dataDir
 	cfg.Agent = defaultAgent
 	cfg.Security.Workspace = cfg.WorkspaceDir()
-	if err := validateSecurityMode(cfg.Security.Mode); err != nil {
-		return nil, err
-	}
 
 	return &cfg, nil
 }

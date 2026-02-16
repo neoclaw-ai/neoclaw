@@ -150,7 +150,7 @@ mode = "strict"
 	}
 }
 
-func TestLoad_InvalidSecurityModeFails(t *testing.T) {
+func TestLoad_InvalidSecurityModeDoesNotFail(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatalf("mkdir data dir: %v", err)
@@ -165,9 +165,12 @@ mode = "banana"
 		t.Fatalf("write config: %v", err)
 	}
 
-	_, err := Load()
-	if err == nil {
-		t.Fatalf("expected invalid security mode to fail")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Security.Mode != "banana" {
+		t.Fatalf("expected raw security mode to be loaded for startup validation, got %q", cfg.Security.Mode)
 	}
 }
 

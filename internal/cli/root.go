@@ -33,6 +33,15 @@ func newServeCmd() *cobra.Command {
 			if err := bootstrap.Initialize(cfg); err != nil {
 				return err
 			}
+			report, err := config.ValidateStartup(cfg)
+			if report != nil {
+				for _, warning := range report.Warnings {
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", warning)
+				}
+			}
+			if err != nil {
+				return err
+			}
 
 			llm := cfg.DefaultLLM()
 			_, err = fmt.Fprintf(
@@ -55,7 +64,21 @@ func newPromptCmd() *cobra.Command {
 		Use:   "prompt",
 		Short: "Send a prompt message",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, err := fmt.Fprintln(cmd.OutOrStdout(), prompt)
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			report, err := config.ValidateStartup(cfg)
+			if report != nil {
+				for _, warning := range report.Warnings {
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", warning)
+				}
+			}
+			if err != nil {
+				return err
+			}
+
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), prompt)
 			return err
 		},
 	}

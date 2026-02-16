@@ -29,6 +29,10 @@ func TestRootCommandRegistersSubcommands(t *testing.T) {
 }
 
 func TestPromptFlagParsing(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	t.Setenv("BETTERCLAW_HOME", dataDir)
+	writeValidConfig(t, dataDir)
+
 	cmd := NewRootCmd()
 	out := &bytes.Buffer{}
 	cmd.SetOut(out)
@@ -48,6 +52,7 @@ func TestPromptFlagParsing(t *testing.T) {
 func TestServeLoadsDefaultsAndBootstraps(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
 	t.Setenv("BETTERCLAW_HOME", dataDir)
+	writeValidConfig(t, dataDir)
 
 	cmd := NewRootCmd()
 	out := &bytes.Buffer{}
@@ -66,5 +71,26 @@ func TestServeLoadsDefaultsAndBootstraps(t *testing.T) {
 	agentFile := filepath.Join(dataDir, "agents", "default", "AGENT.md")
 	if _, err := os.Stat(agentFile); err != nil {
 		t.Fatalf("expected bootstrap file %q to exist: %v", agentFile, err)
+	}
+}
+
+func writeValidConfig(t *testing.T, dataDir string) {
+	t.Helper()
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	configBody := `
+[llm.default]
+api_key = "test-key"
+provider = "anthropic"
+model = "claude-sonnet-4-5-20250514"
+
+[channels.telegram]
+enabled = true
+token = "telegram-token"
+allowed_users = [123456789]
+`
+	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
 	}
 }
