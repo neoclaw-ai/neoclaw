@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.22.1
+	github.com/chzyer/readline v1.5.1
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/lmittmann/tint v1.1.3
 	github.com/spf13/cobra v1.10.2

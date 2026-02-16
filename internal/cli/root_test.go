@@ -61,6 +61,39 @@ func TestPromptFlagParsing(t *testing.T) {
 	}
 }
 
+func TestPromptInteractiveMode(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	t.Setenv("BETTERCLAW_HOME", dataDir)
+	writeValidConfig(t, dataDir)
+
+	origFactory := providerFactory
+	defer func() { providerFactory = origFactory }()
+	providerFactory = func(_ config.LLMProviderConfig) (llm.Provider, error) {
+		return fakeProvider{
+			resp: &llm.ChatResponse{Content: "hello from llm"},
+		}, nil
+	}
+
+	cmd := NewRootCmd()
+	out := &bytes.Buffer{}
+	cmd.SetIn(strings.NewReader("hello\nquit\n"))
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	cmd.SetArgs([]string{"prompt"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute interactive prompt command: %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "Interactive mode. Type /quit or /exit to stop.") {
+		t.Fatalf("expected interactive mode header, got %q", got)
+	}
+	if !strings.Contains(got, "assistant> hello from llm") {
+		t.Fatalf("expected assistant response in interactive mode, got %q", got)
+	}
+}
+
 func TestServeLoadsDefaultsAndBootstraps(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
 	t.Setenv("BETTERCLAW_HOME", dataDir)

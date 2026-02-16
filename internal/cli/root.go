@@ -1,18 +1,17 @@
 package cli
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/machinae/betterclaw/internal/agent"
 	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/bootstrap"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/llm"
-	"github.com/machinae/betterclaw/internal/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -97,12 +96,8 @@ func newPromptCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "prompt",
-		Short: "Send a prompt message",
+		Short: "Send a prompt message (or start interactive chat without -p)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if strings.TrimSpace(prompt) == "" {
-				return errors.New("prompt cannot be empty")
-			}
-
 			cfg, err := config.Load()
 			if err != nil {
 				return err
@@ -116,44 +111,23 @@ func newPromptCmd() *cobra.Command {
 				return err
 			}
 
-			registry := tools.NewRegistry()
-			coreTools := []tools.Tool{
-				tools.ReadFileTool{WorkspaceDir: cfg.WorkspaceDir()},
-				tools.ListDirTool{WorkspaceDir: cfg.WorkspaceDir()},
-				tools.WriteFileTool{WorkspaceDir: cfg.WorkspaceDir()},
-				tools.RunCommandTool{
-					WorkspaceDir:    cfg.WorkspaceDir(),
-					AllowedBinsPath: filepath.Join(cfg.DataDir, "allowed_bins.json"),
-					Timeout:         cfg.Security.CommandTimeout,
-				},
-				tools.SendMessageTool{Writer: cmd.OutOrStdout()},
-			}
-			for _, tool := range coreTools {
-				if err := registry.Register(tool); err != nil {
-					return err
-				}
-			}
-
-			approver := approval.NewCLIApprover(cmd.InOrStdin(), cmd.OutOrStdout())
-			resp, _, err := agent.Run(
-				cmd.Context(),
-				provider,
-				registry,
-				approver,
-				"You are BetterClaw, a lightweight personal AI assistant.",
-				[]llm.ChatMessage{
-					{
-						Role:    llm.RoleUser,
-						Content: prompt,
-					},
-				},
-				10,
-			)
+			inputReader := bufio.NewReader(cmd.InOrStdin())
+			approver := approval.NewCLIApproverFromReader(inputReader, cmd.OutOrStdout())
+			runner, err := newPromptRunner(cfg, provider, approver, cmd.OutOrStdout())
 			if err != nil {
 				return err
 			}
 
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), resp.Content)
+			if strings.TrimSpace(prompt) == "" {
+				return runPromptREPL(cmd.Context(), runner, cmd.InOrStdin(), inputReader, cmd.OutOrStdout())
+			}
+
+			resp, err := runner.Send(cmd.Context(), prompt)
+			if err != nil {
+				return err
+			}
+
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), resp)
 			return err
 		},
 	}

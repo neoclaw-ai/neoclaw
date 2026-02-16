@@ -15,8 +15,18 @@ type CLIApprover struct {
 }
 
 func NewCLIApprover(in io.Reader, out io.Writer) *CLIApprover {
+	if reader, ok := in.(*bufio.Reader); ok {
+		return NewCLIApproverFromReader(reader, out)
+	}
 	return &CLIApprover{
 		in:  bufio.NewReader(in),
+		out: out,
+	}
+}
+
+func NewCLIApproverFromReader(in *bufio.Reader, out io.Writer) *CLIApprover {
+	return &CLIApprover{
+		in:  in,
 		out: out,
 	}
 }
