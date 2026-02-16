@@ -13,6 +13,9 @@ func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "claw",
 		Short: "BetterClaw CLI",
+		// Let main handle fatal error rendering through structured logs.
+		SilenceErrors: true,
+		SilenceUsage:  true,
 	}
 
 	root.AddCommand(newServeCmd())

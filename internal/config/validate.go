@@ -95,7 +95,7 @@ func ValidateStartup(cfg *Config) error {
 	}
 
 	if len(errs) > 0 {
-		return errors.Join(errs...)
+		return errs[0]
 	}
 	return nil
 }

@@ -16,6 +16,23 @@ func newHandler() slog.Handler {
 		return tint.NewHandler(os.Stderr, &tint.Options{
 			Level:      slog.LevelInfo,
 			TimeFormat: "15:04:05",
+			ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
+				if len(groups) > 0 || attr.Key != slog.LevelKey {
+					return attr
+				}
+				level, ok := attr.Value.Any().(slog.Level)
+				if !ok {
+					return attr
+				}
+				switch {
+				case level >= slog.LevelError:
+					return tint.Attr(196, slog.Any(slog.LevelKey, level))
+				case level >= slog.LevelWarn:
+					return tint.Attr(208, slog.Any(slog.LevelKey, level))
+				default:
+					return attr
+				}
+			},
 		})
 	}
 	return slog.NewTextHandler(os.Stderr, opts)
