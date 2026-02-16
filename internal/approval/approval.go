@@ -41,7 +41,10 @@ func ExecuteTool(ctx context.Context, approver Approver, tool tools.Tool, args m
 			return nil, err
 		}
 		if decision == Denied {
-			return nil, fmt.Errorf("tool %q denied by user", tool.Name())
+			return nil, fmt.Errorf(
+				"user denied tool %q. User denied this action. Try a different approach or ask the user for guidance",
+				tool.Name(),
+			)
 		}
 	}
 

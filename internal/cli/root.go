@@ -3,11 +3,15 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
+	"github.com/machinae/betterclaw/internal/agent"
+	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/bootstrap"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/llm"
+	"github.com/machinae/betterclaw/internal/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -87,15 +91,39 @@ func newPromptCmd() *cobra.Command {
 				return err
 			}
 
-			resp, err := provider.Chat(cmd.Context(), llm.ChatRequest{
-				SystemPrompt: "You are BetterClaw, a lightweight personal AI assistant.",
-				Messages: []llm.ChatMessage{
+			registry := tools.NewRegistry()
+			coreTools := []tools.Tool{
+				tools.ReadFileTool{WorkspaceDir: cfg.WorkspaceDir()},
+				tools.ListDirTool{WorkspaceDir: cfg.WorkspaceDir()},
+				tools.WriteFileTool{WorkspaceDir: cfg.WorkspaceDir()},
+				tools.RunCommandTool{
+					WorkspaceDir:    cfg.WorkspaceDir(),
+					AllowedBinsPath: filepath.Join(cfg.DataDir, "allowed_bins.json"),
+					Timeout:         cfg.Security.CommandTimeout,
+				},
+				tools.SendMessageTool{Writer: cmd.OutOrStdout()},
+			}
+			for _, tool := range coreTools {
+				if err := registry.Register(tool); err != nil {
+					return err
+				}
+			}
+
+			approver := approval.NewCLIApprover(cmd.InOrStdin(), cmd.OutOrStdout())
+			resp, _, err := agent.Run(
+				cmd.Context(),
+				provider,
+				registry,
+				approver,
+				"You are BetterClaw, a lightweight personal AI assistant.",
+				[]llm.ChatMessage{
 					{
 						Role:    llm.RoleUser,
 						Content: prompt,
 					},
 				},
-			})
+				10,
+			)
 			if err != nil {
 				return err
 			}

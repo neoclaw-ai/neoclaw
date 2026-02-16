@@ -45,8 +45,8 @@ func TestExecuteTool_RequiresApprovalDeniedPath(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected denial error")
 	}
-	if !strings.Contains(err.Error(), "denied by user") {
-		t.Fatalf("expected denied by user error, got %v", err)
+	if !strings.Contains(err.Error(), "User denied this action") {
+		t.Fatalf("expected recovery guidance in denial error, got %v", err)
 	}
 }
 
