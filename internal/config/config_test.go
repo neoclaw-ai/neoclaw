@@ -69,7 +69,7 @@ func TestLoad_ExpandsEnvVarsInStringValues(t *testing.T) {
 [llm.default]
 api_key = "$ANTHROPIC_API_KEY"
 provider = "anthropic"
-model = "claude-sonnet-4-5-20250514"
+model = "claude-sonnet-4-5"
 `
 	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)

@@ -1,12 +1,17 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/machinae/betterclaw/internal/bootstrap"
 	"github.com/machinae/betterclaw/internal/config"
+	"github.com/machinae/betterclaw/internal/llm"
 	"github.com/spf13/cobra"
 )
+
+var providerFactory = llm.NewProviderFromConfig
 
 // NewRootCmd creates the root command and registers all subcommands.
 func NewRootCmd() *cobra.Command {
@@ -65,6 +70,10 @@ func newPromptCmd() *cobra.Command {
 		Use:   "prompt",
 		Short: "Send a prompt message",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(prompt) == "" {
+				return errors.New("prompt cannot be empty")
+			}
+
 			cfg, err := config.Load()
 			if err != nil {
 				return err
@@ -73,7 +82,25 @@ func newPromptCmd() *cobra.Command {
 				return err
 			}
 
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), prompt)
+			provider, err := providerFactory(cfg.DefaultLLM())
+			if err != nil {
+				return err
+			}
+
+			resp, err := provider.Chat(cmd.Context(), llm.ChatRequest{
+				SystemPrompt: "You are BetterClaw, a lightweight personal AI assistant.",
+				Messages: []llm.ChatMessage{
+					{
+						Role:    llm.RoleUser,
+						Content: prompt,
+					},
+				},
+			})
+			if err != nil {
+				return err
+			}
+
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), resp.Content)
 			return err
 		},
 	}

@@ -2,10 +2,14 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/machinae/betterclaw/internal/config"
+	"github.com/machinae/betterclaw/internal/llm"
 )
 
 func TestRootCommandRegistersSubcommands(t *testing.T) {
@@ -33,6 +37,14 @@ func TestPromptFlagParsing(t *testing.T) {
 	t.Setenv("BETTERCLAW_HOME", dataDir)
 	writeValidConfig(t, dataDir)
 
+	origFactory := providerFactory
+	defer func() { providerFactory = origFactory }()
+	providerFactory = func(_ config.LLMProviderConfig) (llm.Provider, error) {
+		return fakeProvider{
+			resp: &llm.ChatResponse{Content: "hello from llm"},
+		}, nil
+	}
+
 	cmd := NewRootCmd()
 	out := &bytes.Buffer{}
 	cmd.SetOut(out)
@@ -44,8 +56,8 @@ func TestPromptFlagParsing(t *testing.T) {
 	}
 
 	got := strings.TrimSpace(out.String())
-	if got != "hello" {
-		t.Fatalf("expected output %q, got %q", "hello", got)
+	if got != "hello from llm" {
+		t.Fatalf("expected output %q, got %q", "hello from llm", got)
 	}
 }
 
@@ -83,7 +95,7 @@ func writeValidConfig(t *testing.T, dataDir string) {
 [llm.default]
 api_key = "test-key"
 provider = "anthropic"
-model = "claude-sonnet-4-5-20250514"
+model = "claude-sonnet-4-5"
 
 [channels.telegram]
 enabled = true
@@ -93,4 +105,16 @@ allowed_users = [123456789]
 	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+}
+
+type fakeProvider struct {
+	resp *llm.ChatResponse
+	err  error
+}
+
+func (p fakeProvider) Chat(_ context.Context, _ llm.ChatRequest) (*llm.ChatResponse, error) {
+	if p.err != nil {
+		return nil, p.err
+	}
+	return p.resp, nil
 }

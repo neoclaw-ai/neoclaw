@@ -20,7 +20,7 @@ const (
 	SecurityModeStrict           = "strict"
 	defaultLLMProfile            = "default"
 	defaultLLMProvider           = "anthropic"
-	defaultLLMModel              = "claude-sonnet-4-5-20250514"
+	defaultLLMModel              = "claude-sonnet-4-5"
 	defaultTelegramChannel       = "telegram"
 )
 
