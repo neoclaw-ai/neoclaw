@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -107,6 +108,7 @@ func Load() (*Config, error) {
 
 	var cfg Config
 	decodeHook := mapstructure.ComposeDecodeHookFunc(
+		expandEnvStringHook(),
 		mapstructure.StringToTimeDurationHookFunc(),
 		mapstructure.StringToSliceHookFunc(","),
 	)
@@ -183,5 +185,18 @@ func validateSecurityMode(mode string) error {
 		return nil
 	default:
 		return fmt.Errorf("invalid security.mode %q (allowed: %q, %q, %q)", mode, SecurityModeStandard, SecurityModeDangerFullAccess, SecurityModeStrict)
+	}
+}
+
+func expandEnvStringHook() mapstructure.DecodeHookFuncType {
+	return func(from reflect.Type, to reflect.Type, data any) (any, error) {
+		if from.Kind() != reflect.String || to.Kind() != reflect.String {
+			return data, nil
+		}
+		value, ok := data.(string)
+		if !ok {
+			return data, nil
+		}
+		return os.ExpandEnv(value), nil
 	}
 }

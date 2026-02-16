@@ -2,7 +2,7 @@
 # Place at: $BETTERCLAW_HOME/config.toml
 
 [llm.default]
-api_key = ""
+api_key = "$ANTHROPIC_API_KEY"
 provider = "anthropic"
 model = "claude-sonnet-4-5-20250514"
 

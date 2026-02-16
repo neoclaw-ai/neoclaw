@@ -57,6 +57,33 @@ allowed_users = [123]
 	}
 }
 
+func TestLoad_ExpandsEnvVarsInStringValues(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("ANTHROPIC_API_KEY", "expanded-key")
+
+	configBody := `
+[llm.default]
+api_key = "$ANTHROPIC_API_KEY"
+provider = "anthropic"
+model = "claude-sonnet-4-5-20250514"
+`
+	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.DefaultLLM().APIKey != "expanded-key" {
+		t.Fatalf("expected expanded api key %q, got %q", "expanded-key", cfg.DefaultLLM().APIKey)
+	}
+}
+
 func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
 	t.Setenv("BETTERCLAW_HOME", dataDir)
