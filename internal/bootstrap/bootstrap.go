@@ -15,15 +15,28 @@ var defaultAllowedDomains = []string{
 }
 
 var defaultAllowedBins = []string{
-	"git",
-	"go",
-	"python3",
-	"node",
 	"cat",
-	"ls",
-	"grep",
+	"cd",
+	"cut",
+	"echo",
+	"expr",
 	"find",
-	"curl",
+	"grep",
+	"head",
+	"id",
+	"ls",
+	"paste",
+	"pwd",
+	"rev",
+	"seq",
+	"stat",
+	"tail",
+	"tr",
+	"uname",
+	"uniq",
+	"wc",
+	"which",
+	"whoami",
 }
 
 // Initialize creates the expected BetterClaw data tree if missing.

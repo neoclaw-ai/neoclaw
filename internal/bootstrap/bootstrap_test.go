@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,9 +68,12 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read allowed bins file: %v", err)
 	}
-	bins := string(binsRaw)
-	if !strings.Contains(bins, "\"git\"") || !strings.Contains(bins, "\"go\"") || !strings.Contains(bins, "\"curl\"") {
-		t.Fatalf("expected bootstrap allowed bins file to contain default binaries, got %q", bins)
+	var bins []string
+	if err := json.Unmarshal(binsRaw, &bins); err != nil {
+		t.Fatalf("parse allowed bins file as json array: %v", err)
+	}
+	if len(bins) == 0 {
+		t.Fatalf("expected bootstrap allowed bins file to have at least one entry")
 	}
 }
 
