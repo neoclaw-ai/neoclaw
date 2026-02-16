@@ -15,11 +15,15 @@ func TestLoad_FileOverridesDefaults(t *testing.T) {
 	t.Setenv("BETTERCLAW_HOME", dataDir)
 
 	configBody := `
-agent = "custom-agent"
-
-[llm]
+[llm.default]
+api_key = "test-key"
 provider = "openrouter"
 model = "deepseek/deepseek-chat"
+
+[channels.telegram]
+enabled = false
+token = "bot-token"
+allowed_users = [123]
 `
 	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -30,14 +34,26 @@ model = "deepseek/deepseek-chat"
 		t.Fatalf("load config: %v", err)
 	}
 
-	if cfg.Agent != "custom-agent" {
-		t.Fatalf("expected file agent %q, got %q", "custom-agent", cfg.Agent)
+	llm := cfg.DefaultLLM()
+	if llm.APIKey != "test-key" {
+		t.Fatalf("expected api key %q, got %q", "test-key", llm.APIKey)
 	}
-	if cfg.LLM.Provider != "openrouter" {
-		t.Fatalf("expected file provider %q, got %q", "openrouter", cfg.LLM.Provider)
+	if llm.Provider != "openrouter" {
+		t.Fatalf("expected provider %q, got %q", "openrouter", llm.Provider)
 	}
-	if cfg.LLM.Model != "deepseek/deepseek-chat" {
-		t.Fatalf("expected file model %q, got %q", "deepseek/deepseek-chat", cfg.LLM.Model)
+	if llm.Model != "deepseek/deepseek-chat" {
+		t.Fatalf("expected model %q, got %q", "deepseek/deepseek-chat", llm.Model)
+	}
+
+	telegram := cfg.TelegramChannel()
+	if telegram.Enabled {
+		t.Fatalf("expected telegram channel to be disabled from file")
+	}
+	if telegram.Token != "bot-token" {
+		t.Fatalf("expected telegram token from file, got %q", telegram.Token)
+	}
+	if len(telegram.AllowedUsers) != 1 || telegram.AllowedUsers[0] != 123 {
+		t.Fatalf("expected allowed_users [123], got %v", telegram.AllowedUsers)
 	}
 }
 
@@ -56,11 +72,75 @@ func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
 	if cfg.DataDir != dataDir {
 		t.Fatalf("expected data dir %q, got %q", dataDir, cfg.DataDir)
 	}
-	if cfg.LLM.Provider != "anthropic" {
-		t.Fatalf("expected default provider %q, got %q", "anthropic", cfg.LLM.Provider)
+	llm := cfg.DefaultLLM()
+	if llm.Provider != defaultLLMProvider {
+		t.Fatalf("expected default provider %q, got %q", defaultLLMProvider, llm.Provider)
+	}
+	if llm.Model != defaultLLMModel {
+		t.Fatalf("expected default model %q, got %q", defaultLLMModel, llm.Model)
 	}
 	if cfg.Security.CommandTimeout != 5*time.Minute {
 		t.Fatalf("expected default timeout 5m, got %v", cfg.Security.CommandTimeout)
+	}
+	if cfg.Security.Mode != SecurityModeStandard {
+		t.Fatalf("expected default security mode %q, got %q", SecurityModeStandard, cfg.Security.Mode)
+	}
+	expectedWorkspace := filepath.Join(dataDir, "agents", defaultAgent, "workspace")
+	if cfg.Security.Workspace != expectedWorkspace {
+		t.Fatalf("expected derived workspace %q, got %q", expectedWorkspace, cfg.Security.Workspace)
+	}
+
+	telegram := cfg.TelegramChannel()
+	if !telegram.Enabled {
+		t.Fatalf("expected default telegram channel enabled")
+	}
+	if telegram.Token != "" {
+		t.Fatalf("expected default empty token, got %q", telegram.Token)
+	}
+}
+
+func TestLoad_ValidSecurityModeFromFile(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	t.Setenv("BETTERCLAW_HOME", dataDir)
+
+	configBody := `
+[security]
+mode = "strict"
+`
+	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Security.Mode != SecurityModeStrict {
+		t.Fatalf("expected security mode %q, got %q", SecurityModeStrict, cfg.Security.Mode)
+	}
+}
+
+func TestLoad_InvalidSecurityModeFails(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	t.Setenv("BETTERCLAW_HOME", dataDir)
+
+	configBody := `
+[security]
+mode = "banana"
+`
+	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("expected invalid security mode to fail")
 	}
 }
 

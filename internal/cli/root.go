@@ -34,12 +34,13 @@ func newServeCmd() *cobra.Command {
 				return err
 			}
 
+			llm := cfg.DefaultLLM()
 			_, err = fmt.Fprintf(
 				cmd.OutOrStdout(),
 				"starting server... agent=%s provider=%s model=%s data_dir=%s\n",
 				cfg.Agent,
-				cfg.LLM.Provider,
-				cfg.LLM.Model,
+				llm.Provider,
+				llm.Model,
 				cfg.DataDir,
 			)
 			return err

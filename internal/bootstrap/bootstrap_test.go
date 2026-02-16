@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/machinae/betterclaw/internal/config"
@@ -38,6 +39,26 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("expected %q to exist: %v", path, err)
 		}
+	}
+
+	domainsPath := filepath.Join(dataDir, "allowed_domains.json")
+	domainsRaw, err := os.ReadFile(domainsPath)
+	if err != nil {
+		t.Fatalf("read allowed domains file: %v", err)
+	}
+	domains := string(domainsRaw)
+	if !strings.Contains(domains, "api.anthropic.com") || !strings.Contains(domains, "api.openrouter.ai") {
+		t.Fatalf("expected bootstrap allowed domains file to contain default domains, got %q", domains)
+	}
+
+	binsPath := filepath.Join(dataDir, "allowed_bins.json")
+	binsRaw, err := os.ReadFile(binsPath)
+	if err != nil {
+		t.Fatalf("read allowed bins file: %v", err)
+	}
+	bins := string(binsRaw)
+	if !strings.Contains(bins, "\"git\"") || !strings.Contains(bins, "\"go\"") || !strings.Contains(bins, "\"curl\"") {
+		t.Fatalf("expected bootstrap allowed bins file to contain default binaries, got %q", bins)
 	}
 }
 

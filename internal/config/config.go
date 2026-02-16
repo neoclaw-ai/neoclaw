@@ -8,44 +8,51 @@ import (
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
 const defaultAgent = "default"
 
+const (
+	SecurityModeStandard         = "standard"
+	SecurityModeDangerFullAccess = "danger-full-access"
+	SecurityModeStrict           = "strict"
+	defaultLLMProfile            = "default"
+	defaultLLMProvider           = "anthropic"
+	defaultLLMModel              = "claude-sonnet-4-5-20250514"
+	defaultTelegramChannel       = "telegram"
+)
+
 // Config is the runtime configuration loaded from defaults, config.toml, and env vars.
 type Config struct {
 	// DataDir is runtime-resolved from BETTERCLAW_HOME and not read from config.
-	DataDir  string         `mapstructure:"-"`
-	Agent    string         `mapstructure:"agent"`
-	Telegram TelegramConfig `mapstructure:"telegram"`
-	LLM      LLMConfig      `mapstructure:"llm"`
-	Security SecurityConfig `mapstructure:"security"`
-	Network  NetworkConfig  `mapstructure:"network"`
-	Costs    CostsConfig    `mapstructure:"costs"`
-	Web      WebConfig      `mapstructure:"web"`
+	DataDir string `mapstructure:"-"`
+	// Agent is runtime-selected (MVP default: "default"), not read from config.
+	Agent    string                       `mapstructure:"-"`
+	Channels map[string]ChannelConfig     `mapstructure:"channels"`
+	LLM      map[string]LLMProviderConfig `mapstructure:"llm"`
+	Security SecurityConfig               `mapstructure:"security"`
+	Costs    CostsConfig                  `mapstructure:"costs"`
+	Web      WebConfig                    `mapstructure:"web"`
 }
 
-type TelegramConfig struct {
+type ChannelConfig struct {
+	Enabled      bool    `mapstructure:"enabled"`
 	Token        string  `mapstructure:"token"`
 	AllowedUsers []int64 `mapstructure:"allowed_users"`
 }
 
-type LLMConfig struct {
+type LLMProviderConfig struct {
+	APIKey   string `mapstructure:"api_key"`
 	Provider string `mapstructure:"provider"`
 	Model    string `mapstructure:"model"`
 }
 
 type SecurityConfig struct {
-	Workspace       string        `mapstructure:"workspace"`
-	AllowedBinaries []string      `mapstructure:"allowed_binaries"`
-	CommandTimeout  time.Duration `mapstructure:"command_timeout"`
-	RestrictReads   bool          `mapstructure:"restrict_reads"`
-}
-
-type NetworkConfig struct {
-	AllowedDomains []string `mapstructure:"allowed_domains"`
+	// Workspace is derived from DataDir and Agent and is not configurable.
+	Workspace      string        `mapstructure:"-"`
+	CommandTimeout time.Duration `mapstructure:"command_timeout"`
+	Mode           string        `mapstructure:"mode"`
 }
 
 type CostsConfig struct {
@@ -77,17 +84,13 @@ func HomeDir() (string, error) {
 	return filepath.Join(home, ".betterclaw"), nil
 }
 
-// Load merges hardcoded defaults, config file values, and env vars in that order.
+// Load merges hardcoded defaults and config file values in that order.
 // The data directory is determined by BETTERCLAW_HOME (default: ~/.betterclaw).
-// Config is always at $BETTERCLAW_HOME/config.toml, .env at $BETTERCLAW_HOME/.env.
+// Config is always at $BETTERCLAW_HOME/config.toml.
 func Load() (*Config, error) {
 	dataDir, err := HomeDir()
 	if err != nil {
 		return nil, err
-	}
-
-	if err := godotenv.Load(filepath.Join(dataDir, ".env")); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("load .env: %w", err)
 	}
 
 	v := viper.New()
@@ -114,25 +117,26 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("decode config: %w", err)
 	}
 	cfg.DataDir = dataDir
+	cfg.Agent = defaultAgent
+	cfg.Security.Workspace = cfg.WorkspaceDir()
+	if err := validateSecurityMode(cfg.Security.Mode); err != nil {
+		return nil, err
+	}
 
 	return &cfg, nil
 }
 
 func setDefaults(v *viper.Viper, dataDir string) {
-	v.SetDefault("agent", defaultAgent)
+	v.SetDefault("channels."+defaultTelegramChannel+".enabled", true)
+	v.SetDefault("channels."+defaultTelegramChannel+".token", "")
+	v.SetDefault("channels."+defaultTelegramChannel+".allowed_users", []int64{})
 
-	v.SetDefault("telegram.token", "")
-	v.SetDefault("telegram.allowed_users", []int64{})
+	v.SetDefault("llm."+defaultLLMProfile+".api_key", "")
+	v.SetDefault("llm."+defaultLLMProfile+".provider", defaultLLMProvider)
+	v.SetDefault("llm."+defaultLLMProfile+".model", defaultLLMModel)
 
-	v.SetDefault("llm.provider", "anthropic")
-	v.SetDefault("llm.model", "claude-sonnet-4-5-20250514")
-
-	v.SetDefault("security.workspace", filepath.Join(dataDir, "agents", defaultAgent, "workspace"))
-	v.SetDefault("security.allowed_binaries", []string{"git", "go", "python3", "node", "cat", "ls", "grep", "find", "curl"})
 	v.SetDefault("security.command_timeout", "5m")
-	v.SetDefault("security.restrict_reads", false)
-
-	v.SetDefault("network.allowed_domains", []string{"api.anthropic.com", "api.openrouter.ai"})
+	v.SetDefault("security.mode", SecurityModeStandard)
 
 	v.SetDefault("costs.hourly_limit", 2.0)
 	v.SetDefault("costs.daily_limit", 20.0)
@@ -145,4 +149,39 @@ func setDefaults(v *viper.Viper, dataDir string) {
 
 func (c *Config) AgentDir() string {
 	return filepath.Join(c.DataDir, "agents", c.Agent)
+}
+
+func (c *Config) WorkspaceDir() string {
+	return filepath.Join(c.AgentDir(), "workspace")
+}
+
+func (c *Config) DefaultLLM() LLMProviderConfig {
+	if llm, ok := c.LLM[defaultLLMProfile]; ok {
+		return llm
+	}
+	return LLMProviderConfig{
+		APIKey:   "",
+		Provider: defaultLLMProvider,
+		Model:    defaultLLMModel,
+	}
+}
+
+func (c *Config) TelegramChannel() ChannelConfig {
+	if ch, ok := c.Channels[defaultTelegramChannel]; ok {
+		return ch
+	}
+	return ChannelConfig{
+		Enabled:      true,
+		Token:        "",
+		AllowedUsers: []int64{},
+	}
+}
+
+func validateSecurityMode(mode string) error {
+	switch mode {
+	case SecurityModeStandard, SecurityModeDangerFullAccess, SecurityModeStrict:
+		return nil
+	default:
+		return fmt.Errorf("invalid security.mode %q (allowed: %q, %q, %q)", mode, SecurityModeStandard, SecurityModeDangerFullAccess, SecurityModeStrict)
+	}
 }

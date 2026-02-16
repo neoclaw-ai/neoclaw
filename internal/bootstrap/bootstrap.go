@@ -1,12 +1,30 @@
 package bootstrap
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/machinae/betterclaw/internal/config"
 )
+
+var defaultAllowedDomains = []string{
+	"api.anthropic.com",
+	"api.openrouter.ai",
+}
+
+var defaultAllowedBins = []string{
+	"git",
+	"go",
+	"python3",
+	"node",
+	"cat",
+	"ls",
+	"grep",
+	"find",
+	"curl",
+}
 
 // Initialize creates the expected BetterClaw data tree if missing.
 func Initialize(cfg *config.Config) error {
@@ -32,8 +50,8 @@ func Initialize(cfg *config.Config) error {
 		path    string
 		content string
 	}{
-		{path: filepath.Join(cfg.DataDir, "allowed_domains.json"), content: "[]\n"},
-		{path: filepath.Join(cfg.DataDir, "allowed_bins.json"), content: "[]\n"},
+		{path: filepath.Join(cfg.DataDir, "allowed_domains.json"), content: defaultAllowedDomainsJSON()},
+		{path: filepath.Join(cfg.DataDir, "allowed_bins.json"), content: defaultAllowedBinsJSON()},
 		{path: filepath.Join(cfg.DataDir, "costs.jsonl"), content: ""},
 
 		{path: filepath.Join(agentDir, "AGENT.md"), content: "# AGENT\n"},
@@ -66,4 +84,22 @@ func writeFileIfMissing(path, content string) error {
 		return fmt.Errorf("write file %q: %w", path, err)
 	}
 	return nil
+}
+
+func defaultAllowedDomainsJSON() string {
+	b, err := json.MarshalIndent(defaultAllowedDomains, "", "  ")
+	if err != nil {
+		// Static list; this should never fail.
+		return "[]\n"
+	}
+	return string(b) + "\n"
+}
+
+func defaultAllowedBinsJSON() string {
+	b, err := json.MarshalIndent(defaultAllowedBins, "", "  ")
+	if err != nil {
+		// Static list; this should never fail.
+		return "[]\n"
+	}
+	return string(b) + "\n"
 }
