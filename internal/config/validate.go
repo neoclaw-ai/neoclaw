@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"runtime"
 
 	"github.com/machinae/betterclaw/internal/logging"
 )
@@ -91,8 +90,8 @@ func ValidateStartup(cfg *Config) error {
 		}
 	}
 
-	if runtime.GOOS == "linux" {
-		logging.Logger().Warn("landlock availability check is deferred; not enforced at startup in MVP")
+	if !isLandlockAvailable() {
+		logging.Logger().Warn("landlock is unavailable on this host. Upgrade your linux version for higher security")
 	}
 
 	if len(errs) > 0 {
