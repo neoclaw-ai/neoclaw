@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -25,12 +26,36 @@ func NewRootCmd() *cobra.Command {
 		// Let main handle fatal error rendering through structured logs.
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
 			}
-			return bootstrap.Initialize(cfg)
+
+			configPath := filepath.Join(cfg.DataDir, "config.toml")
+			firstRun := false
+			if _, err := os.Stat(configPath); errors.Is(err, os.ErrNotExist) {
+				firstRun = true
+			} else if err != nil {
+				return fmt.Errorf("stat BetterClaw config file %q: %w", configPath, err)
+			}
+
+			if err := bootstrap.Initialize(cfg); err != nil {
+				return err
+			}
+
+			if firstRun {
+				if _, err := fmt.Fprintf(
+					cmd.ErrOrStderr(),
+					"First run setup complete.\nEdit config file: %s\nRestart BetterClaw.\n",
+					configPath,
+				); err != nil {
+					return err
+				}
+				os.Exit(0)
+			}
+
+			return nil
 		},
 	}
 
