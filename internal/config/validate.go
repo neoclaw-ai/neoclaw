@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"runtime"
 
 	"github.com/machinae/betterclaw/internal/logging"
 )
@@ -90,7 +91,7 @@ func ValidateStartup(cfg *Config) error {
 		}
 	}
 
-	if !isLandlockAvailable() {
+	if runtime.GOOS == "linux" && !isLandlockAvailable() {
 		logging.Logger().Warn("landlock is unavailable on this host. Upgrade your linux version for higher security")
 	}
 
