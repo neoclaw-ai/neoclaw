@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/llm"
+	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
@@ -39,6 +41,14 @@ func Run(
 	totalUsage := llm.TokenUsage{}
 
 	for i := 0; i < maxIterations; i++ {
+		logging.Logger().Info(
+			"llm request",
+			"iteration", i+1,
+			"message_count", len(history),
+			"tool_count", len(toolDefs),
+			"latest_user_message", summarizeTextForLog(latestUserMessage(history), 300),
+		)
+
 		resp, err := provider.Chat(ctx, llm.ChatRequest{
 			SystemPrompt: systemPrompt,
 			Messages:     history,
@@ -47,6 +57,14 @@ func Run(
 		if err != nil {
 			return nil, history, err
 		}
+		logging.Logger().Info(
+			"llm response",
+			"iteration", i+1,
+			"tool_call_count", len(resp.ToolCalls),
+			"input_tokens", resp.Usage.InputTokens,
+			"output_tokens", resp.Usage.OutputTokens,
+			"total_tokens", resp.Usage.TotalTokens,
+		)
 
 		totalUsage.InputTokens += resp.Usage.InputTokens
 		totalUsage.OutputTokens += resp.Usage.OutputTokens
@@ -70,8 +88,16 @@ func Run(
 		})
 
 		for _, call := range resp.ToolCalls {
+			startedAt := time.Now()
 			tool, ok := registry.Lookup(call.Name)
 			if !ok {
+				logging.Logger().Warn(
+					"tool call rejected: unknown tool",
+					"tool", call.Name,
+					"tool_call_id", call.ID,
+					"arguments", call.Arguments,
+					"available_tools", availableTools,
+				)
 				history = append(history, llm.ChatMessage{
 					Role:       llm.RoleTool,
 					ToolCallID: call.ID,
@@ -87,12 +113,38 @@ func Run(
 			args := map[string]any{}
 			if call.Arguments != "" {
 				if err := json.Unmarshal([]byte(call.Arguments), &args); err != nil {
-					return nil, history, fmt.Errorf("parse tool arguments for %q: %w", call.Name, err)
+					logging.Logger().Warn(
+						"tool call rejected: invalid arguments",
+						"tool", call.Name,
+						"tool_call_id", call.ID,
+						"arguments", call.Arguments,
+						"err", err,
+					)
+					history = append(history, llm.ChatMessage{
+						Role:       llm.RoleTool,
+						ToolCallID: call.ID,
+						Content:    fmt.Sprintf("tool execution error: invalid tool arguments for %q: %v", call.Name, err),
+					})
+					continue
 				}
 			}
 
+			logging.Logger().Info(
+				"tool call start",
+				"tool", call.Name,
+				"tool_call_id", call.ID,
+				"args", summarizeToolArgs(args),
+			)
+
 			result, err := approval.ExecuteTool(ctx, approver, tool, args, fmt.Sprintf("%s %s", call.Name, call.Arguments))
 			if err != nil {
+				logging.Logger().Warn(
+					"tool call failed",
+					"tool", call.Name,
+					"tool_call_id", call.ID,
+					"duration_ms", time.Since(startedAt).Milliseconds(),
+					"err", err,
+				)
 				history = append(history, llm.ChatMessage{
 					Role:       llm.RoleTool,
 					ToolCallID: call.ID,
@@ -100,6 +152,13 @@ func Run(
 				})
 				continue
 			}
+
+			logging.Logger().Info(
+				"tool call complete",
+				"tool", call.Name,
+				"tool_call_id", call.ID,
+				"duration_ms", time.Since(startedAt).Milliseconds(),
+			)
 
 			history = append(history, llm.ChatMessage{
 				Role:       llm.RoleTool,
@@ -121,4 +180,44 @@ func toolNames(defs []llm.ToolDefinition) string {
 		names = append(names, d.Name)
 	}
 	return strings.Join(names, ", ")
+}
+
+func summarizeToolArgs(args map[string]any) map[string]any {
+	out := make(map[string]any, len(args))
+	for key, value := range args {
+		out[key] = summarizeToolArgValue(value)
+	}
+	return out
+}
+
+func summarizeToolArgValue(value any) any {
+	const maxLoggedStringLen = 200
+
+	switch v := value.(type) {
+	case string:
+		if len(v) <= maxLoggedStringLen {
+			return v
+		}
+		return fmt.Sprintf("%s...[truncated %d chars]", v[:maxLoggedStringLen], len(v)-maxLoggedStringLen)
+	case []byte:
+		return fmt.Sprintf("<bytes len=%d>", len(v))
+	default:
+		return value
+	}
+}
+
+func latestUserMessage(history []llm.ChatMessage) string {
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role == llm.RoleUser && strings.TrimSpace(history[i].Content) != "" {
+			return history[i].Content
+		}
+	}
+	return ""
+}
+
+func summarizeTextForLog(text string, maxLen int) string {
+	if maxLen <= 0 || len(text) <= maxLen {
+		return text
+	}
+	return fmt.Sprintf("%s...[truncated %d chars]", text[:maxLen], len(text)-maxLen)
 }
