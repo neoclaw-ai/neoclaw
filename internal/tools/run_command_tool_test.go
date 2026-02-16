@@ -120,3 +120,96 @@ func TestRunCommand_TruncationMetadata(t *testing.T) {
 		t.Fatalf("expected full output path")
 	}
 }
+
+func TestFirstCommandToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:  "simple command",
+			input: "git status",
+			want:  "git",
+		},
+		{
+			name:  "single command token",
+			input: "ls",
+			want:  "ls",
+		},
+		{
+			name:  "leading env assignments are skipped",
+			input: "FOO=bar PATH=/tmp go test ./...",
+			want:  "go",
+		},
+		{
+			name:    "empty string errors",
+			input:   "",
+			wantErr: true,
+		},
+		{
+			name:    "whitespace string errors",
+			input:   "   \t\n ",
+			wantErr: true,
+		},
+		{
+			name:    "env assignment only errors",
+			input:   "FOO=bar",
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := firstCommandToken(tc.input)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got token %q", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("expected token %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestIsEnvAssignment(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{input: "FOO=bar", want: true},
+		{input: "A1=bar", want: true},
+		{input: "_PATH=/tmp", want: true},
+		{input: "NAME=value=with=equals", want: true},
+		{input: "=bar", want: false},
+		{input: "1FOO=bar", want: false},
+		{input: "FOO", want: false},
+		{input: "FOO-BAR=baz", want: false},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+
+			got := isEnvAssignment(tc.input)
+			if got != tc.want {
+				t.Fatalf("isEnvAssignment(%q) = %v, want %v", tc.input, got, tc.want)
+			}
+		})
+	}
+}
