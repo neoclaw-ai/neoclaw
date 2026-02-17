@@ -1,8 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -226,5 +228,38 @@ func TestHomeDir_RespectsEnvVar(t *testing.T) {
 	}
 	if dir != customDir {
 		t.Fatalf("expected %q, got %q", customDir, dir)
+	}
+}
+
+func TestWrite_PrintsDefaultsAndOverrides(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	t.Setenv("BETTERCLAW_HOME", dataDir)
+
+	configBody := `
+[llm.default]
+api_key = "test-key"
+provider = "openrouter"
+model = "deepseek/deepseek-chat"
+`
+	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := Write(&out); err != nil {
+		t.Fatalf("write merged toml: %v", err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "[llm.default]") {
+		t.Fatalf("expected llm.default section, got %q", got)
+	}
+	if !strings.Contains(got, "provider = 'openrouter'") {
+		t.Fatalf("expected override provider in output, got %q", got)
+	}
+	if !strings.Contains(got, "[costs]") {
+		t.Fatalf("expected defaults section costs in output, got %q", got)
 	}
 }

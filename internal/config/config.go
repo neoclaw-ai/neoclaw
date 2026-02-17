@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -169,6 +170,40 @@ func Load() (*Config, error) {
 	cfg.Security.Workspace = cfg.WorkspaceDir()
 
 	return &cfg, nil
+}
+
+// Write writes the merged configuration (defaults overlaid by user
+// config) to w in TOML format.
+func Write(w io.Writer) error {
+	if w == nil {
+		return errors.New("writer is required")
+	}
+
+	dataDir, err := HomeDir()
+	if err != nil {
+		return err
+	}
+
+	v := viper.New()
+	setDefaults(v, dataDir)
+	v.SetConfigFile(filepath.Join(dataDir, "config.toml"))
+	v.SetConfigType("toml")
+
+	if err := v.ReadInConfig(); err != nil {
+		var notFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &notFound) && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("read config file: %w", err)
+		}
+	}
+
+	// Keep duration fields human-readable in generated TOML.
+	v.Set("security.command_timeout", v.GetDuration("security.command_timeout").String())
+	v.Set("costs.circuit_breaker_window", v.GetDuration("costs.circuit_breaker_window").String())
+
+	if err := v.WriteConfigTo(w); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+	return nil
 }
 
 func setDefaults(v *viper.Viper, dataDir string) {
