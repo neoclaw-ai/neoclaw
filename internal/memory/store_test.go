@@ -31,6 +31,26 @@ func TestAppendFactCreatesSections(t *testing.T) {
 	}
 }
 
+func TestAppendFactAllowsCustomSections(t *testing.T) {
+	store := New(t.TempDir())
+
+	if err := store.AppendFact("Projects", "Beta launch in March"); err != nil {
+		t.Fatalf("append custom section fact: %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(store.dir, "memory.md"))
+	if err != nil {
+		t.Fatalf("read memory file: %v", err)
+	}
+	content := string(raw)
+	if !strings.Contains(content, "## Projects") {
+		t.Fatalf("expected custom section header, got %q", content)
+	}
+	if !strings.Contains(content, "- Beta launch in March") {
+		t.Fatalf("expected custom section fact, got %q", content)
+	}
+}
+
 func TestAppendFactDeduplicates(t *testing.T) {
 	store := New(t.TempDir())
 	if err := store.AppendFact("User", "Name: Alex"); err != nil {

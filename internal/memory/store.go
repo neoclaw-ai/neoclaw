@@ -15,13 +15,6 @@ const (
 	dailyDirName   = "daily"
 )
 
-var allowedMemorySections = map[string]struct{}{
-	"User":        {},
-	"Preferences": {},
-	"People":      {},
-	"Ongoing":     {},
-}
-
 // Store manages long-term memory and daily log files.
 type Store struct {
 	dir string
@@ -41,12 +34,9 @@ func (s *Store) ReadMemory() (string, error) {
 	return readOrInitializeMemory(path)
 }
 
-// AppendFact adds a fact to a section in memory.md. Sections: User, Preferences, People, Ongoing.
+// AppendFact adds a fact to a section in memory.md.
 // No-op if the fact already exists in that section.
 func (s *Store) AppendFact(section, fact string) error {
-	if _, ok := allowedMemorySections[section]; !ok {
-		return fmt.Errorf("invalid section %q", section)
-	}
 	section = strings.TrimSpace(section)
 	fact = strings.TrimSpace(fact)
 	if section == "" {

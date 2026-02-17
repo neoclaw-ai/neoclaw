@@ -71,7 +71,7 @@ func (t MemoryAppendTool) Schema() map[string]any {
 		"properties": map[string]any{
 			"section": map[string]any{
 				"type":        "string",
-				"description": "One of: User, Preferences, People, Ongoing",
+				"description": "Examples: User, Preferences, People, Ongoing",
 			},
 			"fact": map[string]any{
 				"type":        "string",
