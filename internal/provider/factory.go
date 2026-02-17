@@ -7,13 +7,11 @@ import (
 	"github.com/machinae/betterclaw/internal/config"
 )
 
-const defaultMaxTokens = 8192
-
-func normalizeMaxTokens(v int) int {
-	if v <= 0 {
-		return defaultMaxTokens
+func resolveMaxTokens(requestMaxTokens, configuredMaxTokens int) int {
+	if requestMaxTokens > 0 {
+		return requestMaxTokens
 	}
-	return v
+	return configuredMaxTokens
 }
 
 // NewProviderFromConfig builds an LLM provider from the selected LLM profile.

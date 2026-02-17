@@ -47,7 +47,7 @@ func TestAnthropicProviderChat_RequestAndResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := newAnthropicProviderForTest("test-key", "claude-sonnet-4-5", srv.URL, srv.Client())
+	p, err := newAnthropicProviderForTest("test-key", "claude-sonnet-4-5", 8192, srv.URL, srv.Client())
 	if err != nil {
 		t.Fatalf("new provider: %v", err)
 	}

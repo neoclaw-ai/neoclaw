@@ -10,6 +10,7 @@ import (
 
 	"github.com/machinae/betterclaw/internal/approval"
 	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/session"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
@@ -20,12 +21,16 @@ const DefaultSystemPrompt = "You are BetterClaw, a lightweight personal AI assis
 
 // Agent implements the runtime Handler for one conversation.
 type Agent struct {
-	provider     providerapi.Provider
-	registry     *tools.Registry
-	approver     approval.Approver
-	systemPrompt string
-	maxIter      int
-	history      []providerapi.ChatMessage
+	provider          providerapi.Provider
+	registry          *tools.Registry
+	approver          approval.Approver
+	systemPrompt      string
+	maxIter           int
+	maxContextTokens  int
+	recentMessages    int
+	history           []providerapi.ChatMessage
+	sessionStore      *session.Store
+	historyLoadedOnce bool
 }
 
 // New creates a conversation-scoped Agent.
@@ -42,6 +47,23 @@ func New(provider providerapi.Provider, registry *tools.Registry, approver appro
 	}
 }
 
+// NewWithSession creates a conversation-scoped Agent with session persistence.
+func NewWithSession(
+	provider providerapi.Provider,
+	registry *tools.Registry,
+	approver approval.Approver,
+	systemPrompt string,
+	sessionStore *session.Store,
+	maxContextTokens int,
+	recentMessages int,
+) *Agent {
+	ag := New(provider, registry, approver, systemPrompt)
+	ag.sessionStore = sessionStore
+	ag.maxContextTokens = maxContextTokens
+	ag.recentMessages = recentMessages
+	return ag
+}
+
 // HandleMessage processes one inbound message and writes the assistant response.
 func (a *Agent) HandleMessage(ctx context.Context, w runtimeapi.ResponseWriter, msg *runtimeapi.Message) error {
 	if w == nil {
@@ -53,8 +75,24 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtimeapi.ResponseWriter, 
 	if strings.TrimSpace(msg.Text) == "" {
 		return nil
 	}
+	if err := a.ensureHistoryLoaded(ctx); err != nil {
+		return err
+	}
 
-	messages := appendUserMessage(a.history, msg.Text)
+	if isResetCommand(msg.Text) {
+		if err := a.resetSession(ctx); err != nil {
+			return err
+		}
+		return w.WriteMessage(ctx, "Session cleared.")
+	}
+
+	baseHistory := append([]providerapi.ChatMessage{}, a.history...)
+	messages := appendUserMessage(baseHistory, msg.Text)
+	uncompactedMessages := append([]providerapi.ChatMessage{}, messages...)
+	messages, err := a.compactHistoryIfNeeded(ctx, messages)
+	if err != nil {
+		return err
+	}
 	resp, history, err := Run(
 		ctx,
 		a.provider,
@@ -74,6 +112,14 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtimeapi.ResponseWriter, 
 	}
 
 	a.history = history
+	if sameMessageSlice(messages, uncompactedMessages) {
+		err = a.appendSessionDelta(ctx, baseHistory, history)
+	} else {
+		err = a.rewriteSessionIfNeeded(ctx, history)
+	}
+	if err != nil {
+		return err
+	}
 	if err := w.WriteMessage(ctx, resp.Content); err != nil {
 		return err
 	}

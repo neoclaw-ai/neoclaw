@@ -17,6 +17,7 @@ const defaultOpenRouterURL = "https://openrouter.ai/api/v1/chat/completions"
 type openRouterProvider struct {
 	apiKey     string
 	model      string
+	maxTokens  int
 	endpoint   string
 	httpClient *http.Client
 }
@@ -31,12 +32,13 @@ func newOpenRouterProvider(cfg config.LLMProviderConfig) (Provider, error) {
 	return &openRouterProvider{
 		apiKey:     cfg.APIKey,
 		model:      cfg.Model,
+		maxTokens:  cfg.MaxTokens,
 		endpoint:   defaultOpenRouterURL,
 		httpClient: http.DefaultClient,
 	}, nil
 }
 
-func newOpenRouterProviderForTest(apiKey, model, endpoint string, httpClient *http.Client) (Provider, error) {
+func newOpenRouterProviderForTest(apiKey, model string, maxTokens int, endpoint string, httpClient *http.Client) (Provider, error) {
 	if strings.TrimSpace(apiKey) == "" {
 		return nil, fmt.Errorf("openrouter api key is required")
 	}
@@ -52,6 +54,7 @@ func newOpenRouterProviderForTest(apiKey, model, endpoint string, httpClient *ht
 	return &openRouterProvider{
 		apiKey:     apiKey,
 		model:      model,
+		maxTokens:  maxTokens,
 		endpoint:   endpoint,
 		httpClient: httpClient,
 	}, nil
@@ -62,7 +65,7 @@ func (p *openRouterProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRe
 	payload := openRouterRequest{
 		Model:     p.model,
 		Messages:  toOpenRouterMessages(req.Messages),
-		MaxTokens: normalizeMaxTokens(req.MaxTokens),
+		MaxTokens: resolveMaxTokens(req.MaxTokens, p.maxTokens),
 	}
 	if req.SystemPrompt != "" {
 		payload.Messages = append([]openRouterMessage{{

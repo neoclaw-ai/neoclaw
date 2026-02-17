@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-const defaultCommandTimeout = 5 * time.Minute
-
 // RunCommandTool executes shell commands within the configured workspace.
 type RunCommandTool struct {
 	WorkspaceDir    string
@@ -108,7 +106,7 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 
 	timeout := t.Timeout
 	if timeout <= 0 {
-		timeout = defaultCommandTimeout
+		return nil, errors.New("command timeout must be greater than zero")
 	}
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

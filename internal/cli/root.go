@@ -19,6 +19,7 @@ import (
 	"github.com/machinae/betterclaw/internal/memory"
 	providerapi "github.com/machinae/betterclaw/internal/provider"
 	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
+	"github.com/machinae/betterclaw/internal/session"
 	"github.com/machinae/betterclaw/internal/tools"
 	"github.com/spf13/cobra"
 )
@@ -142,6 +143,9 @@ func newPromptCmd() *cobra.Command {
 			}
 
 			if strings.TrimSpace(prompt) != "" {
+				if strings.HasPrefix(strings.TrimSpace(prompt), "/") {
+					return fmt.Errorf("slash commands are not supported in one-shot -p mode")
+				}
 				approver := approval.NewCLIApprover(cmd.InOrStdin(), cmd.OutOrStdout())
 				handler := agent.New(modelProvider, registry, approver, systemPrompt)
 				writer := &singleShotWriter{out: cmd.OutOrStdout()}
@@ -149,7 +153,16 @@ func newPromptCmd() *cobra.Command {
 			}
 
 			listener := channels.NewCLI(cmd.InOrStdin(), cmd.OutOrStdout())
-			handler := agent.New(modelProvider, registry, listener, systemPrompt)
+			sessionStore := session.New(filepath.Join(cfg.AgentDir(), "sessions", "cli", "default.jsonl"))
+			handler := agent.NewWithSession(
+				modelProvider,
+				registry,
+				listener,
+				systemPrompt,
+				sessionStore,
+				cfg.Costs.MaxContextTokens,
+				cfg.Costs.RecentMessages,
+			)
 			return listener.Listen(cmd.Context(), handler)
 		},
 	}

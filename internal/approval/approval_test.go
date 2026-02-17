@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/machinae/betterclaw/internal/tools"
 )
@@ -80,6 +81,7 @@ func TestExecuteTool_ArgResolvedAutoApproveSkipsPrompt(t *testing.T) {
 	tool := tools.RunCommandTool{
 		WorkspaceDir:    workspace,
 		AllowedBinsPath: allowedPath,
+		Timeout:         5 * time.Minute,
 	}
 
 	res, err := ExecuteTool(context.Background(), nil, tool, map[string]any{"command": "pwd"}, "Run: pwd")
@@ -114,6 +116,7 @@ func TestExecuteTool_RunCommandNonAllowlistedRequiresApprover(t *testing.T) {
 	tool := tools.RunCommandTool{
 		WorkspaceDir:    workspace,
 		AllowedBinsPath: allowedPath,
+		Timeout:         5 * time.Minute,
 	}
 
 	_, err := ExecuteTool(context.Background(), nil, tool, map[string]any{"command": "echo hello"}, "Run: echo hello")
@@ -132,6 +135,7 @@ func TestExecuteTool_AlwaysApprovedPersistsRunCommandBinary(t *testing.T) {
 	tool := tools.RunCommandTool{
 		WorkspaceDir:    workspace,
 		AllowedBinsPath: allowedPath,
+		Timeout:         5 * time.Minute,
 	}
 	appr := &fakeApprover{decision: AlwaysApproved}
 

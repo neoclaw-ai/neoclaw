@@ -16,15 +16,13 @@ const defaultAgent = "default"
 
 const (
 	// SecurityModeStandard is the default sandbox/security behavior.
-	SecurityModeStandard         = "standard"
+	SecurityModeStandard = "standard"
 	// SecurityModeDangerFullAccess disables sandbox protections.
 	SecurityModeDangerFullAccess = "danger-full-access"
 	// SecurityModeStrict enables stricter sandbox policy where supported.
-	SecurityModeStrict           = "strict"
-	defaultLLMProfile            = "default"
-	defaultLLMProvider           = "anthropic"
-	defaultLLMModel              = "claude-sonnet-4-5"
-	defaultTelegramChannel       = "telegram"
+	SecurityModeStrict     = "strict"
+	defaultLLMProfile      = "default"
+	defaultTelegramChannel = "telegram"
 )
 
 // Config is the runtime configuration loaded from defaults, config.toml, and env vars.
@@ -49,9 +47,10 @@ type ChannelConfig struct {
 
 // LLMProviderConfig configures one LLM provider profile.
 type LLMProviderConfig struct {
-	APIKey   string `mapstructure:"api_key"`
-	Provider string `mapstructure:"provider"`
-	Model    string `mapstructure:"model"`
+	APIKey    string `mapstructure:"api_key"`
+	Provider  string `mapstructure:"provider"`
+	Model     string `mapstructure:"model"`
+	MaxTokens int    `mapstructure:"max_tokens"`
 }
 
 // SecurityConfig controls command execution and sandbox behavior.
@@ -69,6 +68,8 @@ type CostsConfig struct {
 	MonthlyLimit           float64       `mapstructure:"monthly_limit"`
 	CircuitBreakerMaxCalls int           `mapstructure:"circuit_breaker_max_calls"`
 	CircuitBreakerWindow   time.Duration `mapstructure:"circuit_breaker_window"`
+	MaxContextTokens       int           `mapstructure:"max_context_tokens"`
+	RecentMessages         int           `mapstructure:"recent_messages"`
 }
 
 // WebConfig configures built-in web tool behavior.
@@ -79,6 +80,42 @@ type WebConfig struct {
 // WebSearchConfig configures the web search provider.
 type WebSearchConfig struct {
 	Provider string `mapstructure:"provider"`
+}
+
+var defaultConfig = Config{
+	Channels: map[string]ChannelConfig{
+		defaultTelegramChannel: {
+			Enabled:      true,
+			Token:        "",
+			AllowedUsers: []int64{},
+		},
+	},
+	LLM: map[string]LLMProviderConfig{
+		defaultLLMProfile: {
+			APIKey:    "",
+			Provider:  "anthropic",
+			Model:     "claude-sonnet-4-5",
+			MaxTokens: 8192,
+		},
+	},
+	Security: SecurityConfig{
+		CommandTimeout: 5 * time.Minute,
+		Mode:           SecurityModeStandard,
+	},
+	Costs: CostsConfig{
+		HourlyLimit:            2.0,
+		DailyLimit:             20.0,
+		MonthlyLimit:           100.0,
+		CircuitBreakerMaxCalls: 10,
+		CircuitBreakerWindow:   60 * time.Second,
+		MaxContextTokens:       4000,
+		RecentMessages:         10,
+	},
+	Web: WebConfig{
+		Search: WebSearchConfig{
+			Provider: "brave",
+		},
+	},
 }
 
 // HomeDir returns the BetterClaw home directory.
@@ -135,24 +172,27 @@ func Load() (*Config, error) {
 }
 
 func setDefaults(v *viper.Viper, dataDir string) {
-	v.SetDefault("channels."+defaultTelegramChannel+".enabled", true)
-	v.SetDefault("channels."+defaultTelegramChannel+".token", "")
-	v.SetDefault("channels."+defaultTelegramChannel+".allowed_users", []int64{})
+	v.SetDefault("channels."+defaultTelegramChannel+".enabled", defaultConfig.Channels[defaultTelegramChannel].Enabled)
+	v.SetDefault("channels."+defaultTelegramChannel+".token", defaultConfig.Channels[defaultTelegramChannel].Token)
+	v.SetDefault("channels."+defaultTelegramChannel+".allowed_users", defaultConfig.Channels[defaultTelegramChannel].AllowedUsers)
 
-	v.SetDefault("llm."+defaultLLMProfile+".api_key", "")
-	v.SetDefault("llm."+defaultLLMProfile+".provider", defaultLLMProvider)
-	v.SetDefault("llm."+defaultLLMProfile+".model", defaultLLMModel)
+	v.SetDefault("llm."+defaultLLMProfile+".api_key", defaultConfig.LLM[defaultLLMProfile].APIKey)
+	v.SetDefault("llm."+defaultLLMProfile+".provider", defaultConfig.LLM[defaultLLMProfile].Provider)
+	v.SetDefault("llm."+defaultLLMProfile+".model", defaultConfig.LLM[defaultLLMProfile].Model)
+	v.SetDefault("llm."+defaultLLMProfile+".max_tokens", defaultConfig.LLM[defaultLLMProfile].MaxTokens)
 
-	v.SetDefault("security.command_timeout", "5m")
-	v.SetDefault("security.mode", SecurityModeStandard)
+	v.SetDefault("security.command_timeout", defaultConfig.Security.CommandTimeout)
+	v.SetDefault("security.mode", defaultConfig.Security.Mode)
 
-	v.SetDefault("costs.hourly_limit", 2.0)
-	v.SetDefault("costs.daily_limit", 20.0)
-	v.SetDefault("costs.monthly_limit", 100.0)
-	v.SetDefault("costs.circuit_breaker_max_calls", 10)
-	v.SetDefault("costs.circuit_breaker_window", "60s")
+	v.SetDefault("costs.hourly_limit", defaultConfig.Costs.HourlyLimit)
+	v.SetDefault("costs.daily_limit", defaultConfig.Costs.DailyLimit)
+	v.SetDefault("costs.monthly_limit", defaultConfig.Costs.MonthlyLimit)
+	v.SetDefault("costs.circuit_breaker_max_calls", defaultConfig.Costs.CircuitBreakerMaxCalls)
+	v.SetDefault("costs.circuit_breaker_window", defaultConfig.Costs.CircuitBreakerWindow)
+	v.SetDefault("costs.max_context_tokens", defaultConfig.Costs.MaxContextTokens)
+	v.SetDefault("costs.recent_messages", defaultConfig.Costs.RecentMessages)
 
-	v.SetDefault("web.search.provider", "brave")
+	v.SetDefault("web.search.provider", defaultConfig.Web.Search.Provider)
 }
 
 // AgentDir returns the active agent directory under DataDir.
@@ -170,11 +210,7 @@ func (c *Config) DefaultLLM() LLMProviderConfig {
 	if llm, ok := c.LLM[defaultLLMProfile]; ok {
 		return llm
 	}
-	return LLMProviderConfig{
-		APIKey:   "",
-		Provider: defaultLLMProvider,
-		Model:    defaultLLMModel,
-	}
+	return defaultConfig.LLM[defaultLLMProfile]
 }
 
 // TelegramChannel returns Telegram channel config with fallback defaults.
@@ -182,11 +218,7 @@ func (c *Config) TelegramChannel() ChannelConfig {
 	if ch, ok := c.Channels[defaultTelegramChannel]; ok {
 		return ch
 	}
-	return ChannelConfig{
-		Enabled:      true,
-		Token:        "",
-		AllowedUsers: []int64{},
-	}
+	return defaultConfig.Channels[defaultTelegramChannel]
 }
 
 func validateSecurityMode(mode string) error {

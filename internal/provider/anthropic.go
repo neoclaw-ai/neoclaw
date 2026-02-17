@@ -13,8 +13,9 @@ import (
 )
 
 type anthropicProvider struct {
-	client anthropic.Client
-	model  anthropic.Model
+	client    anthropic.Client
+	model     anthropic.Model
+	maxTokens int
 }
 
 func newAnthropicProvider(cfg config.LLMProviderConfig) (Provider, error) {
@@ -27,12 +28,13 @@ func newAnthropicProvider(cfg config.LLMProviderConfig) (Provider, error) {
 
 	client := anthropic.NewClient(option.WithAPIKey(cfg.APIKey))
 	return &anthropicProvider{
-		client: client,
-		model:  anthropic.Model(cfg.Model),
+		client:    client,
+		model:     anthropic.Model(cfg.Model),
+		maxTokens: cfg.MaxTokens,
 	}, nil
 }
 
-func newAnthropicProviderForTest(apiKey, model, baseURL string, httpClient *http.Client) (Provider, error) {
+func newAnthropicProviderForTest(apiKey, model string, maxTokens int, baseURL string, httpClient *http.Client) (Provider, error) {
 	if strings.TrimSpace(apiKey) == "" {
 		return nil, fmt.Errorf("anthropic api key is required")
 	}
@@ -50,8 +52,9 @@ func newAnthropicProviderForTest(apiKey, model, baseURL string, httpClient *http
 
 	client := anthropic.NewClient(opts...)
 	return &anthropicProvider{
-		client: client,
-		model:  anthropic.Model(model),
+		client:    client,
+		model:     anthropic.Model(model),
+		maxTokens: maxTokens,
 	}, nil
 }
 
@@ -64,7 +67,7 @@ func (p *anthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 
 	body := anthropic.MessageNewParams{
 		Model:     p.model,
-		MaxTokens: int64(normalizeMaxTokens(req.MaxTokens)),
+		MaxTokens: int64(resolveMaxTokens(req.MaxTokens, p.maxTokens)),
 		Messages:  msgs,
 	}
 

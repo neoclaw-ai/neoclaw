@@ -3,12 +3,14 @@ package agent
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"testing"
 
 	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
 
 	"github.com/machinae/betterclaw/internal/approval"
 	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/session"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
@@ -89,6 +91,149 @@ func TestAgentHandleMessageCanceledContextIsFatal(t *testing.T) {
 	}
 }
 
+func TestAgentWithSessionLoadsHistoryAndAppendsTurn(t *testing.T) {
+	registry := tools.NewRegistry()
+	modelProvider := &recordingProvider{
+		responses: []*providerapi.ChatResponse{{Content: "new response"}},
+	}
+	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
+	sessionStore := session.New(sessionPath)
+	if err := sessionStore.Append(context.Background(), []providerapi.ChatMessage{
+		{Role: providerapi.RoleUser, Content: "old user"},
+		{Role: providerapi.RoleAssistant, Content: "old assistant"},
+	}); err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, 4000, 10)
+	writer := &captureWriter{}
+
+	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "next"}); err != nil {
+		t.Fatalf("handle message: %v", err)
+	}
+	if len(modelProvider.requests) != 1 {
+		t.Fatalf("expected one provider request, got %d", len(modelProvider.requests))
+	}
+	if got := len(modelProvider.requests[0].Messages); got != 3 {
+		t.Fatalf("expected loaded history + new user (3 messages), got %d", got)
+	}
+
+	loaded, err := sessionStore.Load(context.Background())
+	if err != nil {
+		t.Fatalf("load session: %v", err)
+	}
+	if len(loaded) != 4 {
+		t.Fatalf("expected 4 persisted messages, got %d", len(loaded))
+	}
+	if loaded[2].Role != providerapi.RoleUser || loaded[2].Content != "next" {
+		t.Fatalf("expected persisted user message, got %#v", loaded[2])
+	}
+	if loaded[3].Role != providerapi.RoleAssistant || loaded[3].Content != "new response" {
+		t.Fatalf("expected persisted assistant message, got %#v", loaded[3])
+	}
+}
+
+func TestAgentHandleMessageNewResetsSession(t *testing.T) {
+	registry := tools.NewRegistry()
+	modelProvider := &recordingProvider{
+		responses: []*providerapi.ChatResponse{{Content: "after reset"}},
+	}
+	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
+	sessionStore := session.New(sessionPath)
+	if err := sessionStore.Append(context.Background(), []providerapi.ChatMessage{
+		{Role: providerapi.RoleUser, Content: "old user"},
+		{Role: providerapi.RoleAssistant, Content: "old assistant"},
+	}); err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, 4000, 10)
+	writer := &captureWriter{}
+
+	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "/new"}); err != nil {
+		t.Fatalf("handle /new: %v", err)
+	}
+	if len(modelProvider.requests) != 0 {
+		t.Fatalf("expected no provider call for /new")
+	}
+	if len(writer.messages) != 1 || writer.messages[0] != "Session cleared." {
+		t.Fatalf("expected session cleared response, got %#v", writer.messages)
+	}
+
+	loaded, err := sessionStore.Load(context.Background())
+	if err != nil {
+		t.Fatalf("load session: %v", err)
+	}
+	if len(loaded) != 0 {
+		t.Fatalf("expected empty session after /new, got %#v", loaded)
+	}
+
+	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "fresh"}); err != nil {
+		t.Fatalf("handle post-reset message: %v", err)
+	}
+	if len(modelProvider.requests) != 1 {
+		t.Fatalf("expected one provider request after reset, got %d", len(modelProvider.requests))
+	}
+	if got := len(modelProvider.requests[0].Messages); got != 1 {
+		t.Fatalf("expected only fresh user message after reset, got %d", got)
+	}
+}
+
+func TestCompactHistoryIfNeededAddsSummaryMessage(t *testing.T) {
+	modelProvider := &recordingProvider{
+		responses: []*providerapi.ChatResponse{{Content: "summary output"}},
+	}
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, DefaultSystemPrompt)
+	ag.maxContextTokens = 10
+	ag.recentMessages = 2
+	messages := []providerapi.ChatMessage{
+		{Role: providerapi.RoleUser, Content: "1111111111"},
+		{Role: providerapi.RoleAssistant, Content: "2222222222"},
+		{Role: providerapi.RoleUser, Content: "3333333333"},
+		{Role: providerapi.RoleAssistant, Content: "4444444444"},
+	}
+
+	compacted, err := ag.compactHistoryIfNeeded(context.Background(), messages)
+	if err != nil {
+		t.Fatalf("compact history: %v", err)
+	}
+	if len(compacted) != 3 {
+		t.Fatalf("expected summary + 2 recent messages, got %d", len(compacted))
+	}
+	if compacted[0].Kind != summaryKind || compacted[0].Role != providerapi.RoleAssistant || compacted[0].Content != "summary output" {
+		t.Fatalf("expected summary message, got %#v", compacted[0])
+	}
+	if len(modelProvider.requests) != 1 {
+		t.Fatalf("expected one summary provider request, got %d", len(modelProvider.requests))
+	}
+}
+
+func TestCompactHistoryIfNeededFallbackRecentOnlyOnSummaryFailure(t *testing.T) {
+	modelProvider := &recordingProvider{
+		errs: []error{errors.New("summary failed")},
+	}
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, DefaultSystemPrompt)
+	ag.maxContextTokens = 10
+	ag.recentMessages = 2
+	messages := []providerapi.ChatMessage{
+		{Role: providerapi.RoleUser, Content: "1111111111"},
+		{Role: providerapi.RoleAssistant, Content: "2222222222"},
+		{Role: providerapi.RoleUser, Content: "3333333333"},
+		{Role: providerapi.RoleAssistant, Content: "4444444444"},
+	}
+
+	compacted, err := ag.compactHistoryIfNeeded(context.Background(), messages)
+	if err != nil {
+		t.Fatalf("compact history: %v", err)
+	}
+	if len(compacted) != 2 {
+		t.Fatalf("expected recent-only fallback of 2 messages, got %d", len(compacted))
+	}
+	if compacted[0].Content != "3333333333" || compacted[1].Content != "4444444444" {
+		t.Fatalf("unexpected recent-only fallback messages: %#v", compacted)
+	}
+}
+
 type noopApprover struct{}
 
 func (noopApprover) RequestApproval(context.Context, approval.ApprovalRequest) (approval.ApprovalDecision, error) {
@@ -108,6 +253,7 @@ type recordingProvider struct {
 	requests           []providerapi.ChatRequest
 	responses          []*providerapi.ChatResponse
 	err                error
+	errs               []error
 	requireLiveContext bool
 }
 
@@ -118,6 +264,13 @@ func (p *recordingProvider) Chat(ctx context.Context, req providerapi.ChatReques
 	}
 	if p.err != nil {
 		return nil, p.err
+	}
+	if len(p.errs) > 0 {
+		err := p.errs[0]
+		p.errs = p.errs[1:]
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(p.responses) == 0 {
 		return &providerapi.ChatResponse{Content: ""}, nil

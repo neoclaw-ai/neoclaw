@@ -47,7 +47,7 @@ func TestOpenRouterProviderChat_RequestAndResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := newOpenRouterProviderForTest("test-key", "deepseek/deepseek-chat", srv.URL+"/api/v1/chat/completions", srv.Client())
+	p, err := newOpenRouterProviderForTest("test-key", "deepseek/deepseek-chat", 8192, srv.URL+"/api/v1/chat/completions", srv.Client())
 	if err != nil {
 		t.Fatalf("new provider: %v", err)
 	}

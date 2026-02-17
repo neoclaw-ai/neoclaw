@@ -21,6 +21,9 @@ const (
 
 // ChatMessage is a single message in model conversation history.
 type ChatMessage struct {
+	// Kind is optional metadata for local persistence/processing (e.g. "summary").
+	// Providers ignore this field when constructing API requests.
+	Kind       string
 	Role       Role
 	Content    string
 	ToolCallID string

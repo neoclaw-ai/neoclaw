@@ -21,6 +21,7 @@ func TestRunCommand_NonAllowlistedBinaryStillExecutes(t *testing.T) {
 	tool := RunCommandTool{
 		WorkspaceDir:    workspace,
 		AllowedBinsPath: allowedPath,
+		Timeout:         5 * time.Minute,
 	}
 	res, err := tool.Execute(context.Background(), map[string]any{"command": "pwd"})
 	if err != nil {
@@ -41,6 +42,7 @@ func TestRunCommand_AllowedBinaryOK(t *testing.T) {
 	tool := RunCommandTool{
 		WorkspaceDir:    workspace,
 		AllowedBinsPath: allowedPath,
+		Timeout:         5 * time.Minute,
 	}
 	res, err := tool.Execute(context.Background(), map[string]any{"command": "echo hello"})
 	if err != nil {
@@ -85,6 +87,7 @@ func TestRunCommand_CombinedOutputOnFailure(t *testing.T) {
 	tool := RunCommandTool{
 		WorkspaceDir:    workspace,
 		AllowedBinsPath: allowedPath,
+		Timeout:         5 * time.Minute,
 	}
 	res, err := tool.Execute(context.Background(), map[string]any{"command": "bash -lc 'echo out; echo err 1>&2; exit 7'"})
 	if err != nil {
@@ -111,6 +114,7 @@ func TestRunCommand_TruncationMetadata(t *testing.T) {
 	tool := RunCommandTool{
 		WorkspaceDir:    workspace,
 		AllowedBinsPath: allowedPath,
+		Timeout:         5 * time.Minute,
 	}
 	res, err := tool.Execute(context.Background(), map[string]any{
 		"command": "bash -lc 'head -c 2101 /dev/zero | tr \"\\000\" a'",
@@ -136,6 +140,7 @@ func TestRunCommand_RequiresApprovalForArgs(t *testing.T) {
 	tool := RunCommandTool{
 		WorkspaceDir:    workspace,
 		AllowedBinsPath: allowedPath,
+		Timeout:         5 * time.Minute,
 	}
 
 	requiresApproval, err := tool.RequiresApprovalForArgs(map[string]any{"command": "pwd"})

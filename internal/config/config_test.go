@@ -100,17 +100,26 @@ func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
 		t.Fatalf("expected data dir %q, got %q", dataDir, cfg.DataDir)
 	}
 	llm := cfg.DefaultLLM()
-	if llm.Provider != defaultLLMProvider {
-		t.Fatalf("expected default provider %q, got %q", defaultLLMProvider, llm.Provider)
+	if llm.Provider != defaultConfig.LLM[defaultLLMProfile].Provider {
+		t.Fatalf("expected default provider %q, got %q", defaultConfig.LLM[defaultLLMProfile].Provider, llm.Provider)
 	}
-	if llm.Model != defaultLLMModel {
-		t.Fatalf("expected default model %q, got %q", defaultLLMModel, llm.Model)
+	if llm.Model != defaultConfig.LLM[defaultLLMProfile].Model {
+		t.Fatalf("expected default model %q, got %q", defaultConfig.LLM[defaultLLMProfile].Model, llm.Model)
+	}
+	if llm.MaxTokens != defaultConfig.LLM[defaultLLMProfile].MaxTokens {
+		t.Fatalf("expected default max tokens %d, got %d", defaultConfig.LLM[defaultLLMProfile].MaxTokens, llm.MaxTokens)
 	}
 	if cfg.Security.CommandTimeout != 5*time.Minute {
 		t.Fatalf("expected default timeout 5m, got %v", cfg.Security.CommandTimeout)
 	}
 	if cfg.Security.Mode != SecurityModeStandard {
 		t.Fatalf("expected default security mode %q, got %q", SecurityModeStandard, cfg.Security.Mode)
+	}
+	if cfg.Costs.MaxContextTokens != defaultConfig.Costs.MaxContextTokens {
+		t.Fatalf("expected default context max tokens %d, got %d", defaultConfig.Costs.MaxContextTokens, cfg.Costs.MaxContextTokens)
+	}
+	if cfg.Costs.RecentMessages != defaultConfig.Costs.RecentMessages {
+		t.Fatalf("expected default recent messages %d, got %d", defaultConfig.Costs.RecentMessages, cfg.Costs.RecentMessages)
 	}
 	expectedWorkspace := filepath.Join(dataDir, "agents", defaultAgent, "workspace")
 	if cfg.Security.Workspace != expectedWorkspace {

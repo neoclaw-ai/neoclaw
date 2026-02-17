@@ -94,6 +94,26 @@ func TestPromptInteractiveMode(t *testing.T) {
 	}
 }
 
+func TestPromptOneShotRejectsSlashCommands(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	t.Setenv("BETTERCLAW_HOME", dataDir)
+	writeValidConfig(t, dataDir)
+
+	cmd := NewRootCmd()
+	out := &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	cmd.SetArgs([]string{"prompt", "-p", "/new"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected slash command rejection in one-shot mode")
+	}
+	if !strings.Contains(err.Error(), "slash commands are not supported in one-shot -p mode") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestServeLoadsDefaultsAndBootstraps(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
 	t.Setenv("BETTERCLAW_HOME", dataDir)
