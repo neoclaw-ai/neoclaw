@@ -113,9 +113,9 @@ func TestServeLoadsDefaultsAndBootstraps(t *testing.T) {
 		t.Fatalf("expected serve output to include startup message, got %q", out.String())
 	}
 
-	agentFile := filepath.Join(dataDir, "agents", "default", "AGENT.md")
-	if _, err := os.Stat(agentFile); err != nil {
-		t.Fatalf("expected bootstrap file %q to exist: %v", agentFile, err)
+	soulFile := filepath.Join(dataDir, "agents", "default", "SOUL.md")
+	if _, err := os.Stat(soulFile); err != nil {
+		t.Fatalf("expected bootstrap file %q to exist: %v", soulFile, err)
 	}
 }
 

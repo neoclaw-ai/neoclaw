@@ -26,11 +26,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		filepath.Join(dataDir, "allowed_domains.json"),
 		filepath.Join(dataDir, "allowed_bins.json"),
 		filepath.Join(dataDir, "costs.jsonl"),
-		filepath.Join(dataDir, "agents", "default", "AGENT.md"),
 		filepath.Join(dataDir, "agents", "default", "SOUL.md"),
-		filepath.Join(dataDir, "agents", "default", "USER.md"),
-		filepath.Join(dataDir, "agents", "default", "IDENTITY.md"),
-		filepath.Join(dataDir, "agents", "default", "TOOLS.md"),
 		filepath.Join(dataDir, "agents", "default", "jobs.json"),
 		filepath.Join(dataDir, "agents", "default", "memory", "memory.md"),
 		filepath.Join(dataDir, "agents", "default", "sessions", "cli", "default.jsonl"),
@@ -41,6 +37,16 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("expected %q to exist: %v", path, err)
 		}
+	}
+
+	soulPath := filepath.Join(dataDir, "agents", "default", "SOUL.md")
+	soulRaw, err := os.ReadFile(soulPath)
+	if err != nil {
+		t.Fatalf("read SOUL.md: %v", err)
+	}
+	soul := string(soulRaw)
+	if !strings.Contains(soul, "## Persona") || !strings.Contains(soul, "## User") || !strings.Contains(soul, "## Preferences") {
+		t.Fatalf("expected SOUL.md template sections, got %q", soul)
 	}
 
 	domainsPath := filepath.Join(dataDir, "allowed_domains.json")

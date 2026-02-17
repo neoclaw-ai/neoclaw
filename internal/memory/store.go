@@ -214,27 +214,17 @@ func (s *Store) SearchLogs(now time.Time, query string, daysBack int) (string, e
 	return strings.TrimSpace(out.String()), nil
 }
 
-// LoadContext returns memory.md contents and today's daily log for system prompt injection.
-func (s *Store) LoadContext(now time.Time) (memoryText string, dailyText string, err error) {
+// LoadContext returns memory.md contents for system prompt injection.
+func (s *Store) LoadContext() (memoryText string, err error) {
 	memoryPath, err := s.memoryPath()
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	memoryText, err = readOptionalFile(memoryPath)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-
-	dailyDir, err := s.dailyDirPath()
-	if err != nil {
-		return "", "", err
-	}
-	dailyPath := filepath.Join(dailyDir, now.Format("2006-01-02")+".md")
-	dailyText, err = readOptionalFile(dailyPath)
-	if err != nil {
-		return "", "", err
-	}
-	return memoryText, dailyText, nil
+	return memoryText, nil
 }
 
 // OptionalIntArg parses an optional integer argument from a tool args map.

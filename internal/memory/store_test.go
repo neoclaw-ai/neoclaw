@@ -126,7 +126,7 @@ func TestSearchLogsAcrossMultipleDays(t *testing.T) {
 	}
 }
 
-func TestLoadContextReturnsMemoryAndDaily(t *testing.T) {
+func TestLoadContextReturnsMemoryOnly(t *testing.T) {
 	store := New(t.TempDir())
 	dailyDir := filepath.Join(store.dir, "daily")
 	if err := os.MkdirAll(dailyDir, 0o755); err != nil {
@@ -134,22 +134,18 @@ func TestLoadContextReturnsMemoryAndDaily(t *testing.T) {
 	}
 
 	memoryText := "# Memory\n\n## Preferences\n- Vegetarian\n"
-	dailyText := "# 2026-02-17\n\n- 09:00:00: API migration work\n"
 	if err := os.WriteFile(filepath.Join(store.dir, "memory.md"), []byte(memoryText), 0o644); err != nil {
 		t.Fatalf("write memory: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dailyDir, "2026-02-17.md"), []byte(dailyText), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dailyDir, "2026-02-17.md"), []byte("# 2026-02-17\n\n- 09:00:00: API migration work\n"), 0o644); err != nil {
 		t.Fatalf("write daily: %v", err)
 	}
 
-	mem, daily, err := store.LoadContext(time.Date(2026, 2, 17, 12, 0, 0, 0, time.Local))
+	mem, err := store.LoadContext()
 	if err != nil {
 		t.Fatalf("load context: %v", err)
 	}
 	if mem != memoryText {
 		t.Fatalf("expected memory text %q, got %q", memoryText, mem)
-	}
-	if daily != dailyText {
-		t.Fatalf("expected daily text %q, got %q", dailyText, daily)
 	}
 }

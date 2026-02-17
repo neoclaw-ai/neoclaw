@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/machinae/betterclaw/internal/agent"
 	"github.com/machinae/betterclaw/internal/approval"
@@ -137,7 +136,7 @@ func newPromptCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			systemPrompt, err := buildSystemPrompt(memoryStore, time.Now())
+			systemPrompt, err := agent.BuildSystemPrompt(cfg.AgentDir(), memoryStore)
 			if err != nil {
 				return err
 			}

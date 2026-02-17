@@ -68,11 +68,7 @@ func Initialize(cfg *config.Config) error {
 		{path: filepath.Join(cfg.DataDir, "allowed_bins.json"), content: defaultAllowedBinsJSON()},
 		{path: filepath.Join(cfg.DataDir, "costs.jsonl"), content: ""},
 
-		{path: filepath.Join(agentDir, "AGENT.md"), content: "# AGENT\n"},
-		{path: filepath.Join(agentDir, "SOUL.md"), content: "# SOUL\n"},
-		{path: filepath.Join(agentDir, "USER.md"), content: "# USER\n"},
-		{path: filepath.Join(agentDir, "IDENTITY.md"), content: "# IDENTITY\n"},
-		{path: filepath.Join(agentDir, "TOOLS.md"), content: "# TOOLS\n"},
+		{path: filepath.Join(agentDir, "SOUL.md"), content: defaultSoulMarkdown()},
 		{path: filepath.Join(agentDir, "jobs.json"), content: "[]\n"},
 		{path: filepath.Join(agentDir, "memory", "memory.md"), content: "# Memory\n"},
 		{path: filepath.Join(agentDir, "sessions", "cli", "default.jsonl"), content: ""},
@@ -128,5 +124,23 @@ model = "claude-sonnet-4-5"
 enabled = true
 token = ""
 allowed_users = []
+`
+}
+
+func defaultSoulMarkdown() string {
+	return `# Soul
+
+## Persona
+You are a helpful personal assistant.
+
+## User
+
+
+## Preferences
+
+
+## Tool Conventions
+- Use tools when they improve accuracy.
+- Keep outputs concise and actionable.
 `
 }
