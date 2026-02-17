@@ -14,20 +14,24 @@ import (
 
 const defaultCommandTimeout = 5 * time.Minute
 
+// RunCommandTool executes shell commands within the configured workspace.
 type RunCommandTool struct {
 	WorkspaceDir    string
 	AllowedBinsPath string
 	Timeout         time.Duration
 }
 
+// Name returns the tool name.
 func (t RunCommandTool) Name() string {
 	return "run_command"
 }
 
+// Description returns the tool description for the model.
 func (t RunCommandTool) Description() string {
 	return "Run a shell command"
 }
 
+// Schema returns the JSON schema for run_command args.
 func (t RunCommandTool) Schema() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -45,6 +49,7 @@ func (t RunCommandTool) Schema() map[string]any {
 	}
 }
 
+// Permission declares default permission behavior for this tool.
 func (t RunCommandTool) Permission() Permission {
 	return RequiresApproval
 }
@@ -68,6 +73,7 @@ func (t RunCommandTool) RequiresApprovalForArgs(args map[string]any) (bool, erro
 	return true, nil
 }
 
+// Execute runs the command and returns combined output, appending exit code on failures.
 func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*ToolResult, error) {
 	command, workdir, err := t.validateArgs(args)
 	if err != nil {
@@ -157,6 +163,7 @@ func firstCommandToken(command string) (string, error) {
 	}
 
 	for _, token := range fields {
+		// Allow leading VAR=value prefixes and return the first actual command token.
 		if isEnvAssignment(token) {
 			continue
 		}
@@ -189,6 +196,8 @@ func isAllowedBinary(allowedBinsPath, bin string) bool {
 		return false
 	}
 
+	// Load on each check so edits to allowed_bins.json take effect immediately
+	// without restarting the process.
 	raw, err := os.ReadFile(allowedBinsPath)
 	if err != nil {
 		return false

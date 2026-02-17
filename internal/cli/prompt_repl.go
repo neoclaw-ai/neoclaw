@@ -60,6 +60,7 @@ func newPromptRunner(cfg *config.Config, provider llm.Provider, approver approva
 	}, nil
 }
 
+// Send appends a user prompt, runs one agent turn, and stores updated history.
 func (r *promptRunner) Send(ctx context.Context, prompt string) (string, error) {
 	messages := append(append([]llm.ChatMessage{}, r.history...), llm.ChatMessage{
 		Role:    llm.RoleUser,
@@ -123,6 +124,7 @@ func newReadlinePromptChannel(in io.Reader, out io.Writer) (*readlinePromptChann
 	return &readlinePromptChannel{rl: rl, out: out}, nil
 }
 
+// Read reads one input line from readline-backed interactive mode.
 func (c *readlinePromptChannel) Read(_ context.Context) (string, error) {
 	line, err := c.rl.Readline()
 	if err != nil {
@@ -134,16 +136,19 @@ func (c *readlinePromptChannel) Read(_ context.Context) (string, error) {
 	return line, nil
 }
 
+// Write emits assistant text for readline-backed interactive mode.
 func (c *readlinePromptChannel) Write(_ context.Context, text string) error {
 	_, err := fmt.Fprintf(c.out, "assistant> %s\n\n", text)
 	return err
 }
 
+// WriteMeta emits informational text for readline-backed interactive mode.
 func (c *readlinePromptChannel) WriteMeta(_ context.Context, text string) error {
 	_, err := fmt.Fprintf(c.out, "%s\n", text)
 	return err
 }
 
+// Close releases readline resources.
 func (c *readlinePromptChannel) Close() error {
 	return c.rl.Close()
 }
@@ -162,6 +167,7 @@ func newStdioPromptChannel(in *bufio.Reader, out io.Writer) *stdioPromptChannel 
 	}
 }
 
+// Read reads one input line from stdio fallback mode.
 func (c *stdioPromptChannel) Read(_ context.Context) (string, error) {
 	if _, err := fmt.Fprint(c.out, c.prompt); err != nil {
 		return "", err
@@ -176,11 +182,13 @@ func (c *stdioPromptChannel) Read(_ context.Context) (string, error) {
 	return line, nil
 }
 
+// Write emits assistant text for stdio fallback mode.
 func (c *stdioPromptChannel) Write(_ context.Context, text string) error {
 	_, err := fmt.Fprintf(c.out, "assistant> %s\n\n", text)
 	return err
 }
 
+// WriteMeta emits informational text for stdio fallback mode.
 func (c *stdioPromptChannel) WriteMeta(_ context.Context, text string) error {
 	_, err := fmt.Fprintf(c.out, "%s\n", text)
 	return err
@@ -193,6 +201,8 @@ func runPromptREPL(ctx context.Context, runner *promptRunner, in io.Reader, fall
 		channel = readlineChannel
 	}
 	if channel == nil {
+		// Fall back to plain stdio when a TTY/readline is unavailable
+		// (for example in tests or piped input environments).
 		channel = newStdioPromptChannel(fallbackReader, out)
 	}
 	if closer, ok := any(channel).(io.Closer); ok {
@@ -227,6 +237,8 @@ func runPromptLoop(ctx context.Context, runner *promptRunner, channel promptChan
 
 		resp, err := runner.Send(ctx, input)
 		if err != nil {
+			// Keep the session alive on per-turn failures so the user can recover
+			// without restarting the interactive prompt.
 			if writeErr := channel.WriteMeta(ctx, fmt.Sprintf("error: %v", err)); writeErr != nil {
 				return writeErr
 			}

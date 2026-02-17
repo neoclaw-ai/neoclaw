@@ -41,6 +41,8 @@ func Run(
 	totalUsage := llm.TokenUsage{}
 
 	for i := 0; i < maxIterations; i++ {
+		// Each iteration sends the full conversation state and available tools.
+		// The model either returns final text or a set of tool calls.
 		logging.Logger().Info(
 			"llm request",
 			"iteration", i+1,
@@ -71,6 +73,7 @@ func Run(
 		totalUsage.TotalTokens += resp.Usage.TotalTokens
 
 		if len(resp.ToolCalls) == 0 {
+			// No tool calls means we are done for this turn.
 			if resp.Content != "" {
 				history = append(history, llm.ChatMessage{
 					Role:    llm.RoleAssistant,
@@ -91,6 +94,8 @@ func Run(
 			startedAt := time.Now()
 			tool, ok := registry.Lookup(call.Name)
 			if !ok {
+				// Unknown tools are surfaced to the model as tool-result errors so
+				// the loop can continue and the model can retry with a valid tool.
 				logging.Logger().Warn(
 					"tool call rejected: unknown tool",
 					"tool", call.Name,
@@ -136,6 +141,8 @@ func Run(
 				"args", summarizeToolArgs(args),
 			)
 
+			// Approval and execution are coupled here so both policy errors and
+			// runtime execution errors are returned to the model uniformly.
 			result, err := approval.ExecuteTool(ctx, approver, tool, args, fmt.Sprintf("%s %s", call.Name, call.Arguments))
 			if err != nil {
 				logging.Logger().Warn(

@@ -8,18 +8,22 @@ import (
 	"os"
 )
 
+// ReadFileTool reads text files from the workspace.
 type ReadFileTool struct {
 	WorkspaceDir string
 }
 
+// Name returns the tool name.
 func (t ReadFileTool) Name() string {
 	return "read_file"
 }
 
+// Description returns the tool description for the model.
 func (t ReadFileTool) Description() string {
 	return "Read a text file from disk"
 }
 
+// Schema returns the JSON schema for read_file args.
 func (t ReadFileTool) Schema() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -33,10 +37,12 @@ func (t ReadFileTool) Schema() map[string]any {
 	}
 }
 
+// Permission declares default permission behavior for this tool.
 func (t ReadFileTool) Permission() Permission {
 	return AutoApprove
 }
 
+// Execute reads text content from a workspace-scoped path.
 func (t ReadFileTool) Execute(_ context.Context, args map[string]any) (*ToolResult, error) {
 	pathArg, err := stringArg(args, "path")
 	if err != nil {

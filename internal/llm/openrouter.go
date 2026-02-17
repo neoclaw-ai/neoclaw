@@ -57,6 +57,7 @@ func newOpenRouterProviderForTest(apiKey, model, endpoint string, httpClient *ht
 	}, nil
 }
 
+// Chat sends a provider-agnostic chat request to OpenRouter and normalizes the response.
 func (p *openRouterProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
 	payload := openRouterRequest{
 		Model:     p.model,

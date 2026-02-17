@@ -13,6 +13,7 @@ type Validatable interface {
 	Validate() error
 }
 
+// Validate checks required LLM provider fields and provider-specific rules.
 func (c LLMProviderConfig) Validate() error {
 	if c.Provider == "" {
 		return errors.New("provider is required")
@@ -34,6 +35,7 @@ func (c LLMProviderConfig) Validate() error {
 	return nil
 }
 
+// Validate checks required channel fields when the channel is enabled.
 func (c ChannelConfig) Validate() error {
 	if !c.Enabled {
 		return nil
@@ -44,14 +46,17 @@ func (c ChannelConfig) Validate() error {
 	return nil
 }
 
+// Validate checks security mode values.
 func (c SecurityConfig) Validate() error {
 	return validateSecurityMode(c.Mode)
 }
 
+// Validate validates cost limits.
 func (c CostsConfig) Validate() error {
 	return nil
 }
 
+// Validate validates web settings.
 func (c WebConfig) Validate() error {
 	return nil
 }

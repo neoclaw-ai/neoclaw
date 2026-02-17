@@ -16,7 +16,9 @@ const maxInlineOutputChars = 2000
 type Permission int
 
 const (
+	// AutoApprove indicates the tool can run without prompting the user.
 	AutoApprove Permission = iota
+	// RequiresApproval indicates the tool must be explicitly approved.
 	RequiresApproval
 )
 
@@ -64,10 +66,12 @@ type Registry struct {
 	byName map[string]Tool
 }
 
+// NewRegistry creates an empty tool registry.
 func NewRegistry() *Registry {
 	return &Registry{byName: make(map[string]Tool)}
 }
 
+// Register adds a tool by unique name.
 func (r *Registry) Register(tool Tool) error {
 	if tool == nil {
 		return errors.New("tool cannot be nil")
@@ -83,11 +87,13 @@ func (r *Registry) Register(tool Tool) error {
 	return nil
 }
 
+// Lookup returns a tool by name.
 func (r *Registry) Lookup(name string) (Tool, bool) {
 	tool, ok := r.byName[name]
 	return tool, ok
 }
 
+// Tools returns all registered tools in stable name order.
 func (r *Registry) Tools() []Tool {
 	keys := make([]string, 0, len(r.byName))
 	for name := range r.byName {

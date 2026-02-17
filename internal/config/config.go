@@ -15,8 +15,11 @@ import (
 const defaultAgent = "default"
 
 const (
+	// SecurityModeStandard is the default sandbox/security behavior.
 	SecurityModeStandard         = "standard"
+	// SecurityModeDangerFullAccess disables sandbox protections.
 	SecurityModeDangerFullAccess = "danger-full-access"
+	// SecurityModeStrict enables stricter sandbox policy where supported.
 	SecurityModeStrict           = "strict"
 	defaultLLMProfile            = "default"
 	defaultLLMProvider           = "anthropic"
@@ -37,18 +40,21 @@ type Config struct {
 	Web      WebConfig                    `mapstructure:"web"`
 }
 
+// ChannelConfig configures one inbound/outbound channel.
 type ChannelConfig struct {
 	Enabled      bool    `mapstructure:"enabled"`
 	Token        string  `mapstructure:"token"`
 	AllowedUsers []int64 `mapstructure:"allowed_users"`
 }
 
+// LLMProviderConfig configures one LLM provider profile.
 type LLMProviderConfig struct {
 	APIKey   string `mapstructure:"api_key"`
 	Provider string `mapstructure:"provider"`
 	Model    string `mapstructure:"model"`
 }
 
+// SecurityConfig controls command execution and sandbox behavior.
 type SecurityConfig struct {
 	// Workspace is derived from DataDir and Agent and is not configurable.
 	Workspace      string        `mapstructure:"-"`
@@ -56,6 +62,7 @@ type SecurityConfig struct {
 	Mode           string        `mapstructure:"mode"`
 }
 
+// CostsConfig defines soft spending and circuit-breaker limits.
 type CostsConfig struct {
 	HourlyLimit            float64       `mapstructure:"hourly_limit"`
 	DailyLimit             float64       `mapstructure:"daily_limit"`
@@ -64,10 +71,12 @@ type CostsConfig struct {
 	CircuitBreakerWindow   time.Duration `mapstructure:"circuit_breaker_window"`
 }
 
+// WebConfig configures built-in web tool behavior.
 type WebConfig struct {
 	Search WebSearchConfig `mapstructure:"search"`
 }
 
+// WebSearchConfig configures the web search provider.
 type WebSearchConfig struct {
 	Provider string `mapstructure:"provider"`
 }
@@ -146,14 +155,17 @@ func setDefaults(v *viper.Viper, dataDir string) {
 	v.SetDefault("web.search.provider", "brave")
 }
 
+// AgentDir returns the active agent directory under DataDir.
 func (c *Config) AgentDir() string {
 	return filepath.Join(c.DataDir, "agents", c.Agent)
 }
 
+// WorkspaceDir returns the active agent workspace directory.
 func (c *Config) WorkspaceDir() string {
 	return filepath.Join(c.AgentDir(), "workspace")
 }
 
+// DefaultLLM returns the default LLM profile with fallback defaults.
 func (c *Config) DefaultLLM() LLMProviderConfig {
 	if llm, ok := c.LLM[defaultLLMProfile]; ok {
 		return llm
@@ -165,6 +177,7 @@ func (c *Config) DefaultLLM() LLMProviderConfig {
 	}
 }
 
+// TelegramChannel returns Telegram channel config with fallback defaults.
 func (c *Config) TelegramChannel() ChannelConfig {
 	if ch, ok := c.Channels[defaultTelegramChannel]; ok {
 		return ch

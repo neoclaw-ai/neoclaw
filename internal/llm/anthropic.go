@@ -55,6 +55,7 @@ func newAnthropicProviderForTest(apiKey, model, baseURL string, httpClient *http
 	}, nil
 }
 
+// Chat sends a provider-agnostic chat request to Anthropic and normalizes the response.
 func (p *anthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
 	msgs, err := toAnthropicMessages(req.Messages)
 	if err != nil {
