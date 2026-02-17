@@ -56,6 +56,7 @@ func TestAnthropicProviderChat_RequestAndResponse(t *testing.T) {
 		SystemPrompt: "be concise",
 		MaxTokens:    256,
 		Messages: []ChatMessage{
+			{Role: RoleUser, Content: "earlier context"},
 			{Role: RoleUser, Content: "weather in SF?"},
 		},
 		Tools: []ToolDefinition{
@@ -84,6 +85,45 @@ func TestAnthropicProviderChat_RequestAndResponse(t *testing.T) {
 	}
 	if int(gotReq["max_tokens"].(float64)) != 256 {
 		t.Fatalf("unexpected max_tokens: %#v", gotReq["max_tokens"])
+	}
+	system, ok := gotReq["system"].([]any)
+	if !ok || len(system) != 1 {
+		t.Fatalf("expected one system block, got %#v", gotReq["system"])
+	}
+	systemBlock, ok := system[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected system block object, got %#v", system[0])
+	}
+	systemCacheControl, ok := systemBlock["cache_control"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected system cache_control, got %#v", systemBlock["cache_control"])
+	}
+	if systemCacheControl["type"] != "ephemeral" {
+		t.Fatalf("expected system cache_control type ephemeral, got %#v", systemCacheControl["type"])
+	}
+
+	messages, ok := gotReq["messages"].([]any)
+	if !ok || len(messages) != 2 {
+		t.Fatalf("expected two messages, got %#v", gotReq["messages"])
+	}
+	firstMessage, ok := messages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first message object, got %#v", messages[0])
+	}
+	firstMessageContent, ok := firstMessage["content"].([]any)
+	if !ok || len(firstMessageContent) == 0 {
+		t.Fatalf("expected first message content blocks, got %#v", firstMessage["content"])
+	}
+	firstBlock, ok := firstMessageContent[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first content block object, got %#v", firstMessageContent[0])
+	}
+	historyCacheControl, ok := firstBlock["cache_control"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected history cache_control on second-to-last message, got %#v", firstBlock["cache_control"])
+	}
+	if historyCacheControl["type"] != "ephemeral" {
+		t.Fatalf("expected history cache_control type ephemeral, got %#v", historyCacheControl["type"])
 	}
 
 	if resp.Content != "I can call a tool." {

@@ -72,7 +72,10 @@ func (p *anthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 	}
 
 	if req.SystemPrompt != "" {
-		body.System = []anthropic.TextBlockParam{{Text: req.SystemPrompt}}
+		body.System = []anthropic.TextBlockParam{{
+			Text:         req.SystemPrompt,
+			CacheControl: anthropic.NewCacheControlEphemeralParam(),
+		}}
 	}
 	if len(req.Tools) > 0 {
 		body.Tools = toAnthropicTools(req.Tools)
@@ -146,7 +149,45 @@ func toAnthropicMessages(messages []ChatMessage) ([]anthropic.MessageParam, erro
 			return nil, fmt.Errorf("unsupported message role %q", msg.Role)
 		}
 	}
+	applyHistoryCacheBreakpoint(out)
 	return out, nil
+}
+
+// applyHistoryCacheBreakpoint marks the second-to-last message block as a cache
+// breakpoint so the latest message remains uncached while the full prior prefix
+// can be reused.
+func applyHistoryCacheBreakpoint(messages []anthropic.MessageParam) {
+	if len(messages) < 2 {
+		return
+	}
+	addCacheControlToLastBlock(&messages[len(messages)-2])
+}
+
+func addCacheControlToLastBlock(message *anthropic.MessageParam) {
+	if message == nil || len(message.Content) == 0 {
+		return
+	}
+	block := &message.Content[len(message.Content)-1]
+	cacheControl := anthropic.NewCacheControlEphemeralParam()
+
+	switch {
+	case block.OfText != nil:
+		block.OfText.CacheControl = cacheControl
+	case block.OfImage != nil:
+		block.OfImage.CacheControl = cacheControl
+	case block.OfDocument != nil:
+		block.OfDocument.CacheControl = cacheControl
+	case block.OfSearchResult != nil:
+		block.OfSearchResult.CacheControl = cacheControl
+	case block.OfToolUse != nil:
+		block.OfToolUse.CacheControl = cacheControl
+	case block.OfToolResult != nil:
+		block.OfToolResult.CacheControl = cacheControl
+	case block.OfServerToolUse != nil:
+		block.OfServerToolUse.CacheControl = cacheControl
+	case block.OfWebSearchToolResult != nil:
+		block.OfWebSearchToolResult.CacheControl = cacheControl
+	}
 }
 
 func toAnthropicTools(tools []ToolDefinition) []anthropic.ToolUnionParam {
