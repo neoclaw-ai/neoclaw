@@ -1,17 +1,22 @@
 package cli
 
 import (
-	"bufio"
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/machinae/betterclaw/internal/agent"
 	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/bootstrap"
+	"github.com/machinae/betterclaw/internal/channels"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/llm"
+	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
+	"github.com/machinae/betterclaw/internal/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -113,28 +118,56 @@ func newPromptCmd() *cobra.Command {
 				return err
 			}
 
-			inputReader := bufio.NewReader(cmd.InOrStdin())
-			approver := approval.NewCLIApproverFromReader(inputReader, cmd.OutOrStdout())
-			runner, err := newPromptRunner(cfg, provider, approver, cmd.OutOrStdout())
+			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout())
 			if err != nil {
 				return err
 			}
 
-			if strings.TrimSpace(prompt) == "" {
-				return runPromptREPL(cmd.Context(), runner, cmd.InOrStdin(), inputReader, cmd.OutOrStdout())
+			if strings.TrimSpace(prompt) != "" {
+				approver := approval.NewCLIApprover(cmd.InOrStdin(), cmd.OutOrStdout())
+				handler := agent.New(provider, registry, approver, agent.DefaultSystemPrompt)
+				writer := &singleShotWriter{out: cmd.OutOrStdout()}
+				return handler.HandleMessage(cmd.Context(), writer, &runtimeapi.Message{Text: prompt})
 			}
 
-			resp, err := runner.Send(cmd.Context(), prompt)
-			if err != nil {
-				return err
-			}
-
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), resp)
-			return err
+			listener := channels.NewCLI(cmd.InOrStdin(), cmd.OutOrStdout())
+			handler := agent.New(provider, registry, listener, agent.DefaultSystemPrompt)
+			return listener.Listen(cmd.Context(), handler)
 		},
 	}
 
 	cmd.Flags().StringVarP(&prompt, "prompt", "p", "", "Prompt message")
 
 	return cmd
+}
+
+func buildToolRegistry(cfg *config.Config, out io.Writer) (*tools.Registry, error) {
+	registry := tools.NewRegistry()
+	coreTools := []tools.Tool{
+		tools.ReadFileTool{WorkspaceDir: cfg.WorkspaceDir()},
+		tools.ListDirTool{WorkspaceDir: cfg.WorkspaceDir()},
+		tools.WriteFileTool{WorkspaceDir: cfg.WorkspaceDir()},
+		tools.RunCommandTool{
+			WorkspaceDir:    cfg.WorkspaceDir(),
+			AllowedBinsPath: filepath.Join(cfg.DataDir, "allowed_bins.json"),
+			Timeout:         cfg.Security.CommandTimeout,
+		},
+		tools.SendMessageTool{Writer: out},
+	}
+	for _, tool := range coreTools {
+		if err := registry.Register(tool); err != nil {
+			return nil, fmt.Errorf("register tool %q: %w", tool.Name(), err)
+		}
+	}
+	return registry, nil
+}
+
+type singleShotWriter struct {
+	out io.Writer
+}
+
+// WriteMessage writes one response message for one-shot prompt mode.
+func (w *singleShotWriter) WriteMessage(_ context.Context, text string) error {
+	_, err := fmt.Fprintln(w.out, text)
+	return err
 }
