@@ -137,6 +137,22 @@ func TestRun_UnknownToolAppendsErrorAndContinues(t *testing.T) {
 	}
 }
 
+func TestToolDescriptionUsesSummarizer(t *testing.T) {
+	tool := summarizedTool{summary: `write_file: path="notes.md" (12 bytes)`}
+	got := toolDescription(tool, map[string]any{"path": "notes.md", "content": "hello world!"}, "write_file")
+	if got != tool.summary {
+		t.Fatalf("expected summarized description %q, got %q", tool.summary, got)
+	}
+}
+
+func TestToolDescriptionFallsBackToCallName(t *testing.T) {
+	tool := fakeTool{name: "read_file", out: "ok"}
+	got := toolDescription(tool, map[string]any{"path": "README.md"}, "read_file")
+	if got != "read_file" {
+		t.Fatalf("expected fallback call name, got %q", got)
+	}
+}
+
 type scriptProvider struct {
 	responses []*providerapi.ChatResponse
 	calls     int
@@ -162,4 +178,19 @@ func (t fakeTool) Schema() map[string]any       { return map[string]any{"type": 
 func (t fakeTool) Permission() tools.Permission { return tools.AutoApprove }
 func (t fakeTool) Execute(_ context.Context, _ map[string]any) (*tools.ToolResult, error) {
 	return &tools.ToolResult{Output: t.out}, nil
+}
+
+type summarizedTool struct {
+	summary string
+}
+
+func (t summarizedTool) Name() string                 { return "summarized_tool" }
+func (t summarizedTool) Description() string          { return "summarized tool" }
+func (t summarizedTool) Schema() map[string]any       { return map[string]any{"type": "object"} }
+func (t summarizedTool) Permission() tools.Permission { return tools.RequiresApproval }
+func (t summarizedTool) Execute(_ context.Context, _ map[string]any) (*tools.ToolResult, error) {
+	return &tools.ToolResult{Output: "ok"}, nil
+}
+func (t summarizedTool) SummarizeArgs(_ map[string]any) string {
+	return t.summary
 }

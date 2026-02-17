@@ -143,7 +143,7 @@ func Run(
 
 			// Approval and execution are coupled here so both policy errors and
 			// runtime execution errors are returned to the model uniformly.
-			result, err := approval.ExecuteTool(ctx, approver, tool, args, fmt.Sprintf("%s %s", call.Name, call.Arguments))
+			result, err := approval.ExecuteTool(ctx, approver, tool, args, toolDescription(tool, args, call.Name))
 			if err != nil {
 				logging.Logger().Warn(
 					"tool call failed",
@@ -227,4 +227,11 @@ func summarizeTextForLog(text string, maxLen int) string {
 		return text
 	}
 	return fmt.Sprintf("%s...[truncated %d chars]", text[:maxLen], len(text)-maxLen)
+}
+
+func toolDescription(tool tools.Tool, args map[string]any, callName string) string {
+	if s, ok := tool.(tools.Summarizer); ok {
+		return s.SummarizeArgs(args)
+	}
+	return callName
 }

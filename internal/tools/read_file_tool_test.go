@@ -62,3 +62,10 @@ func TestReadFile_LargeFileTruncated(t *testing.T) {
 		t.Fatalf("expected %d bytes, got %d", maxReadFileBytes, len(res.Output))
 	}
 }
+
+func TestReadFileDoesNotImplementSummarizer(t *testing.T) {
+	tool := ReadFileTool{}
+	if _, ok := any(tool).(Summarizer); ok {
+		t.Fatalf("read file tool should not implement Summarizer")
+	}
+}

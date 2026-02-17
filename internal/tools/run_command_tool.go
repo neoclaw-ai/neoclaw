@@ -54,6 +54,19 @@ func (t RunCommandTool) Permission() Permission {
 	return RequiresApproval
 }
 
+// SummarizeArgs returns a concise approval prompt summary for run_command.
+func (t RunCommandTool) SummarizeArgs(args map[string]any) string {
+	raw, ok := args["command"]
+	if !ok {
+		return "run_command: <empty>"
+	}
+	command, ok := raw.(string)
+	if !ok || strings.TrimSpace(command) == "" {
+		return "run_command: <empty>"
+	}
+	return fmt.Sprintf("run_command: %s", command)
+}
+
 // RequiresApprovalForArgs resolves approval behavior for this specific command.
 // Allowlisted binaries are auto-approved; all others require an approval prompt.
 func (t RunCommandTool) RequiresApprovalForArgs(args map[string]any) (bool, error) {

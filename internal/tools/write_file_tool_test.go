@@ -44,3 +44,21 @@ func TestWriteFile_OutsideWorkspaceErrors(t *testing.T) {
 		t.Fatalf("expected outside workspace error, got %v", err)
 	}
 }
+
+func TestWriteFileSummarizeArgs(t *testing.T) {
+	tool := WriteFileTool{}
+	s, ok := any(tool).(Summarizer)
+	if !ok {
+		t.Fatalf("write file tool should implement Summarizer")
+	}
+
+	content := strings.Repeat("a", 1243)
+	got := s.SummarizeArgs(map[string]any{
+		"path":    "notes.md",
+		"content": content,
+	})
+	want := `write_file: path="notes.md" (1,243 bytes)`
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 // WriteFileTool writes text files under the workspace root.
@@ -45,6 +47,25 @@ func (t WriteFileTool) Permission() Permission {
 	return RequiresApproval
 }
 
+// SummarizeArgs returns a concise approval prompt summary for write_file.
+func (t WriteFileTool) SummarizeArgs(args map[string]any) string {
+	path := "<unknown>"
+	if raw, ok := args["path"]; ok {
+		if s, ok := raw.(string); ok && strings.TrimSpace(s) != "" {
+			path = s
+		}
+	}
+
+	byteCount := 0
+	if raw, ok := args["content"]; ok {
+		if s, ok := raw.(string); ok {
+			byteCount = len([]byte(s))
+		}
+	}
+
+	return fmt.Sprintf(`write_file: path=%q (%s bytes)`, path, formatWithCommas(byteCount))
+}
+
 // Execute writes content to a workspace-scoped file path.
 func (t WriteFileTool) Execute(_ context.Context, args map[string]any) (*ToolResult, error) {
 	pathArg, err := stringArg(args, "path")
@@ -69,4 +90,22 @@ func (t WriteFileTool) Execute(_ context.Context, args map[string]any) (*ToolRes
 	}
 
 	return &ToolResult{Output: "ok"}, nil
+}
+
+func formatWithCommas(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	s := strconv.Itoa(n)
+	var b strings.Builder
+	lead := len(s) % 3
+	if lead == 0 {
+		lead = 3
+	}
+	b.WriteString(s[:lead])
+	for i := lead; i < len(s); i += 3 {
+		b.WriteByte(',')
+		b.WriteString(s[i : i+3])
+	}
+	return b.String()
 }

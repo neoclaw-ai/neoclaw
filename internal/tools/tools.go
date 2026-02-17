@@ -31,6 +31,12 @@ type Tool interface {
 	Execute(ctx context.Context, args map[string]any) (*ToolResult, error)
 }
 
+// Summarizer is an optional interface tools can implement to provide
+// human-readable descriptions for approval prompts.
+type Summarizer interface {
+	SummarizeArgs(args map[string]any) string
+}
+
 // ToolResult is the normalized output returned by tools.
 type ToolResult struct {
 	Output         string

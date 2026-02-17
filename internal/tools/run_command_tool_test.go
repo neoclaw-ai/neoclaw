@@ -245,3 +245,17 @@ func TestIsEnvAssignment(t *testing.T) {
 		})
 	}
 }
+
+func TestRunCommandSummarizeArgs(t *testing.T) {
+	tool := RunCommandTool{}
+	s, ok := any(tool).(Summarizer)
+	if !ok {
+		t.Fatalf("run command tool should implement Summarizer")
+	}
+
+	got := s.SummarizeArgs(map[string]any{"command": "git status"})
+	want := "run_command: git status"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
