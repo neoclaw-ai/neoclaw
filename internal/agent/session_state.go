@@ -62,22 +62,25 @@ func (a *Agent) summarizeSessionToDailyLogAsync(ctx context.Context, history []p
 		timeout = defaultRequestTimeout
 	}
 
-	go func(snapshot []provider.ChatMessage) {
-		reqCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
+	snapshot := append([]provider.ChatMessage{}, history...)
+	go a.runSessionSummary(ctx, timeout, snapshot)
+}
 
-		summary, err := a.summarizeMessages(reqCtx, snapshot)
-		if err != nil {
-			logging.Logger().Warn("session reset summary failed", "err", err)
-			return
-		}
-		summary = strings.TrimSpace(summary)
-		if summary == "" {
-			logging.Logger().Warn("session reset summary is empty; skipping daily log append")
-			return
-		}
-		if err := a.memoryStore.AppendDailyLog(time.Now(), "Summary: "+summary); err != nil {
-			logging.Logger().Warn("append session summary to daily log failed", "err", err)
-		}
-	}(append([]provider.ChatMessage{}, history...))
+func (a *Agent) runSessionSummary(ctx context.Context, timeout time.Duration, snapshot []provider.ChatMessage) {
+	reqCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	summary, err := a.summarizeMessages(reqCtx, snapshot)
+	if err != nil {
+		logging.Logger().Warn("session reset summary failed", "err", err)
+		return
+	}
+	summary = strings.TrimSpace(summary)
+	if summary == "" {
+		logging.Logger().Warn("session reset summary is empty; skipping daily log append")
+		return
+	}
+	if err := a.memoryStore.AppendDailyLog(time.Now(), "Summary: "+summary); err != nil {
+		logging.Logger().Warn("append session summary to daily log failed", "err", err)
+	}
 }
