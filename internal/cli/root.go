@@ -10,11 +10,11 @@ import (
 	"github.com/machinae/betterclaw/internal/bootstrap"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/logging"
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 	"github.com/spf13/cobra"
 )
 
-var providerFactory = providerapi.NewProviderFromConfig
+var providerFactory = provider.NewProviderFromConfig
 
 // NewRootCmd creates the root command and registers all subcommands.
 func NewRootCmd() *cobra.Command {

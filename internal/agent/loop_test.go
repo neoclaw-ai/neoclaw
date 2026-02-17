@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
@@ -16,9 +16,9 @@ func TestRun_DispatchesToolAndReturnsFinalResponse(t *testing.T) {
 		t.Fatalf("register tool: %v", err)
 	}
 
-	modelProvider := &scriptProvider{responses: []*providerapi.ChatResponse{
+	modelProvider := &scriptProvider{responses: []*provider.ChatResponse{
 		{
-			ToolCalls: []providerapi.ToolCall{{
+			ToolCalls: []provider.ToolCall{{
 				ID:        "call_1",
 				Name:      "read_file",
 				Arguments: `{"path":"README.md"}`,
@@ -33,7 +33,7 @@ func TestRun_DispatchesToolAndReturnsFinalResponse(t *testing.T) {
 		registry,
 		nil,
 		"system",
-		[]providerapi.ChatMessage{{Role: providerapi.RoleUser, Content: "read it"}},
+		[]provider.ChatMessage{{Role: provider.RoleUser, Content: "read it"}},
 		10,
 	)
 	if err != nil {
@@ -48,7 +48,7 @@ func TestRun_DispatchesToolAndReturnsFinalResponse(t *testing.T) {
 
 	var foundToolResult bool
 	for _, msg := range history {
-		if msg.Role == providerapi.RoleTool && msg.ToolCallID == "call_1" && msg.Content == "hello from file" {
+		if msg.Role == provider.RoleTool && msg.ToolCallID == "call_1" && msg.Content == "hello from file" {
 			foundToolResult = true
 		}
 	}
@@ -63,16 +63,16 @@ func TestRun_MaxIterationsGuard(t *testing.T) {
 		t.Fatalf("register tool: %v", err)
 	}
 
-	modelProvider := &scriptProvider{responses: []*providerapi.ChatResponse{
+	modelProvider := &scriptProvider{responses: []*provider.ChatResponse{
 		{
-			ToolCalls: []providerapi.ToolCall{{
+			ToolCalls: []provider.ToolCall{{
 				ID:        "1",
 				Name:      "read_file",
 				Arguments: `{"path":"a"}`,
 			}},
 		},
 		{
-			ToolCalls: []providerapi.ToolCall{{
+			ToolCalls: []provider.ToolCall{{
 				ID:        "2",
 				Name:      "read_file",
 				Arguments: `{"path":"b"}`,
@@ -86,7 +86,7 @@ func TestRun_MaxIterationsGuard(t *testing.T) {
 		registry,
 		nil,
 		"system",
-		[]providerapi.ChatMessage{{Role: providerapi.RoleUser, Content: "loop"}},
+		[]provider.ChatMessage{{Role: provider.RoleUser, Content: "loop"}},
 		1,
 	)
 	if err == nil || !strings.Contains(err.Error(), "max iterations exceeded") {
@@ -99,9 +99,9 @@ func TestRun_UnknownToolAppendsErrorAndContinues(t *testing.T) {
 	if err := registry.Register(fakeTool{name: "read_file", out: "ok"}); err != nil {
 		t.Fatalf("register tool: %v", err)
 	}
-	modelProvider := &scriptProvider{responses: []*providerapi.ChatResponse{
+	modelProvider := &scriptProvider{responses: []*provider.ChatResponse{
 		{
-			ToolCalls: []providerapi.ToolCall{{
+			ToolCalls: []provider.ToolCall{{
 				ID:        "call_1",
 				Name:      "does_not_exist",
 				Arguments: `{}`,
@@ -116,7 +116,7 @@ func TestRun_UnknownToolAppendsErrorAndContinues(t *testing.T) {
 		registry,
 		nil,
 		"system",
-		[]providerapi.ChatMessage{{Role: providerapi.RoleUser, Content: "do it"}},
+		[]provider.ChatMessage{{Role: provider.RoleUser, Content: "do it"}},
 		2,
 	)
 	if err != nil {
@@ -128,7 +128,7 @@ func TestRun_UnknownToolAppendsErrorAndContinues(t *testing.T) {
 
 	var foundUnknownToolMessage bool
 	for _, msg := range history {
-		if msg.Role == providerapi.RoleTool && msg.ToolCallID == "call_1" && strings.Contains(msg.Content, "unknown tool") {
+		if msg.Role == provider.RoleTool && msg.ToolCallID == "call_1" && strings.Contains(msg.Content, "unknown tool") {
 			foundUnknownToolMessage = true
 		}
 	}
@@ -154,11 +154,11 @@ func TestToolDescriptionFallsBackToCallName(t *testing.T) {
 }
 
 type scriptProvider struct {
-	responses []*providerapi.ChatResponse
+	responses []*provider.ChatResponse
 	calls     int
 }
 
-func (p *scriptProvider) Chat(_ context.Context, _ providerapi.ChatRequest) (*providerapi.ChatResponse, error) {
+func (p *scriptProvider) Chat(_ context.Context, _ provider.ChatRequest) (*provider.ChatResponse, error) {
 	if p.calls >= len(p.responses) {
 		return nil, fmt.Errorf("unexpected extra call")
 	}

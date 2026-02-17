@@ -9,7 +9,7 @@ import (
 
 	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/logging"
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
@@ -18,13 +18,13 @@ const defaultMaxIterations = 10
 // Run executes the agent loop until the model returns a final text response.
 func Run(
 	ctx context.Context,
-	modelProvider providerapi.Provider,
+	modelProvider provider.Provider,
 	registry *tools.Registry,
 	approver approval.Approver,
 	systemPrompt string,
-	messages []providerapi.ChatMessage,
+	messages []provider.ChatMessage,
 	maxIterations int,
-) (*providerapi.ChatResponse, []providerapi.ChatMessage, error) {
+) (*provider.ChatResponse, []provider.ChatMessage, error) {
 	if modelProvider == nil {
 		return nil, nil, fmt.Errorf("provider is required")
 	}
@@ -35,10 +35,10 @@ func Run(
 		maxIterations = defaultMaxIterations
 	}
 
-	history := append([]providerapi.ChatMessage(nil), messages...)
+	history := append([]provider.ChatMessage(nil), messages...)
 	toolDefs := registry.ToolDefinitions()
 	availableTools := toolNames(toolDefs)
-	totalUsage := providerapi.TokenUsage{}
+	totalUsage := provider.TokenUsage{}
 
 	for i := 0; i < maxIterations; i++ {
 		// Each iteration sends the full conversation state and available tools.
@@ -51,7 +51,7 @@ func Run(
 			"latest_user_message", summarizeTextForLog(latestUserMessage(history), 300),
 		)
 
-		resp, err := modelProvider.Chat(ctx, providerapi.ChatRequest{
+		resp, err := modelProvider.Chat(ctx, provider.ChatRequest{
 			SystemPrompt: systemPrompt,
 			Messages:     history,
 			Tools:        toolDefs,
@@ -75,8 +75,8 @@ func Run(
 		if len(resp.ToolCalls) == 0 {
 			// No tool calls means we are done for this turn.
 			if resp.Content != "" {
-				history = append(history, providerapi.ChatMessage{
-					Role:    providerapi.RoleAssistant,
+				history = append(history, provider.ChatMessage{
+					Role:    provider.RoleAssistant,
 					Content: resp.Content,
 				})
 			}
@@ -84,8 +84,8 @@ func Run(
 			return resp, history, nil
 		}
 
-		history = append(history, providerapi.ChatMessage{
-			Role:      providerapi.RoleAssistant,
+		history = append(history, provider.ChatMessage{
+			Role:      provider.RoleAssistant,
 			Content:   resp.Content,
 			ToolCalls: resp.ToolCalls,
 		})
@@ -103,8 +103,8 @@ func Run(
 					"arguments", call.Arguments,
 					"available_tools", availableTools,
 				)
-				history = append(history, providerapi.ChatMessage{
-					Role:       providerapi.RoleTool,
+				history = append(history, provider.ChatMessage{
+					Role:       provider.RoleTool,
 					ToolCallID: call.ID,
 					Content: fmt.Sprintf(
 						`tool execution error: unknown tool %q. Available tools: %s. Use an available tool name exactly.`,
@@ -125,8 +125,8 @@ func Run(
 						"arguments", call.Arguments,
 						"err", err,
 					)
-					history = append(history, providerapi.ChatMessage{
-						Role:       providerapi.RoleTool,
+					history = append(history, provider.ChatMessage{
+						Role:       provider.RoleTool,
 						ToolCallID: call.ID,
 						Content:    fmt.Sprintf("tool execution error: invalid tool arguments for %q: %v", call.Name, err),
 					})
@@ -152,8 +152,8 @@ func Run(
 					"duration_ms", time.Since(startedAt).Milliseconds(),
 					"err", err,
 				)
-				history = append(history, providerapi.ChatMessage{
-					Role:       providerapi.RoleTool,
+				history = append(history, provider.ChatMessage{
+					Role:       provider.RoleTool,
 					ToolCallID: call.ID,
 					Content:    fmt.Sprintf("tool execution error: %v", err),
 				})
@@ -167,8 +167,8 @@ func Run(
 				"duration_ms", time.Since(startedAt).Milliseconds(),
 			)
 
-			history = append(history, providerapi.ChatMessage{
-				Role:       providerapi.RoleTool,
+			history = append(history, provider.ChatMessage{
+				Role:       provider.RoleTool,
 				ToolCallID: call.ID,
 				Content:    result.Output,
 			})
@@ -178,7 +178,7 @@ func Run(
 	return nil, history, fmt.Errorf("max iterations exceeded (%d)", maxIterations)
 }
 
-func toolNames(defs []providerapi.ToolDefinition) string {
+func toolNames(defs []provider.ToolDefinition) string {
 	if len(defs) == 0 {
 		return "<none>"
 	}
@@ -213,9 +213,9 @@ func summarizeToolArgValue(value any) any {
 	}
 }
 
-func latestUserMessage(history []providerapi.ChatMessage) string {
+func latestUserMessage(history []provider.ChatMessage) string {
 	for i := len(history) - 1; i >= 0; i-- {
-		if history[i].Role == providerapi.RoleUser && strings.TrimSpace(history[i].Content) != "" {
+		if history[i].Role == provider.RoleUser && strings.TrimSpace(history[i].Content) != "" {
 			return history[i].Content
 		}
 	}

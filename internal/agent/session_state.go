@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/machinae/betterclaw/internal/logging"
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 )
 
 func (a *Agent) ensureHistoryLoaded(ctx context.Context) error {
@@ -31,14 +31,14 @@ func (a *Agent) resetSession(ctx context.Context) error {
 	return a.sessionStore.Reset(ctx)
 }
 
-func (a *Agent) rewriteSessionIfNeeded(ctx context.Context, history []providerapi.ChatMessage) error {
+func (a *Agent) rewriteSessionIfNeeded(ctx context.Context, history []provider.ChatMessage) error {
 	if a.sessionStore == nil {
 		return nil
 	}
 	return a.sessionStore.Rewrite(ctx, history)
 }
 
-func (a *Agent) appendSessionDelta(ctx context.Context, base, history []providerapi.ChatMessage) error {
+func (a *Agent) appendSessionDelta(ctx context.Context, base, history []provider.ChatMessage) error {
 	if a.sessionStore == nil {
 		return nil
 	}
@@ -53,7 +53,7 @@ func isResetCommand(text string) bool {
 	return normalized == "/new" || normalized == "/reset"
 }
 
-func (a *Agent) summarizeSessionToDailyLogAsync(ctx context.Context, history []providerapi.ChatMessage) {
+func (a *Agent) summarizeSessionToDailyLogAsync(ctx context.Context, history []provider.ChatMessage) {
 	if a == nil || a.memoryStore == nil || len(history) == 0 {
 		return
 	}
@@ -62,7 +62,7 @@ func (a *Agent) summarizeSessionToDailyLogAsync(ctx context.Context, history []p
 		timeout = defaultRequestTimeout
 	}
 
-	go func(snapshot []providerapi.ChatMessage) {
+	go func(snapshot []provider.ChatMessage) {
 		reqCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 
@@ -79,5 +79,5 @@ func (a *Agent) summarizeSessionToDailyLogAsync(ctx context.Context, history []p
 		if err := a.memoryStore.AppendDailyLog(time.Now(), "Summary: "+summary); err != nil {
 			logging.Logger().Warn("append session summary to daily log failed", "err", err)
 		}
-	}(append([]providerapi.ChatMessage{}, history...))
+	}(append([]provider.ChatMessage{}, history...))
 }

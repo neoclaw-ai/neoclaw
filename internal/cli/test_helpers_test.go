@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 )
 
 func createTestHome(t *testing.T) string {
@@ -38,11 +38,11 @@ allowed_users = [123456789]
 }
 
 type fakeProvider struct {
-	resp *providerapi.ChatResponse
+	resp *provider.ChatResponse
 	err  error
 }
 
-func (p fakeProvider) Chat(_ context.Context, _ providerapi.ChatRequest) (*providerapi.ChatResponse, error) {
+func (p fakeProvider) Chat(_ context.Context, _ provider.ChatRequest) (*provider.ChatResponse, error) {
 	if p.err != nil {
 		return nil, p.err
 	}

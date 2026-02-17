@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
+	"github.com/machinae/betterclaw/internal/runtime"
 
 	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/memory"
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 	"github.com/machinae/betterclaw/internal/session"
 	"github.com/machinae/betterclaw/internal/tools"
 )
@@ -24,14 +24,14 @@ const DefaultSystemPrompt = "You are BetterClaw, a lightweight personal AI assis
 
 // Agent implements the runtime Handler for one conversation.
 type Agent struct {
-	provider          providerapi.Provider
+	provider          provider.Provider
 	registry          *tools.Registry
 	approver          approval.Approver
 	systemPrompt      string
 	maxIter           int
 	maxContextTokens  int
 	recentMessages    int
-	history           []providerapi.ChatMessage
+	history           []provider.ChatMessage
 	sessionStore      *session.Store
 	memoryStore       *memory.Store
 	requestTimeout    time.Duration
@@ -39,7 +39,7 @@ type Agent struct {
 }
 
 // New creates a conversation-scoped Agent.
-func New(provider providerapi.Provider, registry *tools.Registry, approver approval.Approver, systemPrompt string) *Agent {
+func New(provider provider.Provider, registry *tools.Registry, approver approval.Approver, systemPrompt string) *Agent {
 	if strings.TrimSpace(systemPrompt) == "" {
 		systemPrompt = DefaultSystemPrompt
 	}
@@ -54,7 +54,7 @@ func New(provider providerapi.Provider, registry *tools.Registry, approver appro
 
 // NewWithSession creates a conversation-scoped Agent with session persistence.
 func NewWithSession(
-	provider providerapi.Provider,
+	provider provider.Provider,
 	registry *tools.Registry,
 	approver approval.Approver,
 	systemPrompt string,
@@ -77,7 +77,7 @@ func NewWithSession(
 }
 
 // HandleMessage processes one inbound message and writes the assistant response.
-func (a *Agent) HandleMessage(ctx context.Context, w runtimeapi.ResponseWriter, msg *runtimeapi.Message) error {
+func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg *runtime.Message) error {
 	if w == nil {
 		return errors.New("response writer is required")
 	}
@@ -92,7 +92,7 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtimeapi.ResponseWriter, 
 	}
 
 	if isResetCommand(msg.Text) {
-		historySnapshot := append([]providerapi.ChatMessage{}, a.history...)
+		historySnapshot := append([]provider.ChatMessage{}, a.history...)
 		a.summarizeSessionToDailyLogAsync(ctx, historySnapshot)
 		if err := a.resetSession(ctx); err != nil {
 			return err
@@ -100,9 +100,9 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtimeapi.ResponseWriter, 
 		return w.WriteMessage(ctx, "Session cleared.")
 	}
 
-	baseHistory := append([]providerapi.ChatMessage{}, a.history...)
+	baseHistory := append([]provider.ChatMessage{}, a.history...)
 	messages := appendUserMessage(baseHistory, msg.Text)
-	uncompactedMessages := append([]providerapi.ChatMessage{}, messages...)
+	uncompactedMessages := append([]provider.ChatMessage{}, messages...)
 	messages, err := a.compactHistoryIfNeeded(ctx, messages)
 	if err != nil {
 		return err

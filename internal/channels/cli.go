@@ -11,15 +11,15 @@ import (
 
 	"github.com/chzyer/readline"
 	"github.com/machinae/betterclaw/internal/approval"
-	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
+	"github.com/machinae/betterclaw/internal/runtime"
 	"golang.org/x/term"
 )
 
 const defaultReplPrompt = "you> "
 
 var (
-	_ runtimeapi.Listener = (*CLIListener)(nil)
-	_ approval.Approver   = (*CLIListener)(nil)
+	_ runtime.Listener  = (*CLIListener)(nil)
+	_ approval.Approver = (*CLIListener)(nil)
 )
 
 // CLIWriter writes assistant responses to terminal output.
@@ -48,7 +48,7 @@ func NewCLI(in io.Reader, out io.Writer) *CLIListener {
 }
 
 // Listen runs the interactive loop until EOF, /quit, /exit, or fatal handler error.
-func (c *CLIListener) Listen(ctx context.Context, handler runtimeapi.Handler) error {
+func (c *CLIListener) Listen(ctx context.Context, handler runtime.Handler) error {
 	if handler == nil {
 		return fmt.Errorf("handler is required")
 	}
@@ -82,7 +82,7 @@ func (c *CLIListener) Listen(ctx context.Context, handler runtimeapi.Handler) er
 			return nil
 		}
 
-		if err := handler.HandleMessage(ctx, writer, &runtimeapi.Message{Text: input}); err != nil {
+		if err := handler.HandleMessage(ctx, writer, &runtime.Message{Text: input}); err != nil {
 			return err
 		}
 	}

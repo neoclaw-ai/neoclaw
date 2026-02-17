@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/machinae/betterclaw/internal/approval"
-	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
+	"github.com/machinae/betterclaw/internal/runtime"
 )
 
 func TestCLIListenerListenDispatchesMessages(t *testing.T) {
@@ -94,7 +94,7 @@ type testHandler struct {
 	err      error
 }
 
-func (h *testHandler) HandleMessage(ctx context.Context, w runtimeapi.ResponseWriter, msg *runtimeapi.Message) error {
+func (h *testHandler) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg *runtime.Message) error {
 	h.messages = append(h.messages, msg.Text)
 	if h.err != nil {
 		return h.err

@@ -12,7 +12,7 @@ import (
 	"github.com/machinae/betterclaw/internal/channels"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/memory"
-	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
+	"github.com/machinae/betterclaw/internal/runtime"
 	"github.com/machinae/betterclaw/internal/session"
 	"github.com/machinae/betterclaw/internal/tools"
 	"github.com/spf13/cobra"
@@ -57,7 +57,7 @@ func newPromptCmd() *cobra.Command {
 				approver := approval.NewCLIApprover(cmd.InOrStdin(), cmd.OutOrStdout())
 				handler := agent.New(modelProvider, registry, approver, systemPrompt)
 				writer := &singleShotWriter{out: cmd.OutOrStdout()}
-				return handler.HandleMessage(cmd.Context(), writer, &runtimeapi.Message{Text: prompt})
+				return handler.HandleMessage(cmd.Context(), writer, &runtime.Message{Text: prompt})
 			}
 
 			listener := channels.NewCLI(cmd.InOrStdin(), cmd.OutOrStdout())

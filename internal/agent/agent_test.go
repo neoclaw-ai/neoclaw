@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/machinae/betterclaw/internal/memory"
-	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
+	"github.com/machinae/betterclaw/internal/runtime"
 
 	"github.com/machinae/betterclaw/internal/approval"
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 	"github.com/machinae/betterclaw/internal/session"
 	"github.com/machinae/betterclaw/internal/tools"
 )
@@ -21,12 +21,12 @@ import (
 func TestAgentHandleMessageWritesResponse(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
-		responses: []*providerapi.ChatResponse{{Content: "hello"}},
+		responses: []*provider.ChatResponse{{Content: "hello"}},
 	}
 	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
 	writer := &captureWriter{}
 
-	err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "hi"})
+	err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "hi"})
 	if err != nil {
 		t.Fatalf("handle message: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestAgentHandleMessageWritesResponse(t *testing.T) {
 func TestAgentHandleMessageAccumulatesHistory(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
-		responses: []*providerapi.ChatResponse{
+		responses: []*provider.ChatResponse{
 			{Content: "r1"},
 			{Content: "r2"},
 		},
@@ -46,10 +46,10 @@ func TestAgentHandleMessageAccumulatesHistory(t *testing.T) {
 	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
 	writer := &captureWriter{}
 
-	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "one"}); err != nil {
+	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "one"}); err != nil {
 		t.Fatalf("first handle message: %v", err)
 	}
-	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "two"}); err != nil {
+	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "two"}); err != nil {
 		t.Fatalf("second handle message: %v", err)
 	}
 
@@ -69,7 +69,7 @@ func TestAgentHandleMessageProviderErrorIsFatal(t *testing.T) {
 	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
 	writer := &captureWriter{}
 
-	err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "hi"})
+	err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "hi"})
 	if err == nil {
 		t.Fatalf("expected fatal error")
 	}
@@ -89,7 +89,7 @@ func TestAgentHandleMessageCanceledContextIsFatal(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := ag.HandleMessage(ctx, writer, &runtimeapi.Message{Text: "hi"})
+	err := ag.HandleMessage(ctx, writer, &runtime.Message{Text: "hi"})
 	if err == nil {
 		t.Fatalf("expected fatal cancellation error")
 	}
@@ -98,13 +98,13 @@ func TestAgentHandleMessageCanceledContextIsFatal(t *testing.T) {
 func TestAgentWithSessionLoadsHistoryAndAppendsTurn(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
-		responses: []*providerapi.ChatResponse{{Content: "new response"}},
+		responses: []*provider.ChatResponse{{Content: "new response"}},
 	}
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	sessionStore := session.New(sessionPath)
-	if err := sessionStore.Append(context.Background(), []providerapi.ChatMessage{
-		{Role: providerapi.RoleUser, Content: "old user"},
-		{Role: providerapi.RoleAssistant, Content: "old assistant"},
+	if err := sessionStore.Append(context.Background(), []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "old user"},
+		{Role: provider.RoleAssistant, Content: "old assistant"},
 	}); err != nil {
 		t.Fatalf("seed session: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestAgentWithSessionLoadsHistoryAndAppendsTurn(t *testing.T) {
 	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, time.Second)
 	writer := &captureWriter{}
 
-	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "next"}); err != nil {
+	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "next"}); err != nil {
 		t.Fatalf("handle message: %v", err)
 	}
 	if len(modelProvider.requests) != 1 {
@@ -129,10 +129,10 @@ func TestAgentWithSessionLoadsHistoryAndAppendsTurn(t *testing.T) {
 	if len(loaded) != 4 {
 		t.Fatalf("expected 4 persisted messages, got %d", len(loaded))
 	}
-	if loaded[2].Role != providerapi.RoleUser || loaded[2].Content != "next" {
+	if loaded[2].Role != provider.RoleUser || loaded[2].Content != "next" {
 		t.Fatalf("expected persisted user message, got %#v", loaded[2])
 	}
-	if loaded[3].Role != providerapi.RoleAssistant || loaded[3].Content != "new response" {
+	if loaded[3].Role != provider.RoleAssistant || loaded[3].Content != "new response" {
 		t.Fatalf("expected persisted assistant message, got %#v", loaded[3])
 	}
 }
@@ -140,13 +140,13 @@ func TestAgentWithSessionLoadsHistoryAndAppendsTurn(t *testing.T) {
 func TestAgentHandleMessageNewResetsSession(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
-		responses: []*providerapi.ChatResponse{{Content: "after reset"}},
+		responses: []*provider.ChatResponse{{Content: "after reset"}},
 	}
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	sessionStore := session.New(sessionPath)
-	if err := sessionStore.Append(context.Background(), []providerapi.ChatMessage{
-		{Role: providerapi.RoleUser, Content: "old user"},
-		{Role: providerapi.RoleAssistant, Content: "old assistant"},
+	if err := sessionStore.Append(context.Background(), []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "old user"},
+		{Role: provider.RoleAssistant, Content: "old assistant"},
 	}); err != nil {
 		t.Fatalf("seed session: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestAgentHandleMessageNewResetsSession(t *testing.T) {
 	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, time.Second)
 	writer := &captureWriter{}
 
-	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "/new"}); err != nil {
+	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "/new"}); err != nil {
 		t.Fatalf("handle /new: %v", err)
 	}
 	if len(modelProvider.requests) != 0 {
@@ -172,7 +172,7 @@ func TestAgentHandleMessageNewResetsSession(t *testing.T) {
 		t.Fatalf("expected empty session after /new, got %#v", loaded)
 	}
 
-	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "fresh"}); err != nil {
+	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "fresh"}); err != nil {
 		t.Fatalf("handle post-reset message: %v", err)
 	}
 	if len(modelProvider.requests) != 1 {
@@ -186,13 +186,13 @@ func TestAgentHandleMessageNewResetsSession(t *testing.T) {
 func TestAgentHandleMessageNewWritesSummaryToDailyLog(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
-		responses: []*providerapi.ChatResponse{{Content: "session summary"}},
+		responses: []*provider.ChatResponse{{Content: "session summary"}},
 	}
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	sessionStore := session.New(sessionPath)
-	if err := sessionStore.Append(context.Background(), []providerapi.ChatMessage{
-		{Role: providerapi.RoleUser, Content: "old user"},
-		{Role: providerapi.RoleAssistant, Content: "old assistant"},
+	if err := sessionStore.Append(context.Background(), []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "old user"},
+		{Role: provider.RoleAssistant, Content: "old assistant"},
 	}); err != nil {
 		t.Fatalf("seed session: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestAgentHandleMessageNewWritesSummaryToDailyLog(t *testing.T) {
 	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, memoryStore, 4000, 10, time.Second)
 	writer := &captureWriter{}
 
-	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "/new"}); err != nil {
+	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "/new"}); err != nil {
 		t.Fatalf("handle /new: %v", err)
 	}
 	if len(writer.messages) != 1 || writer.messages[0] != "Session cleared." {
@@ -228,7 +228,7 @@ func TestAgentHandleMessageNewWritesSummaryToDailyLog(t *testing.T) {
 func TestAgentHandleMessageNewSkipsSummaryOnEmptyHistory(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
-		responses: []*providerapi.ChatResponse{{Content: "unexpected summary call"}},
+		responses: []*provider.ChatResponse{{Content: "unexpected summary call"}},
 	}
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	sessionStore := session.New(sessionPath)
@@ -237,7 +237,7 @@ func TestAgentHandleMessageNewSkipsSummaryOnEmptyHistory(t *testing.T) {
 	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, memoryStore, 4000, 10, time.Second)
 	writer := &captureWriter{}
 
-	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "/new"}); err != nil {
+	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "/new"}); err != nil {
 		t.Fatalf("handle /new: %v", err)
 	}
 	if len(writer.messages) != 1 || writer.messages[0] != "Session cleared." {
@@ -255,16 +255,16 @@ func TestAgentHandleMessageNewSkipsSummaryOnEmptyHistory(t *testing.T) {
 
 func TestCompactHistoryIfNeededAddsSummaryMessage(t *testing.T) {
 	modelProvider := &recordingProvider{
-		responses: []*providerapi.ChatResponse{{Content: "summary output"}},
+		responses: []*provider.ChatResponse{{Content: "summary output"}},
 	}
 	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, DefaultSystemPrompt)
 	ag.maxContextTokens = 10
 	ag.recentMessages = 2
-	messages := []providerapi.ChatMessage{
-		{Role: providerapi.RoleUser, Content: "1111111111"},
-		{Role: providerapi.RoleAssistant, Content: "2222222222"},
-		{Role: providerapi.RoleUser, Content: "3333333333"},
-		{Role: providerapi.RoleAssistant, Content: "4444444444"},
+	messages := []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "1111111111"},
+		{Role: provider.RoleAssistant, Content: "2222222222"},
+		{Role: provider.RoleUser, Content: "3333333333"},
+		{Role: provider.RoleAssistant, Content: "4444444444"},
 	}
 
 	compacted, err := ag.compactHistoryIfNeeded(context.Background(), messages)
@@ -274,7 +274,7 @@ func TestCompactHistoryIfNeededAddsSummaryMessage(t *testing.T) {
 	if len(compacted) != 3 {
 		t.Fatalf("expected summary + 2 recent messages, got %d", len(compacted))
 	}
-	if compacted[0].Kind != summaryKind || compacted[0].Role != providerapi.RoleAssistant || compacted[0].Content != "summary output" {
+	if compacted[0].Kind != summaryKind || compacted[0].Role != provider.RoleAssistant || compacted[0].Content != "summary output" {
 		t.Fatalf("expected summary message, got %#v", compacted[0])
 	}
 	if len(modelProvider.requests) != 1 {
@@ -289,11 +289,11 @@ func TestCompactHistoryIfNeededFallbackRecentOnlyOnSummaryFailure(t *testing.T) 
 	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, DefaultSystemPrompt)
 	ag.maxContextTokens = 10
 	ag.recentMessages = 2
-	messages := []providerapi.ChatMessage{
-		{Role: providerapi.RoleUser, Content: "1111111111"},
-		{Role: providerapi.RoleAssistant, Content: "2222222222"},
-		{Role: providerapi.RoleUser, Content: "3333333333"},
-		{Role: providerapi.RoleAssistant, Content: "4444444444"},
+	messages := []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "1111111111"},
+		{Role: provider.RoleAssistant, Content: "2222222222"},
+		{Role: provider.RoleUser, Content: "3333333333"},
+		{Role: provider.RoleAssistant, Content: "4444444444"},
 	}
 
 	compacted, err := ag.compactHistoryIfNeeded(context.Background(), messages)
@@ -315,9 +315,9 @@ func TestAgentSessionStoresTruncatedToolOutput(t *testing.T) {
 	}
 
 	modelProvider := &recordingProvider{
-		responses: []*providerapi.ChatResponse{
+		responses: []*provider.ChatResponse{
 			{
-				ToolCalls: []providerapi.ToolCall{
+				ToolCalls: []provider.ToolCall{
 					{ID: "call_1", Name: "truncating_tool", Arguments: "{}"},
 				},
 			},
@@ -330,7 +330,7 @@ func TestAgentSessionStoresTruncatedToolOutput(t *testing.T) {
 	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, time.Second)
 	writer := &captureWriter{}
 
-	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "run the tool"}); err != nil {
+	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "run the tool"}); err != nil {
 		t.Fatalf("handle message: %v", err)
 	}
 
@@ -339,9 +339,9 @@ func TestAgentSessionStoresTruncatedToolOutput(t *testing.T) {
 		t.Fatalf("load session: %v", err)
 	}
 
-	var toolMsg *providerapi.ChatMessage
+	var toolMsg *provider.ChatMessage
 	for i := range loaded {
-		if loaded[i].Role == providerapi.RoleTool {
+		if loaded[i].Role == provider.RoleTool {
 			toolMsg = &loaded[i]
 			break
 		}
@@ -373,14 +373,14 @@ func (w *captureWriter) WriteMessage(_ context.Context, text string) error {
 }
 
 type recordingProvider struct {
-	requests           []providerapi.ChatRequest
-	responses          []*providerapi.ChatResponse
+	requests           []provider.ChatRequest
+	responses          []*provider.ChatResponse
 	err                error
 	errs               []error
 	requireLiveContext bool
 }
 
-func (p *recordingProvider) Chat(ctx context.Context, req providerapi.ChatRequest) (*providerapi.ChatResponse, error) {
+func (p *recordingProvider) Chat(ctx context.Context, req provider.ChatRequest) (*provider.ChatResponse, error) {
 	p.requests = append(p.requests, req)
 	if p.requireLiveContext && ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -396,7 +396,7 @@ func (p *recordingProvider) Chat(ctx context.Context, req providerapi.ChatReques
 		}
 	}
 	if len(p.responses) == 0 {
-		return &providerapi.ChatResponse{Content: ""}, nil
+		return &provider.ChatResponse{Content: ""}, nil
 	}
 	resp := p.responses[0]
 	p.responses = p.responses[1:]

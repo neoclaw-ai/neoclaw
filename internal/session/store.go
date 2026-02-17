@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 )
 
 // Store persists conversation history in a JSONL file.
@@ -18,11 +18,11 @@ type Store struct {
 }
 
 type record struct {
-	Kind       string                 `json:"kind,omitempty"`
-	Role       providerapi.Role       `json:"role"`
-	Content    string                 `json:"content,omitempty"`
-	ToolCallID string                 `json:"tool_call_id,omitempty"`
-	ToolCalls  []providerapi.ToolCall `json:"tool_calls,omitempty"`
+	Kind       string              `json:"kind,omitempty"`
+	Role       provider.Role       `json:"role"`
+	Content    string              `json:"content,omitempty"`
+	ToolCallID string              `json:"tool_call_id,omitempty"`
+	ToolCalls  []provider.ToolCall `json:"tool_calls,omitempty"`
 }
 
 // New creates a session store for one channel session file.
@@ -32,7 +32,7 @@ func New(path string) *Store {
 
 // Load reads all valid JSONL records from disk into chat messages.
 // Malformed lines are skipped.
-func (s *Store) Load(ctx context.Context) ([]providerapi.ChatMessage, error) {
+func (s *Store) Load(ctx context.Context) ([]provider.ChatMessage, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -42,14 +42,14 @@ func (s *Store) Load(ctx context.Context) ([]providerapi.ChatMessage, error) {
 
 	f, err := os.Open(s.path)
 	if errors.Is(err, os.ErrNotExist) {
-		return []providerapi.ChatMessage{}, nil
+		return []provider.ChatMessage{}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("open session file: %w", err)
 	}
 	defer f.Close()
 
-	messages := make([]providerapi.ChatMessage, 0)
+	messages := make([]provider.ChatMessage, 0)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		if err := ctx.Err(); err != nil {
@@ -63,7 +63,7 @@ func (s *Store) Load(ctx context.Context) ([]providerapi.ChatMessage, error) {
 		if err := json.Unmarshal(line, &rec); err != nil {
 			continue
 		}
-		messages = append(messages, providerapi.ChatMessage{
+		messages = append(messages, provider.ChatMessage{
 			Kind:       rec.Kind,
 			Role:       rec.Role,
 			Content:    rec.Content,
@@ -78,7 +78,7 @@ func (s *Store) Load(ctx context.Context) ([]providerapi.ChatMessage, error) {
 }
 
 // Append appends messages as JSONL records.
-func (s *Store) Append(ctx context.Context, messages []providerapi.ChatMessage) error {
+func (s *Store) Append(ctx context.Context, messages []provider.ChatMessage) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (s *Store) Append(ctx context.Context, messages []providerapi.ChatMessage) 
 }
 
 // Rewrite replaces the session file with the provided message list.
-func (s *Store) Rewrite(ctx context.Context, messages []providerapi.ChatMessage) error {
+func (s *Store) Rewrite(ctx context.Context, messages []provider.ChatMessage) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}

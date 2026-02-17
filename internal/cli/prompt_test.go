@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/machinae/betterclaw/internal/config"
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 )
 
 func TestPromptFlagParsing(t *testing.T) {
@@ -15,9 +15,9 @@ func TestPromptFlagParsing(t *testing.T) {
 
 	origFactory := providerFactory
 	defer func() { providerFactory = origFactory }()
-	providerFactory = func(_ config.LLMProviderConfig) (providerapi.Provider, error) {
+	providerFactory = func(_ config.LLMProviderConfig) (provider.Provider, error) {
 		return fakeProvider{
-			resp: &providerapi.ChatResponse{Content: "hello from llm"},
+			resp: &provider.ChatResponse{Content: "hello from llm"},
 		}, nil
 	}
 
@@ -43,9 +43,9 @@ func TestPromptInteractiveMode(t *testing.T) {
 
 	origFactory := providerFactory
 	defer func() { providerFactory = origFactory }()
-	providerFactory = func(_ config.LLMProviderConfig) (providerapi.Provider, error) {
+	providerFactory = func(_ config.LLMProviderConfig) (provider.Provider, error) {
 		return fakeProvider{
-			resp: &providerapi.ChatResponse{Content: "hello from llm"},
+			resp: &provider.ChatResponse{Content: "hello from llm"},
 		}, nil
 	}
 

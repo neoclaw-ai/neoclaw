@@ -6,24 +6,24 @@ import (
 	"strings"
 
 	"github.com/machinae/betterclaw/internal/logging"
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 )
 
 const summaryKind = "summary"
 const summaryPrompt = "Summarize the earlier conversation for future context. Include user preferences, constraints, decisions, and unresolved tasks. Be concise and factual."
 
-func (a *Agent) compactHistoryIfNeeded(ctx context.Context, messages []providerapi.ChatMessage) ([]providerapi.ChatMessage, error) {
+func (a *Agent) compactHistoryIfNeeded(ctx context.Context, messages []provider.ChatMessage) ([]provider.ChatMessage, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if a.maxContextTokens <= 0 {
-		return append([]providerapi.ChatMessage{}, messages...), nil
+		return append([]provider.ChatMessage{}, messages...), nil
 	}
 	if estimateTokens(a.systemPrompt, messages) <= a.maxContextTokens {
-		return append([]providerapi.ChatMessage{}, messages...), nil
+		return append([]provider.ChatMessage{}, messages...), nil
 	}
 	if len(messages) == 0 {
-		return []providerapi.ChatMessage{}, nil
+		return []provider.ChatMessage{}, nil
 	}
 
 	recentCount := a.recentMessages
@@ -31,7 +31,7 @@ func (a *Agent) compactHistoryIfNeeded(ctx context.Context, messages []providera
 		recentCount = len(messages)
 	}
 	olderCount := len(messages) - recentCount
-	recent := append([]providerapi.ChatMessage{}, messages[olderCount:]...)
+	recent := append([]provider.ChatMessage{}, messages[olderCount:]...)
 	if olderCount <= 0 {
 		return recent, nil
 	}
@@ -47,21 +47,21 @@ func (a *Agent) compactHistoryIfNeeded(ctx context.Context, messages []providera
 		return recent, nil
 	}
 
-	compacted := make([]providerapi.ChatMessage, 0, len(recent)+1)
-	compacted = append(compacted, providerapi.ChatMessage{
+	compacted := make([]provider.ChatMessage, 0, len(recent)+1)
+	compacted = append(compacted, provider.ChatMessage{
 		Kind:    summaryKind,
-		Role:    providerapi.RoleAssistant,
+		Role:    provider.RoleAssistant,
 		Content: summary,
 	})
 	compacted = append(compacted, recent...)
 	return compacted, nil
 }
 
-func (a *Agent) summarizeMessages(ctx context.Context, messages []providerapi.ChatMessage) (string, error) {
+func (a *Agent) summarizeMessages(ctx context.Context, messages []provider.ChatMessage) (string, error) {
 	if len(messages) == 0 {
 		return "", nil
 	}
-	resp, err := a.provider.Chat(ctx, providerapi.ChatRequest{
+	resp, err := a.provider.Chat(ctx, provider.ChatRequest{
 		SystemPrompt: summaryPrompt,
 		Messages:     messages,
 		Tools:        nil,
@@ -75,7 +75,7 @@ func (a *Agent) summarizeMessages(ctx context.Context, messages []providerapi.Ch
 	return resp.Content, nil
 }
 
-func estimateTokens(systemPrompt string, messages []providerapi.ChatMessage) int {
+func estimateTokens(systemPrompt string, messages []provider.ChatMessage) int {
 	charCount := len(systemPrompt)
 	for _, msg := range messages {
 		charCount += len(msg.Kind)
@@ -90,7 +90,7 @@ func estimateTokens(systemPrompt string, messages []providerapi.ChatMessage) int
 	return charCount / 4
 }
 
-func sameMessageSlice(a, b []providerapi.ChatMessage) bool {
+func sameMessageSlice(a, b []provider.ChatMessage) bool {
 	if len(a) != len(b) {
 		return false
 	}

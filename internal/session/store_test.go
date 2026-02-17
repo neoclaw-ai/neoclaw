@@ -6,29 +6,29 @@ import (
 	"path/filepath"
 	"testing"
 
-	providerapi "github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/provider"
 )
 
 func TestStoreAppendLoadRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	store := New(path)
 
-	input := []providerapi.ChatMessage{
-		{Role: providerapi.RoleUser, Content: "hello"},
+	input := []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "hello"},
 		{
 			Kind:    "summary",
-			Role:    providerapi.RoleAssistant,
+			Role:    provider.RoleAssistant,
 			Content: "summary text",
 		},
 		{
-			Role:    providerapi.RoleAssistant,
+			Role:    provider.RoleAssistant,
 			Content: "calling tool",
-			ToolCalls: []providerapi.ToolCall{
+			ToolCalls: []provider.ToolCall{
 				{ID: "1", Name: "list_dir", Arguments: `{"path":"."}`},
 			},
 		},
 		{
-			Role:       providerapi.RoleTool,
+			Role:       provider.RoleTool,
 			ToolCallID: "1",
 			Content:    "file1\nfile2",
 		},
@@ -76,8 +76,8 @@ func TestStoreLoadSkipsMalformedLines(t *testing.T) {
 func TestStoreResetClearsFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	store := New(path)
-	if err := store.Append(context.Background(), []providerapi.ChatMessage{
-		{Role: providerapi.RoleUser, Content: "hello"},
+	if err := store.Append(context.Background(), []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "hello"},
 	}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
