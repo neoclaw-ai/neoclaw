@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/machinae/betterclaw/internal/bootstrap"
 	"github.com/machinae/betterclaw/internal/channels"
 	"github.com/machinae/betterclaw/internal/config"
+	"github.com/machinae/betterclaw/internal/logging"
 	providerapi "github.com/machinae/betterclaw/internal/provider"
 	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
 	"github.com/machinae/betterclaw/internal/tools"
@@ -24,6 +26,8 @@ var providerFactory = providerapi.NewProviderFromConfig
 
 // NewRootCmd creates the root command and registers all subcommands.
 func NewRootCmd() *cobra.Command {
+	var verbose bool
+
 	root := &cobra.Command{
 		Use:   "claw",
 		Short: "BetterClaw CLI",
@@ -31,6 +35,12 @@ func NewRootCmd() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if verbose {
+				logging.SetLevel(slog.LevelInfo)
+			} else {
+				logging.SetLevel(slog.LevelWarn)
+			}
+
 			cfg, err := config.Load()
 			if err != nil {
 				return err
@@ -67,6 +77,7 @@ func NewRootCmd() *cobra.Command {
 
 	root.AddCommand(newServeCmd())
 	root.AddCommand(newPromptCmd())
+	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (info level)")
 
 	return root
 }

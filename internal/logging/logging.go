@@ -8,13 +8,15 @@ import (
 	"golang.org/x/term"
 )
 
-var logger = slog.New(newHandler())
+const defaultLogLevel = slog.LevelWarn
 
-func newHandler() slog.Handler {
-	opts := &slog.HandlerOptions{Level: slog.LevelInfo}
+var logger = slog.New(newHandler(defaultLogLevel))
+
+func newHandler(level slog.Level) slog.Handler {
+	opts := &slog.HandlerOptions{Level: level}
 	if isTerminal(os.Stderr) {
 		return tint.NewHandler(os.Stderr, &tint.Options{
-			Level:      slog.LevelInfo,
+			Level:      level,
 			TimeFormat: "15:04:05",
 			ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
 				if len(groups) > 0 || attr.Key != slog.LevelKey {
@@ -48,4 +50,9 @@ func isTerminal(f *os.File) bool {
 // Logger returns the process logger.
 func Logger() *slog.Logger {
 	return logger
+}
+
+// SetLevel updates the global logger level.
+func SetLevel(level slog.Level) {
+	logger = slog.New(newHandler(level))
 }
