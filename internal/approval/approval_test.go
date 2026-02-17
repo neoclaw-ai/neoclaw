@@ -2,6 +2,7 @@ package approval
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -119,6 +120,51 @@ func TestExecuteTool_RunCommandNonAllowlistedRequiresApprover(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "requires approval") {
 		t.Fatalf("expected missing approver error for non-allowlisted command, got %v", err)
 	}
+}
+
+func TestExecuteTool_AlwaysApprovedPersistsRunCommandBinary(t *testing.T) {
+	workspace := t.TempDir()
+	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
+	if err := os.WriteFile(allowedPath, []byte("[\"pwd\"]\n"), 0o644); err != nil {
+		t.Fatalf("write allowed bins: %v", err)
+	}
+
+	tool := tools.RunCommandTool{
+		WorkspaceDir:    workspace,
+		AllowedBinsPath: allowedPath,
+	}
+	appr := &fakeApprover{decision: AlwaysApproved}
+
+	if _, err := ExecuteTool(
+		context.Background(),
+		appr,
+		tool,
+		map[string]any{"command": "echo hello"},
+		"Run: echo hello",
+	); err != nil {
+		t.Fatalf("execute tool: %v", err)
+	}
+
+	raw, err := os.ReadFile(allowedPath)
+	if err != nil {
+		t.Fatalf("read allowlist: %v", err)
+	}
+	var allowed []string
+	if err := json.Unmarshal(raw, &allowed); err != nil {
+		t.Fatalf("unmarshal allowlist: %v", err)
+	}
+	if !containsString(allowed, "echo") {
+		t.Fatalf("expected allowlist to contain echo, got %v", allowed)
+	}
+}
+
+func containsString(values []string, target string) bool {
+	for _, v := range values {
+		if v == target {
+			return true
+		}
+	}
+	return false
 }
 
 type fakeApprover struct {

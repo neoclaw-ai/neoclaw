@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
@@ -25,7 +26,8 @@ type ApprovalDecision int
 const (
 	// Approved indicates approval for this invocation only.
 	Approved ApprovalDecision = iota
-	// AlwaysApproved indicates sticky approval semantics (future use).
+	// AlwaysApproved indicates the action is approved and the decision should be persisted
+	// so future invocations of the same binary/domain are auto-approved.
 	AlwaysApproved
 	// Denied indicates the action was explicitly rejected.
 	Denied
@@ -75,6 +77,26 @@ func ExecuteTool(ctx context.Context, approver Approver, tool tools.Tool, args m
 				"user denied tool %q. User denied this action. Try a different approach or ask the user for guidance",
 				tool.Name(),
 			)
+		}
+		if decision == AlwaysApproved {
+			switch t := tool.(type) {
+			case tools.RunCommandTool:
+				if err := t.PersistAllowedBinary(args); err != nil {
+					logging.Logger().Warn(
+						"failed to persist run_command always approval",
+						"tool", tool.Name(),
+						"err", err,
+					)
+				}
+			case *tools.RunCommandTool:
+				if err := t.PersistAllowedBinary(args); err != nil {
+					logging.Logger().Warn(
+						"failed to persist run_command always approval",
+						"tool", tool.Name(),
+						"err", err,
+					)
+				}
+			}
 		}
 	}
 

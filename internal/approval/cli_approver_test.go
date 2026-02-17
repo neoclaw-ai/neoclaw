@@ -25,6 +25,9 @@ func TestCLIApprover_Approved(t *testing.T) {
 	if !strings.Contains(out.String(), "approve tool run_command?") {
 		t.Fatalf("expected prompt text, got %q", out.String())
 	}
+	if !strings.Contains(out.String(), "[y]es/[n]o/[a]lways") {
+		t.Fatalf("expected explicit yes/no/always prompt, got %q", out.String())
+	}
 }
 
 func TestCLIApprover_AlwaysApproved(t *testing.T) {

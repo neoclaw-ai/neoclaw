@@ -2,8 +2,10 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -258,4 +260,86 @@ func TestRunCommandSummarizeArgs(t *testing.T) {
 	if got != want {
 		t.Fatalf("expected %q, got %q", want, got)
 	}
+}
+
+func TestAddAllowedBinary_AppendsToFile(t *testing.T) {
+	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
+	if err := os.WriteFile(allowedPath, []byte("[\"ls\"]\n"), 0o644); err != nil {
+		t.Fatalf("write allowlist: %v", err)
+	}
+
+	if err := addAllowedBinary(allowedPath, "git"); err != nil {
+		t.Fatalf("add allowed binary: %v", err)
+	}
+
+	allowed := readAllowedBins(t, allowedPath)
+	want := []string{"ls", "git"}
+	if !reflect.DeepEqual(allowed, want) {
+		t.Fatalf("expected allowlist %v, got %v", want, allowed)
+	}
+}
+
+func TestAddAllowedBinary_NoDuplicates(t *testing.T) {
+	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
+	initial := []byte("[\"ls\"]\n")
+	if err := os.WriteFile(allowedPath, initial, 0o644); err != nil {
+		t.Fatalf("write allowlist: %v", err)
+	}
+
+	if err := addAllowedBinary(allowedPath, "ls"); err != nil {
+		t.Fatalf("add allowed binary: %v", err)
+	}
+
+	raw, err := os.ReadFile(allowedPath)
+	if err != nil {
+		t.Fatalf("read allowlist: %v", err)
+	}
+	if string(raw) != string(initial) {
+		t.Fatalf("expected unchanged file %q, got %q", string(initial), string(raw))
+	}
+}
+
+func TestAddAllowedBinary_CreatesFileIfMissing(t *testing.T) {
+	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
+
+	if err := addAllowedBinary(allowedPath, "git"); err != nil {
+		t.Fatalf("add allowed binary: %v", err)
+	}
+
+	allowed := readAllowedBins(t, allowedPath)
+	want := []string{"git"}
+	if !reflect.DeepEqual(allowed, want) {
+		t.Fatalf("expected allowlist %v, got %v", want, allowed)
+	}
+}
+
+func TestPersistAllowedBinary_ExtractsFirstToken(t *testing.T) {
+	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
+	tool := RunCommandTool{
+		AllowedBinsPath: allowedPath,
+	}
+
+	if err := tool.PersistAllowedBinary(map[string]any{"command": "npm install foo"}); err != nil {
+		t.Fatalf("persist allowed binary: %v", err)
+	}
+
+	allowed := readAllowedBins(t, allowedPath)
+	want := []string{"npm"}
+	if !reflect.DeepEqual(allowed, want) {
+		t.Fatalf("expected allowlist %v, got %v", want, allowed)
+	}
+}
+
+func readAllowedBins(t *testing.T, path string) []string {
+	t.Helper()
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read allowlist: %v", err)
+	}
+	var allowed []string
+	if err := json.Unmarshal(raw, &allowed); err != nil {
+		t.Fatalf("unmarshal allowlist: %v", err)
+	}
+	return allowed
 }

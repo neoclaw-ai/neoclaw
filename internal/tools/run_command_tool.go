@@ -67,6 +67,19 @@ func (t RunCommandTool) SummarizeArgs(args map[string]any) string {
 	return fmt.Sprintf("run_command: %s", command)
 }
 
+// PersistAllowedBinary stores the command binary in allowed_bins.json for future auto-approval.
+func (t RunCommandTool) PersistAllowedBinary(args map[string]any) error {
+	command, err := stringArg(args, "command")
+	if err != nil {
+		return err
+	}
+	bin, err := firstCommandToken(command)
+	if err != nil {
+		return err
+	}
+	return addAllowedBinary(t.AllowedBinsPath, bin)
+}
+
 // RequiresApprovalForArgs resolves approval behavior for this specific command.
 // Allowlisted binaries are auto-approved; all others require an approval prompt.
 func (t RunCommandTool) RequiresApprovalForArgs(args map[string]any) (bool, error) {
@@ -229,4 +242,70 @@ func isAllowedBinary(allowedBinsPath, bin string) bool {
 	}
 
 	return false
+}
+
+func addAllowedBinary(allowedBinsPath, bin string) error {
+	if strings.TrimSpace(allowedBinsPath) == "" {
+		return fmt.Errorf("allowed bins path is required")
+	}
+
+	dir := filepath.Dir(allowedBinsPath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create allowlist directory: %w", err)
+	}
+
+	allowed := make([]string, 0)
+	raw, err := os.ReadFile(allowedBinsPath)
+	switch {
+	case err == nil:
+		if len(strings.TrimSpace(string(raw))) > 0 {
+			if err := json.Unmarshal(raw, &allowed); err != nil {
+				return fmt.Errorf("decode allowlist %q: %w", allowedBinsPath, err)
+			}
+		}
+	case errors.Is(err, os.ErrNotExist):
+		// Missing file is treated as empty allowlist.
+	default:
+		return fmt.Errorf("read allowlist %q: %w", allowedBinsPath, err)
+	}
+
+	target := filepath.Base(strings.TrimSpace(bin))
+	if target == "" || target == "." {
+		return fmt.Errorf("binary is required")
+	}
+
+	for _, candidate := range allowed {
+		if filepath.Base(strings.TrimSpace(candidate)) == target {
+			return nil
+		}
+	}
+
+	allowed = append(allowed, target)
+	encoded, err := json.MarshalIndent(allowed, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode allowlist: %w", err)
+	}
+	encoded = append(encoded, '\n')
+
+	tempFile, err := os.CreateTemp(dir, "allowed_bins-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create allowlist temp file: %w", err)
+	}
+	tempPath := tempFile.Name()
+	defer func() {
+		_ = os.Remove(tempPath)
+	}()
+
+	if _, err := tempFile.Write(encoded); err != nil {
+		_ = tempFile.Close()
+		return fmt.Errorf("write allowlist temp file: %w", err)
+	}
+	if err := tempFile.Close(); err != nil {
+		return fmt.Errorf("close allowlist temp file: %w", err)
+	}
+	if err := os.Rename(tempPath, allowedBinsPath); err != nil {
+		return fmt.Errorf("replace allowlist: %w", err)
+	}
+
+	return nil
 }

@@ -81,6 +81,9 @@ func TestCLIListenerRequestApproval(t *testing.T) {
 			if got := out.String(); !strings.Contains(got, "approve tool run_command?") {
 				t.Fatalf("expected prompt output, got %q", got)
 			}
+			if got := out.String(); !strings.Contains(got, "[y]es/[n]o/[a]lways") {
+				t.Fatalf("expected explicit yes/no/always prompt, got %q", got)
+			}
 		})
 	}
 }

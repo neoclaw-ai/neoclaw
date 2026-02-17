@@ -97,7 +97,7 @@ func (c *CLIListener) RequestApproval(ctx context.Context, req approval.Approval
 		return approval.Denied, err
 	}
 
-	prompt := fmt.Sprintf("approve tool %s? %s [y/N]: ", req.Tool, req.Description)
+	prompt := fmt.Sprintf("approve tool %s? %s [y]es/[n]o/[a]lways: ", req.Tool, req.Description)
 
 	var answer string
 	if c.rl != nil {
