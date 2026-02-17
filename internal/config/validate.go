@@ -21,6 +21,9 @@ func (c LLMProviderConfig) Validate() error {
 	if c.Model == "" {
 		return errors.New("model is required")
 	}
+	if c.RequestTimeout <= 0 {
+		return errors.New("request_timeout must be > 0")
+	}
 
 	switch c.Provider {
 	case "anthropic", "openrouter":

@@ -119,6 +119,7 @@ func defaultConfigTOML() string {
 api_key = "$ANTHROPIC_API_KEY"
 provider = "anthropic"
 model = "claude-sonnet-4-6"
+request_timeout = "30s"
 
 [channels.telegram]
 enabled = true

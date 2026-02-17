@@ -5,16 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
 
 	"github.com/machinae/betterclaw/internal/approval"
+	"github.com/machinae/betterclaw/internal/memory"
 	providerapi "github.com/machinae/betterclaw/internal/provider"
 	"github.com/machinae/betterclaw/internal/session"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
 const defaultAgentMaxIterations = 10
+const defaultRequestTimeout = 30 * time.Second
 
 // DefaultSystemPrompt is the default system prompt used by the prompt command.
 const DefaultSystemPrompt = "You are BetterClaw, a lightweight personal AI assistant."
@@ -30,6 +33,8 @@ type Agent struct {
 	recentMessages    int
 	history           []providerapi.ChatMessage
 	sessionStore      *session.Store
+	memoryStore       *memory.Store
+	requestTimeout    time.Duration
 	historyLoadedOnce bool
 }
 
@@ -54,13 +59,20 @@ func NewWithSession(
 	approver approval.Approver,
 	systemPrompt string,
 	sessionStore *session.Store,
+	memoryStore *memory.Store,
 	maxContextTokens int,
 	recentMessages int,
+	requestTimeout time.Duration,
 ) *Agent {
 	ag := New(provider, registry, approver, systemPrompt)
 	ag.sessionStore = sessionStore
+	ag.memoryStore = memoryStore
 	ag.maxContextTokens = maxContextTokens
 	ag.recentMessages = recentMessages
+	ag.requestTimeout = requestTimeout
+	if ag.requestTimeout <= 0 {
+		ag.requestTimeout = defaultRequestTimeout
+	}
 	return ag
 }
 
@@ -80,6 +92,8 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtimeapi.ResponseWriter, 
 	}
 
 	if isResetCommand(msg.Text) {
+		historySnapshot := append([]providerapi.ChatMessage{}, a.history...)
+		a.summarizeSessionToDailyLogAsync(ctx, historySnapshot)
 		if err := a.resetSession(ctx); err != nil {
 			return err
 		}

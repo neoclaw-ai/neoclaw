@@ -33,7 +33,8 @@ func newPromptCmd() *cobra.Command {
 				return err
 			}
 
-			modelProvider, err := providerFactory(cfg.DefaultLLM())
+			llmCfg := cfg.DefaultLLM()
+			modelProvider, err := providerFactory(llmCfg)
 			if err != nil {
 				return err
 			}
@@ -67,8 +68,10 @@ func newPromptCmd() *cobra.Command {
 				listener,
 				systemPrompt,
 				sessionStore,
+				memoryStore,
 				cfg.Costs.MaxContextTokens,
 				cfg.Costs.RecentMessages,
+				llmCfg.RequestTimeout,
 			)
 			return listener.Listen(cmd.Context(), handler)
 		},

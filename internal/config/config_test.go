@@ -21,6 +21,7 @@ func TestLoad_FileOverridesDefaults(t *testing.T) {
 api_key = "test-key"
 provider = "openrouter"
 model = "deepseek/deepseek-chat"
+request_timeout = "45s"
 
 [channels.telegram]
 enabled = false
@@ -45,6 +46,9 @@ allowed_users = [123]
 	}
 	if llm.Model != "deepseek/deepseek-chat" {
 		t.Fatalf("expected model %q, got %q", "deepseek/deepseek-chat", llm.Model)
+	}
+	if llm.RequestTimeout != 45*time.Second {
+		t.Fatalf("expected request timeout %v, got %v", 45*time.Second, llm.RequestTimeout)
 	}
 
 	telegram := cfg.TelegramChannel()
@@ -110,6 +114,9 @@ func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
 	}
 	if llm.MaxTokens != defaultConfig.LLM[defaultLLMProfile].MaxTokens {
 		t.Fatalf("expected default max tokens %d, got %d", defaultConfig.LLM[defaultLLMProfile].MaxTokens, llm.MaxTokens)
+	}
+	if llm.RequestTimeout != defaultConfig.LLM[defaultLLMProfile].RequestTimeout {
+		t.Fatalf("expected default request timeout %v, got %v", defaultConfig.LLM[defaultLLMProfile].RequestTimeout, llm.RequestTimeout)
 	}
 	if cfg.Security.CommandTimeout != 5*time.Minute {
 		t.Fatalf("expected default timeout 5m, got %v", cfg.Security.CommandTimeout)

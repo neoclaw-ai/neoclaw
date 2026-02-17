@@ -48,10 +48,11 @@ type ChannelConfig struct {
 
 // LLMProviderConfig configures one LLM provider profile.
 type LLMProviderConfig struct {
-	APIKey    string `mapstructure:"api_key"`
-	Provider  string `mapstructure:"provider"`
-	Model     string `mapstructure:"model"`
-	MaxTokens int    `mapstructure:"max_tokens"`
+	APIKey         string        `mapstructure:"api_key"`
+	Provider       string        `mapstructure:"provider"`
+	Model          string        `mapstructure:"model"`
+	MaxTokens      int           `mapstructure:"max_tokens"`
+	RequestTimeout time.Duration `mapstructure:"request_timeout"`
 }
 
 // SecurityConfig controls command execution and sandbox behavior.
@@ -93,10 +94,11 @@ var defaultConfig = Config{
 	},
 	LLM: map[string]LLMProviderConfig{
 		defaultLLMProfile: {
-			APIKey:    "",
-			Provider:  "anthropic",
-			Model:     "claude-sonnet-4-6",
-			MaxTokens: 8192,
+			APIKey:         "",
+			Provider:       "anthropic",
+			Model:          "claude-sonnet-4-6",
+			MaxTokens:      8192,
+			RequestTimeout: 30 * time.Second,
 		},
 	},
 	Security: SecurityConfig{
@@ -197,6 +199,7 @@ func Write(w io.Writer) error {
 	}
 
 	// Keep duration fields human-readable in generated TOML.
+	v.Set("llm."+defaultLLMProfile+".request_timeout", v.GetDuration("llm."+defaultLLMProfile+".request_timeout").String())
 	v.Set("security.command_timeout", v.GetDuration("security.command_timeout").String())
 	v.Set("costs.circuit_breaker_window", v.GetDuration("costs.circuit_breaker_window").String())
 
@@ -215,6 +218,7 @@ func setDefaults(v *viper.Viper, dataDir string) {
 	v.SetDefault("llm."+defaultLLMProfile+".provider", defaultConfig.LLM[defaultLLMProfile].Provider)
 	v.SetDefault("llm."+defaultLLMProfile+".model", defaultConfig.LLM[defaultLLMProfile].Model)
 	v.SetDefault("llm."+defaultLLMProfile+".max_tokens", defaultConfig.LLM[defaultLLMProfile].MaxTokens)
+	v.SetDefault("llm."+defaultLLMProfile+".request_timeout", defaultConfig.LLM[defaultLLMProfile].RequestTimeout)
 
 	v.SetDefault("security.command_timeout", defaultConfig.Security.CommandTimeout)
 	v.SetDefault("security.mode", defaultConfig.Security.Mode)

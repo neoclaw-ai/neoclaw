@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
@@ -28,7 +29,7 @@ func TestValidateStartup_HardFailNoLLM(t *testing.T) {
 
 func TestValidateStartup_HardFailNoChannels(t *testing.T) {
 	cfg := &Config{
-		LLM:      map[string]LLMProviderConfig{"default": {Provider: "anthropic", APIKey: "k", Model: "m"}},
+		LLM:      map[string]LLMProviderConfig{"default": {Provider: "anthropic", APIKey: "k", Model: "m", RequestTimeout: time.Second}},
 		Channels: map[string]ChannelConfig{},
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
@@ -41,7 +42,7 @@ func TestValidateStartup_HardFailNoChannels(t *testing.T) {
 
 func TestValidateStartup_AnthropicRequiresAPIKey(t *testing.T) {
 	cfg := &Config{
-		LLM:      map[string]LLMProviderConfig{"default": {Provider: "anthropic", APIKey: "", Model: "m"}},
+		LLM:      map[string]LLMProviderConfig{"default": {Provider: "anthropic", APIKey: "", Model: "m", RequestTimeout: time.Second}},
 		Channels: map[string]ChannelConfig{"telegram": {Enabled: true, Token: "t", AllowedUsers: []int64{1}}},
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
@@ -54,7 +55,7 @@ func TestValidateStartup_AnthropicRequiresAPIKey(t *testing.T) {
 
 func TestValidateStartup_OllamaDoesNotRequireAPIKey(t *testing.T) {
 	cfg := &Config{
-		LLM:      map[string]LLMProviderConfig{"default": {Provider: "ollama", APIKey: "", Model: "llama3"}},
+		LLM:      map[string]LLMProviderConfig{"default": {Provider: "ollama", APIKey: "", Model: "llama3", RequestTimeout: time.Second}},
 		Channels: map[string]ChannelConfig{"telegram": {Enabled: true, Token: "t", AllowedUsers: []int64{1}}},
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
@@ -67,7 +68,7 @@ func TestValidateStartup_OllamaDoesNotRequireAPIKey(t *testing.T) {
 
 func TestValidateStartup_TelegramAllowedUsersEmptyWarnsOnly(t *testing.T) {
 	cfg := &Config{
-		LLM:      map[string]LLMProviderConfig{"default": {Provider: "anthropic", APIKey: "k", Model: "m"}},
+		LLM:      map[string]LLMProviderConfig{"default": {Provider: "anthropic", APIKey: "k", Model: "m", RequestTimeout: time.Second}},
 		Channels: map[string]ChannelConfig{"telegram": {Enabled: true, Token: "t", AllowedUsers: []int64{}}},
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
@@ -75,5 +76,18 @@ func TestValidateStartup_TelegramAllowedUsersEmptyWarnsOnly(t *testing.T) {
 	err := ValidateStartup(cfg)
 	if err != nil {
 		t.Fatalf("expected no hard error, got %v", err)
+	}
+}
+
+func TestValidateStartup_RequestTimeoutMustBePositive(t *testing.T) {
+	cfg := &Config{
+		LLM:      map[string]LLMProviderConfig{"default": {Provider: "anthropic", APIKey: "k", Model: "m", RequestTimeout: 0}},
+		Channels: map[string]ChannelConfig{"telegram": {Enabled: true, Token: "t", AllowedUsers: []int64{1}}},
+		Security: SecurityConfig{Mode: SecurityModeStandard},
+	}
+
+	err := ValidateStartup(cfg)
+	if err == nil || !strings.Contains(err.Error(), "request_timeout must be > 0") {
+		t.Fatalf("expected request_timeout validation error, got %v", err)
 	}
 }
