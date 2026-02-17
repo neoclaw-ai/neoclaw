@@ -78,6 +78,11 @@ func (t RunCommandTool) PersistAllowedBinary(args map[string]any) error {
 	return addAllowedBinary(t.AllowedBinsPath, bin)
 }
 
+// PersistAlwaysApproval persists an AlwaysApproved decision for this tool.
+func (t RunCommandTool) PersistAlwaysApproval(args map[string]any) error {
+	return t.PersistAllowedBinary(args)
+}
+
 // RequiresApprovalForArgs resolves approval behavior for this specific command.
 // Allowlisted binaries are auto-approved; all others require an approval prompt.
 func (t RunCommandTool) RequiresApprovalForArgs(args map[string]any) (bool, error) {

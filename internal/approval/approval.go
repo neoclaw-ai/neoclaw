@@ -37,19 +37,8 @@ const (
 func ExecuteTool(ctx context.Context, approver Approver, tool tools.Tool, args map[string]any, description string) (*tools.ToolResult, error) {
 	permission := tool.Permission()
 	if permission == tools.RequiresApproval {
-		switch t := tool.(type) {
-		case tools.RunCommandTool:
-			// run_command can be auto-approved for specific binaries based on args.
-			requiresApproval, err := t.RequiresApprovalForArgs(args)
-			if err != nil {
-				return nil, err
-			}
-			if !requiresApproval {
-				permission = tools.AutoApprove
-			}
-		case *tools.RunCommandTool:
-			// Pointer receiver variant for completeness with registry usage.
-			requiresApproval, err := t.RequiresApprovalForArgs(args)
+		if conditional, ok := tool.(tools.ConditionalApprover); ok {
+			requiresApproval, err := conditional.RequiresApprovalForArgs(args)
 			if err != nil {
 				return nil, err
 			}
@@ -79,19 +68,10 @@ func ExecuteTool(ctx context.Context, approver Approver, tool tools.Tool, args m
 			)
 		}
 		if decision == AlwaysApproved {
-			switch t := tool.(type) {
-			case tools.RunCommandTool:
-				if err := t.PersistAllowedBinary(args); err != nil {
+			if persister, ok := tool.(tools.ApprovalPersister); ok {
+				if err := persister.PersistAlwaysApproval(args); err != nil {
 					logging.Logger().Warn(
-						"failed to persist run_command always approval",
-						"tool", tool.Name(),
-						"err", err,
-					)
-				}
-			case *tools.RunCommandTool:
-				if err := t.PersistAllowedBinary(args); err != nil {
-					logging.Logger().Warn(
-						"failed to persist run_command always approval",
+						"failed to persist always approval",
 						"tool", tool.Name(),
 						"err", err,
 					)

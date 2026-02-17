@@ -37,6 +37,18 @@ type Summarizer interface {
 	SummarizeArgs(args map[string]any) string
 }
 
+// ConditionalApprover is an optional interface for tools that can decide
+// approval requirements from per-call arguments.
+type ConditionalApprover interface {
+	RequiresApprovalForArgs(args map[string]any) (bool, error)
+}
+
+// ApprovalPersister is an optional interface for tools that can persist an
+// AlwaysApproved decision for future invocations.
+type ApprovalPersister interface {
+	PersistAlwaysApproval(args map[string]any) error
+}
+
 // ToolResult is the normalized output returned by tools.
 type ToolResult struct {
 	Output         string
