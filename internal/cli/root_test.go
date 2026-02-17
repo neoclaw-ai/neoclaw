@@ -148,7 +148,7 @@ func writeValidConfig(t *testing.T, dataDir string) {
 [llm.default]
 api_key = "test-key"
 provider = "anthropic"
-model = "claude-sonnet-4-5"
+model = "claude-sonnet-4-6"
 
 [channels.telegram]
 enabled = true

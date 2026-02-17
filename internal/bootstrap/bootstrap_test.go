@@ -100,7 +100,7 @@ func TestInitializeIsIdempotent(t *testing.T) {
 		t.Fatalf("seed custom jobs content: %v", err)
 	}
 	configPath := filepath.Join(dataDir, "config.toml")
-	customConfig := []byte("[llm.default]\napi_key = \"keep-me\"\nprovider = \"anthropic\"\nmodel = \"claude-sonnet-4-5\"\n")
+	customConfig := []byte("[llm.default]\napi_key = \"keep-me\"\nprovider = \"anthropic\"\nmodel = \"claude-sonnet-4-6\"\n")
 	if err := os.WriteFile(configPath, customConfig, 0o644); err != nil {
 		t.Fatalf("seed custom config content: %v", err)
 	}

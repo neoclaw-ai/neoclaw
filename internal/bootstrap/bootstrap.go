@@ -118,7 +118,7 @@ func defaultConfigTOML() string {
 	return `[llm.default]
 api_key = "$ANTHROPIC_API_KEY"
 provider = "anthropic"
-model = "claude-sonnet-4-5"
+model = "claude-sonnet-4-6"
 
 [channels.telegram]
 enabled = true

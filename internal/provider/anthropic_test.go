@@ -26,7 +26,7 @@ func TestAnthropicProviderChat_RequestAndResponse(t *testing.T) {
 			"id":"msg_1",
 			"type":"message",
 			"role":"assistant",
-			"model":"claude-sonnet-4-5",
+			"model":"claude-sonnet-4-6",
 			"content":[
 				{"type":"text","text":"I can call a tool."},
 				{"type":"tool_use","id":"toolu_1","name":"get_weather","input":{"city":"SF"}}
@@ -47,7 +47,7 @@ func TestAnthropicProviderChat_RequestAndResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := newAnthropicProviderForTest("test-key", "claude-sonnet-4-5", 8192, srv.URL, srv.Client())
+	p, err := newAnthropicProviderForTest("test-key", "claude-sonnet-4-6", 8192, srv.URL, srv.Client())
 	if err != nil {
 		t.Fatalf("new provider: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestAnthropicProviderChat_RequestAndResponse(t *testing.T) {
 	if gotAPIKey != "test-key" {
 		t.Fatalf("unexpected api key header: %q", gotAPIKey)
 	}
-	if gotReq["model"] != "claude-sonnet-4-5" {
+	if gotReq["model"] != "claude-sonnet-4-6" {
 		t.Fatalf("unexpected model in request: %#v", gotReq["model"])
 	}
 	if int(gotReq["max_tokens"].(float64)) != 256 {

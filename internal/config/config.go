@@ -94,7 +94,7 @@ var defaultConfig = Config{
 		defaultLLMProfile: {
 			APIKey:    "",
 			Provider:  "anthropic",
-			Model:     "claude-sonnet-4-5",
+			Model:     "claude-sonnet-4-6",
 			MaxTokens: 8192,
 		},
 	},

@@ -10,7 +10,7 @@ func TestNewProviderFromConfig_SelectsAnthropic(t *testing.T) {
 	p, err := NewProviderFromConfig(config.LLMProviderConfig{
 		Provider: "anthropic",
 		APIKey:   "k",
-		Model:    "claude-sonnet-4-5",
+		Model:    "claude-sonnet-4-6",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

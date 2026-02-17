@@ -4,7 +4,8 @@
 [llm.default]
 api_key = "$ANTHROPIC_API_KEY"
 provider = "anthropic"
-model = "claude-sonnet-4-5"
+model = "claude-sonnet-4-6"
+max_tokens = 8192
 
 [channels.telegram]
 enabled = true
@@ -21,6 +22,8 @@ daily_limit = 20.0
 monthly_limit = 100.0
 circuit_breaker_max_calls = 10
 circuit_breaker_window = "60s"
+max_context_tokens = 4000
+recent_messages = 10
 
 [web.search]
 provider = "brave"
