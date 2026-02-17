@@ -1,11 +1,11 @@
 package agent
 
-import "github.com/machinae/betterclaw/internal/llm"
+import providerapi "github.com/machinae/betterclaw/internal/provider"
 
-func appendUserMessage(history []llm.ChatMessage, text string) []llm.ChatMessage {
-	next := append([]llm.ChatMessage{}, history...)
-	next = append(next, llm.ChatMessage{
-		Role:    llm.RoleUser,
+func appendUserMessage(history []providerapi.ChatMessage, text string) []providerapi.ChatMessage {
+	next := append([]providerapi.ChatMessage{}, history...)
+	next = append(next, providerapi.ChatMessage{
+		Role:    providerapi.RoleUser,
 		Content: text,
 	})
 	return next

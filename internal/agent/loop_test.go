@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/llm"
+	providerapi "github.com/machinae/betterclaw/internal/provider"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
@@ -16,9 +16,9 @@ func TestRun_DispatchesToolAndReturnsFinalResponse(t *testing.T) {
 		t.Fatalf("register tool: %v", err)
 	}
 
-	provider := &scriptProvider{responses: []*llm.ChatResponse{
+	modelProvider := &scriptProvider{responses: []*providerapi.ChatResponse{
 		{
-			ToolCalls: []llm.ToolCall{{
+			ToolCalls: []providerapi.ToolCall{{
 				ID:        "call_1",
 				Name:      "read_file",
 				Arguments: `{"path":"README.md"}`,
@@ -29,11 +29,11 @@ func TestRun_DispatchesToolAndReturnsFinalResponse(t *testing.T) {
 
 	resp, history, err := Run(
 		context.Background(),
-		provider,
+		modelProvider,
 		registry,
 		nil,
 		"system",
-		[]llm.ChatMessage{{Role: llm.RoleUser, Content: "read it"}},
+		[]providerapi.ChatMessage{{Role: providerapi.RoleUser, Content: "read it"}},
 		10,
 	)
 	if err != nil {
@@ -42,13 +42,13 @@ func TestRun_DispatchesToolAndReturnsFinalResponse(t *testing.T) {
 	if resp.Content != "done" {
 		t.Fatalf("expected final response done, got %q", resp.Content)
 	}
-	if provider.calls != 2 {
-		t.Fatalf("expected 2 provider calls, got %d", provider.calls)
+	if modelProvider.calls != 2 {
+		t.Fatalf("expected 2 provider calls, got %d", modelProvider.calls)
 	}
 
 	var foundToolResult bool
 	for _, msg := range history {
-		if msg.Role == llm.RoleTool && msg.ToolCallID == "call_1" && msg.Content == "hello from file" {
+		if msg.Role == providerapi.RoleTool && msg.ToolCallID == "call_1" && msg.Content == "hello from file" {
 			foundToolResult = true
 		}
 	}
@@ -63,16 +63,16 @@ func TestRun_MaxIterationsGuard(t *testing.T) {
 		t.Fatalf("register tool: %v", err)
 	}
 
-	provider := &scriptProvider{responses: []*llm.ChatResponse{
+	modelProvider := &scriptProvider{responses: []*providerapi.ChatResponse{
 		{
-			ToolCalls: []llm.ToolCall{{
+			ToolCalls: []providerapi.ToolCall{{
 				ID:        "1",
 				Name:      "read_file",
 				Arguments: `{"path":"a"}`,
 			}},
 		},
 		{
-			ToolCalls: []llm.ToolCall{{
+			ToolCalls: []providerapi.ToolCall{{
 				ID:        "2",
 				Name:      "read_file",
 				Arguments: `{"path":"b"}`,
@@ -82,11 +82,11 @@ func TestRun_MaxIterationsGuard(t *testing.T) {
 
 	_, _, err := Run(
 		context.Background(),
-		provider,
+		modelProvider,
 		registry,
 		nil,
 		"system",
-		[]llm.ChatMessage{{Role: llm.RoleUser, Content: "loop"}},
+		[]providerapi.ChatMessage{{Role: providerapi.RoleUser, Content: "loop"}},
 		1,
 	)
 	if err == nil || !strings.Contains(err.Error(), "max iterations exceeded") {
@@ -99,9 +99,9 @@ func TestRun_UnknownToolAppendsErrorAndContinues(t *testing.T) {
 	if err := registry.Register(fakeTool{name: "read_file", out: "ok"}); err != nil {
 		t.Fatalf("register tool: %v", err)
 	}
-	provider := &scriptProvider{responses: []*llm.ChatResponse{
+	modelProvider := &scriptProvider{responses: []*providerapi.ChatResponse{
 		{
-			ToolCalls: []llm.ToolCall{{
+			ToolCalls: []providerapi.ToolCall{{
 				ID:        "call_1",
 				Name:      "does_not_exist",
 				Arguments: `{}`,
@@ -112,11 +112,11 @@ func TestRun_UnknownToolAppendsErrorAndContinues(t *testing.T) {
 
 	resp, history, err := Run(
 		context.Background(),
-		provider,
+		modelProvider,
 		registry,
 		nil,
 		"system",
-		[]llm.ChatMessage{{Role: llm.RoleUser, Content: "do it"}},
+		[]providerapi.ChatMessage{{Role: providerapi.RoleUser, Content: "do it"}},
 		2,
 	)
 	if err != nil {
@@ -128,7 +128,7 @@ func TestRun_UnknownToolAppendsErrorAndContinues(t *testing.T) {
 
 	var foundUnknownToolMessage bool
 	for _, msg := range history {
-		if msg.Role == llm.RoleTool && msg.ToolCallID == "call_1" && strings.Contains(msg.Content, "unknown tool") {
+		if msg.Role == providerapi.RoleTool && msg.ToolCallID == "call_1" && strings.Contains(msg.Content, "unknown tool") {
 			foundUnknownToolMessage = true
 		}
 	}
@@ -138,11 +138,11 @@ func TestRun_UnknownToolAppendsErrorAndContinues(t *testing.T) {
 }
 
 type scriptProvider struct {
-	responses []*llm.ChatResponse
+	responses []*providerapi.ChatResponse
 	calls     int
 }
 
-func (p *scriptProvider) Chat(_ context.Context, _ llm.ChatRequest) (*llm.ChatResponse, error) {
+func (p *scriptProvider) Chat(_ context.Context, _ providerapi.ChatRequest) (*providerapi.ChatResponse, error) {
 	if p.calls >= len(p.responses) {
 		return nil, fmt.Errorf("unexpected extra call")
 	}

@@ -1,4 +1,4 @@
-package llm
+package provider
 
 import "context"
 
@@ -12,11 +12,11 @@ type Role string
 
 const (
 	// RoleUser is a user-authored message.
-	RoleUser      Role = "user"
+	RoleUser Role = "user"
 	// RoleAssistant is an assistant-authored message.
 	RoleAssistant Role = "assistant"
 	// RoleTool is a tool-result message addressed to the model.
-	RoleTool      Role = "tool"
+	RoleTool Role = "tool"
 )
 
 // ChatMessage is a single message in model conversation history.

@@ -8,16 +8,16 @@ import (
 	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
 
 	"github.com/machinae/betterclaw/internal/approval"
-	"github.com/machinae/betterclaw/internal/llm"
+	providerapi "github.com/machinae/betterclaw/internal/provider"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
 func TestAgentHandleMessageWritesResponse(t *testing.T) {
 	registry := tools.NewRegistry()
-	provider := &recordingProvider{
-		responses: []*llm.ChatResponse{{Content: "hello"}},
+	modelProvider := &recordingProvider{
+		responses: []*providerapi.ChatResponse{{Content: "hello"}},
 	}
-	ag := New(provider, registry, noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
 	writer := &captureWriter{}
 
 	err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "hi"})
@@ -31,13 +31,13 @@ func TestAgentHandleMessageWritesResponse(t *testing.T) {
 
 func TestAgentHandleMessageAccumulatesHistory(t *testing.T) {
 	registry := tools.NewRegistry()
-	provider := &recordingProvider{
-		responses: []*llm.ChatResponse{
+	modelProvider := &recordingProvider{
+		responses: []*providerapi.ChatResponse{
 			{Content: "r1"},
 			{Content: "r2"},
 		},
 	}
-	ag := New(provider, registry, noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
 	writer := &captureWriter{}
 
 	if err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "one"}); err != nil {
@@ -47,20 +47,20 @@ func TestAgentHandleMessageAccumulatesHistory(t *testing.T) {
 		t.Fatalf("second handle message: %v", err)
 	}
 
-	if len(provider.requests) != 2 {
-		t.Fatalf("expected 2 provider requests, got %d", len(provider.requests))
+	if len(modelProvider.requests) != 2 {
+		t.Fatalf("expected 2 provider requests, got %d", len(modelProvider.requests))
 	}
-	if got := len(provider.requests[1].Messages); got != 3 {
+	if got := len(modelProvider.requests[1].Messages); got != 3 {
 		t.Fatalf("expected second request to include prior history, got %d messages", got)
 	}
 }
 
 func TestAgentHandleMessageProviderErrorIsFatal(t *testing.T) {
 	registry := tools.NewRegistry()
-	provider := &recordingProvider{
+	modelProvider := &recordingProvider{
 		err: errors.New("provider unavailable"),
 	}
-	ag := New(provider, registry, noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
 	writer := &captureWriter{}
 
 	err := ag.HandleMessage(context.Background(), writer, &runtimeapi.Message{Text: "hi"})
@@ -74,10 +74,10 @@ func TestAgentHandleMessageProviderErrorIsFatal(t *testing.T) {
 
 func TestAgentHandleMessageCanceledContextIsFatal(t *testing.T) {
 	registry := tools.NewRegistry()
-	provider := &recordingProvider{
+	modelProvider := &recordingProvider{
 		requireLiveContext: true,
 	}
-	ag := New(provider, registry, noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
 	writer := &captureWriter{}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -105,13 +105,13 @@ func (w *captureWriter) WriteMessage(_ context.Context, text string) error {
 }
 
 type recordingProvider struct {
-	requests           []llm.ChatRequest
-	responses          []*llm.ChatResponse
+	requests           []providerapi.ChatRequest
+	responses          []*providerapi.ChatResponse
 	err                error
 	requireLiveContext bool
 }
 
-func (p *recordingProvider) Chat(ctx context.Context, req llm.ChatRequest) (*llm.ChatResponse, error) {
+func (p *recordingProvider) Chat(ctx context.Context, req providerapi.ChatRequest) (*providerapi.ChatResponse, error) {
 	p.requests = append(p.requests, req)
 	if p.requireLiveContext && ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -120,7 +120,7 @@ func (p *recordingProvider) Chat(ctx context.Context, req llm.ChatRequest) (*llm
 		return nil, p.err
 	}
 	if len(p.responses) == 0 {
-		return &llm.ChatResponse{Content: ""}, nil
+		return &providerapi.ChatResponse{Content: ""}, nil
 	}
 	resp := p.responses[0]
 	p.responses = p.responses[1:]

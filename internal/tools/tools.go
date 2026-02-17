@@ -7,7 +7,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/machinae/betterclaw/internal/llm"
+	"github.com/machinae/betterclaw/internal/provider"
 )
 
 const maxInlineOutputChars = 2000
@@ -109,11 +109,11 @@ func (r *Registry) Tools() []Tool {
 }
 
 // ToolDefinitions converts registered tools into LLM request tool definitions.
-func (r *Registry) ToolDefinitions() []llm.ToolDefinition {
+func (r *Registry) ToolDefinitions() []provider.ToolDefinition {
 	tools := r.Tools()
-	defs := make([]llm.ToolDefinition, 0, len(tools))
+	defs := make([]provider.ToolDefinition, 0, len(tools))
 	for _, tool := range tools {
-		defs = append(defs, llm.ToolDefinition{
+		defs = append(defs, provider.ToolDefinition{
 			Name:        tool.Name(),
 			Description: tool.Description(),
 			Parameters:  tool.Schema(),

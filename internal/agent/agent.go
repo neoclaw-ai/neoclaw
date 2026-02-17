@@ -9,7 +9,7 @@ import (
 	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
 
 	"github.com/machinae/betterclaw/internal/approval"
-	"github.com/machinae/betterclaw/internal/llm"
+	providerapi "github.com/machinae/betterclaw/internal/provider"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
@@ -20,16 +20,16 @@ const DefaultSystemPrompt = "You are BetterClaw, a lightweight personal AI assis
 
 // Agent implements the runtime Handler for one conversation.
 type Agent struct {
-	provider     llm.Provider
+	provider     providerapi.Provider
 	registry     *tools.Registry
 	approver     approval.Approver
 	systemPrompt string
 	maxIter      int
-	history      []llm.ChatMessage
+	history      []providerapi.ChatMessage
 }
 
 // New creates a conversation-scoped Agent.
-func New(provider llm.Provider, registry *tools.Registry, approver approval.Approver, systemPrompt string) *Agent {
+func New(provider providerapi.Provider, registry *tools.Registry, approver approval.Approver, systemPrompt string) *Agent {
 	if strings.TrimSpace(systemPrompt) == "" {
 		systemPrompt = DefaultSystemPrompt
 	}

@@ -14,13 +14,13 @@ import (
 	"github.com/machinae/betterclaw/internal/bootstrap"
 	"github.com/machinae/betterclaw/internal/channels"
 	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/llm"
+	providerapi "github.com/machinae/betterclaw/internal/provider"
 	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
 	"github.com/machinae/betterclaw/internal/tools"
 	"github.com/spf13/cobra"
 )
 
-var providerFactory = llm.NewProviderFromConfig
+var providerFactory = providerapi.NewProviderFromConfig
 
 // NewRootCmd creates the root command and registers all subcommands.
 func NewRootCmd() *cobra.Command {
@@ -113,7 +113,7 @@ func newPromptCmd() *cobra.Command {
 				return err
 			}
 
-			provider, err := providerFactory(cfg.DefaultLLM())
+			modelProvider, err := providerFactory(cfg.DefaultLLM())
 			if err != nil {
 				return err
 			}
@@ -125,13 +125,13 @@ func newPromptCmd() *cobra.Command {
 
 			if strings.TrimSpace(prompt) != "" {
 				approver := approval.NewCLIApprover(cmd.InOrStdin(), cmd.OutOrStdout())
-				handler := agent.New(provider, registry, approver, agent.DefaultSystemPrompt)
+				handler := agent.New(modelProvider, registry, approver, agent.DefaultSystemPrompt)
 				writer := &singleShotWriter{out: cmd.OutOrStdout()}
 				return handler.HandleMessage(cmd.Context(), writer, &runtimeapi.Message{Text: prompt})
 			}
 
 			listener := channels.NewCLI(cmd.InOrStdin(), cmd.OutOrStdout())
-			handler := agent.New(provider, registry, listener, agent.DefaultSystemPrompt)
+			handler := agent.New(modelProvider, registry, listener, agent.DefaultSystemPrompt)
 			return listener.Listen(cmd.Context(), handler)
 		},
 	}

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/llm"
+	providerapi "github.com/machinae/betterclaw/internal/provider"
 )
 
 func TestRootCommandRegistersSubcommands(t *testing.T) {
@@ -39,9 +39,9 @@ func TestPromptFlagParsing(t *testing.T) {
 
 	origFactory := providerFactory
 	defer func() { providerFactory = origFactory }()
-	providerFactory = func(_ config.LLMProviderConfig) (llm.Provider, error) {
+	providerFactory = func(_ config.LLMProviderConfig) (providerapi.Provider, error) {
 		return fakeProvider{
-			resp: &llm.ChatResponse{Content: "hello from llm"},
+			resp: &providerapi.ChatResponse{Content: "hello from llm"},
 		}, nil
 	}
 
@@ -68,9 +68,9 @@ func TestPromptInteractiveMode(t *testing.T) {
 
 	origFactory := providerFactory
 	defer func() { providerFactory = origFactory }()
-	providerFactory = func(_ config.LLMProviderConfig) (llm.Provider, error) {
+	providerFactory = func(_ config.LLMProviderConfig) (providerapi.Provider, error) {
 		return fakeProvider{
-			resp: &llm.ChatResponse{Content: "hello from llm"},
+			resp: &providerapi.ChatResponse{Content: "hello from llm"},
 		}, nil
 	}
 
@@ -141,11 +141,11 @@ allowed_users = [123456789]
 }
 
 type fakeProvider struct {
-	resp *llm.ChatResponse
+	resp *providerapi.ChatResponse
 	err  error
 }
 
-func (p fakeProvider) Chat(_ context.Context, _ llm.ChatRequest) (*llm.ChatResponse, error) {
+func (p fakeProvider) Chat(_ context.Context, _ providerapi.ChatRequest) (*providerapi.ChatResponse, error) {
 	if p.err != nil {
 		return nil, p.err
 	}
