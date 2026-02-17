@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/machinae/betterclaw/internal/agent"
 	"github.com/machinae/betterclaw/internal/approval"
@@ -16,6 +17,7 @@ import (
 	"github.com/machinae/betterclaw/internal/channels"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/logging"
+	"github.com/machinae/betterclaw/internal/memory"
 	providerapi "github.com/machinae/betterclaw/internal/provider"
 	runtimeapi "github.com/machinae/betterclaw/internal/runtime"
 	"github.com/machinae/betterclaw/internal/tools"
@@ -129,20 +131,26 @@ func newPromptCmd() *cobra.Command {
 				return err
 			}
 
-			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout())
+			memoryStore := memory.New(filepath.Join(cfg.AgentDir(), "memory"))
+
+			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore)
+			if err != nil {
+				return err
+			}
+			systemPrompt, err := buildSystemPrompt(memoryStore, time.Now())
 			if err != nil {
 				return err
 			}
 
 			if strings.TrimSpace(prompt) != "" {
 				approver := approval.NewCLIApprover(cmd.InOrStdin(), cmd.OutOrStdout())
-				handler := agent.New(modelProvider, registry, approver, agent.DefaultSystemPrompt)
+				handler := agent.New(modelProvider, registry, approver, systemPrompt)
 				writer := &singleShotWriter{out: cmd.OutOrStdout()}
 				return handler.HandleMessage(cmd.Context(), writer, &runtimeapi.Message{Text: prompt})
 			}
 
 			listener := channels.NewCLI(cmd.InOrStdin(), cmd.OutOrStdout())
-			handler := agent.New(modelProvider, registry, listener, agent.DefaultSystemPrompt)
+			handler := agent.New(modelProvider, registry, listener, systemPrompt)
 			return listener.Listen(cmd.Context(), handler)
 		},
 	}
@@ -152,12 +160,17 @@ func newPromptCmd() *cobra.Command {
 	return cmd
 }
 
-func buildToolRegistry(cfg *config.Config, out io.Writer) (*tools.Registry, error) {
+func buildToolRegistry(cfg *config.Config, out io.Writer, memoryStore *memory.Store) (*tools.Registry, error) {
 	registry := tools.NewRegistry()
 	coreTools := []tools.Tool{
 		tools.ReadFileTool{WorkspaceDir: cfg.WorkspaceDir()},
 		tools.ListDirTool{WorkspaceDir: cfg.WorkspaceDir()},
 		tools.WriteFileTool{WorkspaceDir: cfg.WorkspaceDir()},
+		tools.MemoryReadTool{Store: memoryStore},
+		tools.MemoryAppendTool{Store: memoryStore},
+		tools.MemoryRemoveTool{Store: memoryStore},
+		tools.DailyLogTool{Store: memoryStore},
+		tools.SearchLogsTool{Store: memoryStore},
 		tools.RunCommandTool{
 			WorkspaceDir:    cfg.WorkspaceDir(),
 			AllowedBinsPath: filepath.Join(cfg.DataDir, "allowed_bins.json"),
