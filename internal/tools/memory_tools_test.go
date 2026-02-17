@@ -126,13 +126,16 @@ func TestSearchLogsFindsAcrossMultipleDays(t *testing.T) {
 		Now:   func() time.Time { return time.Date(2026, 2, 17, 12, 0, 0, 0, time.Local) },
 	}
 	res, err := tool.Execute(context.Background(), map[string]any{
-		"query":     "migration",
-		"days_back": 2,
+		"query":    "migration",
+		"fromTime": time.Date(2026, 2, 16, 0, 0, 0, 0, time.Local).Format(time.RFC3339),
 	})
 	if err != nil {
 		t.Fatalf("search logs: %v", err)
 	}
-	if !strings.Contains(res.Output, "2026-02-17") || !strings.Contains(res.Output, "2026-02-16") {
+	if !strings.Contains(res.Output, "2026-02-17T09:00:00") || !strings.Contains(res.Output, "2026-02-16T11:00:00") {
 		t.Fatalf("expected matches from both days, got %q", res.Output)
+	}
+	if !strings.Contains(res.Output, "- 09:00:00: API migration work") || !strings.Contains(res.Output, "- 11:00:00: Discussed migration timeline") {
+		t.Fatalf("expected exact daily log lines, got %q", res.Output)
 	}
 }

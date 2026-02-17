@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/machinae/betterclaw/internal/memory"
@@ -14,9 +15,16 @@ import (
 const autoRememberInstruction = "When you learn something important about the user (preferences, facts, relationships, ongoing constraints), write it to memory using memory_append without asking permission."
 const maxSoulChars = 4000
 
+// DailyLogLookback controls how far back recent daily log entries are injected into the system prompt.
+const DailyLogLookback = 24 * time.Hour
+
 // BuildSystemPrompt assembles the runtime system prompt from base instructions,
-// SOUL.md, and long-term memory.
+// SOUL.md, long-term memory, and recent daily log entries.
 func BuildSystemPrompt(agentDir string, store *memory.Store) (string, error) {
+	return buildSystemPromptAt(agentDir, store, time.Now())
+}
+
+func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time) (string, error) {
 	if strings.TrimSpace(agentDir) == "" {
 		return "", errors.New("agent directory is required")
 	}
@@ -35,8 +43,12 @@ func BuildSystemPrompt(agentDir string, store *memory.Store) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	recentLogs, err := store.GetDailyLogs(now.Add(-DailyLogLookback), now)
+	if err != nil {
+		return "", err
+	}
 
-	if soulText == "" && memoryText == "" {
+	if soulText == "" && memoryText == "" && len(recentLogs) == 0 {
 		return prompt, nil
 	}
 
@@ -58,6 +70,16 @@ func BuildSystemPrompt(agentDir string, store *memory.Store) (string, error) {
 		b.WriteString("\n[Long-term memory]\n")
 		b.WriteString(memoryText)
 		if !strings.HasSuffix(memoryText, "\n") {
+			b.WriteByte('\n')
+		}
+	}
+	if len(recentLogs) > 0 {
+		b.WriteString("\n[Recent daily log]\n")
+		for _, entry := range recentLogs {
+			b.WriteString("- ")
+			b.WriteString(entry.Timestamp.Format(time.RFC3339))
+			b.WriteString(": ")
+			b.WriteString(entry.Entry)
 			b.WriteByte('\n')
 		}
 	}

@@ -1,11 +1,12 @@
 package memory
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
+	"sort"
 	"strings"
 	"time"
 )
@@ -18,6 +19,12 @@ const (
 // Store manages long-term memory and daily log files.
 type Store struct {
 	dir string
+}
+
+// LogEntry is one timestamped daily log entry.
+type LogEntry struct {
+	Timestamp time.Time
+	Entry     string
 }
 
 // New creates a Store for the given memory directory.
@@ -122,7 +129,7 @@ func (s *Store) AppendDailyLog(now time.Time, entry string) error {
 		return fmt.Errorf("create daily log directory: %w", err)
 	}
 
-	path := filepath.Join(dailyDir, now.Format("2006-01-02")+".md")
+	path := filepath.Join(dailyDir, dailyLogFilename(now))
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 		header := "# " + now.Format("2006-01-02") + "\n\n"
 		if err := os.WriteFile(path, []byte(header), 0o644); err != nil {
@@ -138,70 +145,103 @@ func (s *Store) AppendDailyLog(now time.Time, entry string) error {
 	}
 	defer f.Close()
 
-	line := fmt.Sprintf("- %s: %s\n", now.Format("15:04:05"), entry)
-	if _, err := f.WriteString(line); err != nil {
+	if _, err := f.WriteString(formatDailyLogLine(LogEntry{Timestamp: now, Entry: entry}) + "\n"); err != nil {
 		return fmt.Errorf("append daily log: %w", err)
 	}
 	return nil
 }
 
-// SearchLogs does case-insensitive substring search across daily logs for the last N days.
-func (s *Store) SearchLogs(now time.Time, query string, daysBack int) (string, error) {
+// GetDailyLogs returns parsed daily log entries in the inclusive [fromTime, toTime] range.
+func (s *Store) GetDailyLogs(fromTime, toTime time.Time) ([]LogEntry, error) {
+	fromBound, toBound, err := normalizeTimeRange(fromTime, toTime)
+	if err != nil {
+		return nil, err
+	}
+	dailyDir, err := s.dailyDirPath()
+	if err != nil {
+		return nil, err
+	}
+	files, err := os.ReadDir(dailyDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return []LogEntry{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read daily log directory %q: %w", dailyDir, err)
+	}
+
+	logFiles := make([]string, 0, len(files))
+	for _, f := range files {
+		if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
+			continue
+		}
+		logFiles = append(logFiles, f.Name())
+	}
+	sort.Strings(logFiles)
+
+	results := make([]LogEntry, 0)
+	for _, name := range logFiles {
+		dayText := strings.TrimSuffix(name, ".md")
+		day, err := time.ParseInLocation("2006-01-02", dayText, time.Local)
+		if err != nil {
+			continue
+		}
+		path := filepath.Join(dailyDir, name)
+		lines, err := readAllLines(path)
+		if err != nil {
+			return nil, fmt.Errorf("read daily log %q: %w", path, err)
+		}
+		for _, line := range lines {
+			entry, ok := parseDailyLogLine(day, line)
+			if !ok {
+				continue
+			}
+			if entry.Timestamp.Before(fromBound) || entry.Timestamp.After(toBound) {
+				continue
+			}
+			results = append(results, entry)
+		}
+	}
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Timestamp.Before(results[j].Timestamp)
+	})
+	return results, nil
+}
+
+// GetAllDailyLogs returns all parsed daily log entries.
+func (s *Store) GetAllDailyLogs() ([]LogEntry, error) {
+	return s.GetDailyLogs(time.Time{}, time.Time{})
+}
+
+// SearchLogs does case-insensitive substring search across daily logs in the time range.
+func (s *Store) SearchLogs(query string, fromTime, toTime time.Time) (string, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return "", errors.New("query is required")
 	}
-	if daysBack <= 0 {
-		daysBack = 7
-	}
-
-	dailyDir, err := s.dailyDirPath()
+	entries, err := s.GetDailyLogs(fromTime, toTime)
 	if err != nil {
 		return "", err
 	}
 
 	lowerQuery := strings.ToLower(query)
 	var out strings.Builder
-	matches := 0
-	for i := 0; i < daysBack; i++ {
-		day := now.AddDate(0, 0, -i)
-		path := filepath.Join(dailyDir, day.Format("2006-01-02")+".md")
-		raw, err := os.ReadFile(path)
-		if errors.Is(err, os.ErrNotExist) {
+	for _, entry := range entries {
+		line := formatDailyLogLine(entry)
+		if !strings.Contains(strings.ToLower(line), lowerQuery) {
 			continue
 		}
-		if err != nil {
-			return "", fmt.Errorf("read daily log %q: %w", path, err)
-		}
-
-		lines := strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n")
-		dayMatches := make([]string, 0)
-		for _, line := range lines {
-			if strings.Contains(strings.ToLower(line), lowerQuery) {
-				dayMatches = append(dayMatches, strings.TrimSpace(line))
-			}
-		}
-		if len(dayMatches) == 0 {
-			continue
-		}
-
-		if matches > 0 {
+		if out.Len() > 0 {
 			out.WriteByte('\n')
 		}
-		out.WriteString(day.Format("2006-01-02"))
-		out.WriteByte('\n')
-		for _, line := range dayMatches {
-			out.WriteString("- ")
-			out.WriteString(line)
-			out.WriteByte('\n')
-		}
-		matches += len(dayMatches)
+		out.WriteString(entry.Timestamp.Format(time.RFC3339))
+		out.WriteString(" ")
+		out.WriteString(line)
 	}
 
-	if matches == 0 {
+	if out.Len() == 0 {
 		return "no matches", nil
 	}
-	return strings.TrimSpace(out.String()), nil
+	return out.String(), nil
 }
 
 // LoadContext returns memory.md contents for system prompt injection.
@@ -215,36 +255,6 @@ func (s *Store) LoadContext() (memoryText string, err error) {
 		return "", err
 	}
 	return memoryText, nil
-}
-
-// OptionalIntArg parses an optional integer argument from a tool args map.
-func OptionalIntArg(args map[string]any, key string, def int) (int, error) {
-	raw, ok := args[key]
-	if !ok {
-		return def, nil
-	}
-	switch v := raw.(type) {
-	case int:
-		return v, nil
-	case int8:
-		return int(v), nil
-	case int16:
-		return int(v), nil
-	case int32:
-		return int(v), nil
-	case int64:
-		return int(v), nil
-	case float64:
-		return int(v), nil
-	case string:
-		parsed, err := strconv.Atoi(strings.TrimSpace(v))
-		if err != nil {
-			return 0, fmt.Errorf("argument %q must be an integer", key)
-		}
-		return parsed, nil
-	default:
-		return 0, fmt.Errorf("argument %q must be an integer", key)
-	}
 }
 
 func (s *Store) memoryPath() (string, error) {
@@ -343,4 +353,71 @@ func readOptionalFile(path string) (string, error) {
 	default:
 		return "", fmt.Errorf("read %q: %w", path, err)
 	}
+}
+
+func dailyLogFilename(ts time.Time) string {
+	return ts.Format("2006-01-02") + ".md"
+}
+
+func formatDailyLogLine(entry LogEntry) string {
+	return fmt.Sprintf("- %s: %s", entry.Timestamp.Format("15:04:05"), entry.Entry)
+}
+
+func parseDailyLogLine(day time.Time, line string) (LogEntry, bool) {
+	line = strings.TrimSpace(line)
+	if !strings.HasPrefix(line, "- ") {
+		return LogEntry{}, false
+	}
+	rest := strings.TrimPrefix(line, "- ")
+	sep := strings.Index(rest, ": ")
+	if sep <= 0 {
+		return LogEntry{}, false
+	}
+	timePart := strings.TrimSpace(rest[:sep])
+	entry := rest[sep+2:]
+	if strings.TrimSpace(entry) == "" {
+		return LogEntry{}, false
+	}
+	ts, err := time.ParseInLocation(
+		"2006-01-02 15:04:05",
+		day.Format("2006-01-02")+" "+timePart,
+		time.Local,
+	)
+	if err != nil {
+		return LogEntry{}, false
+	}
+	return LogEntry{Timestamp: ts, Entry: entry}, true
+}
+
+func normalizeTimeRange(fromTime, toTime time.Time) (time.Time, time.Time, error) {
+	fromBound := fromTime
+	if fromBound.IsZero() {
+		fromBound = time.Time{}
+	}
+	toBound := toTime
+	if toBound.IsZero() {
+		toBound = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+	}
+	if fromBound.After(toBound) {
+		return time.Time{}, time.Time{}, errors.New("fromTime must be before or equal to toTime")
+	}
+	return fromBound, toBound, nil
+}
+
+func readAllLines(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	lines := make([]string, 0)
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan %q: %w", path, err)
+	}
+	return lines, nil
 }

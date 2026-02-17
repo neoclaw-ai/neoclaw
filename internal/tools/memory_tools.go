@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/machinae/betterclaw/internal/memory"
@@ -238,9 +239,13 @@ func (t SearchLogsTool) Schema() map[string]any {
 				"type":        "string",
 				"description": "Query substring to search for",
 			},
-			"days_back": map[string]any{
-				"type":        "integer",
-				"description": "Number of days to search (default: 7)",
+			"fromTime": map[string]any{
+				"type":        "string",
+				"description": "Optional RFC3339 timestamp lower bound (inclusive)",
+			},
+			"toTime": map[string]any{
+				"type":        "string",
+				"description": "Optional RFC3339 timestamp upper bound (inclusive, default: now)",
 			},
 		},
 		"required": []string{"query"},
@@ -261,18 +266,43 @@ func (t SearchLogsTool) Execute(_ context.Context, args map[string]any) (*ToolRe
 	if err != nil {
 		return nil, err
 	}
-	daysBack, err := memory.OptionalIntArg(args, "days_back", 7)
-	if err != nil {
-		return nil, err
-	}
+
 	now := time.Now()
 	if t.Now != nil {
 		now = t.Now()
 	}
+	fromTime, err := optionalRFC3339Arg(args, "fromTime", time.Time{})
+	if err != nil {
+		return nil, err
+	}
+	toTime, err := optionalRFC3339Arg(args, "toTime", now)
+	if err != nil {
+		return nil, err
+	}
 
-	text, err := t.Store.SearchLogs(now, query, daysBack)
+	text, err := t.Store.SearchLogs(query, fromTime, toTime)
 	if err != nil {
 		return nil, err
 	}
 	return TruncateOutput(text)
+}
+
+func optionalRFC3339Arg(args map[string]any, key string, def time.Time) (time.Time, error) {
+	raw, ok := args[key]
+	if !ok {
+		return def, nil
+	}
+	s, ok := raw.(string)
+	if !ok {
+		return time.Time{}, fmt.Errorf("argument %q must be an RFC3339 timestamp string", key)
+	}
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return def, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("argument %q must be RFC3339 format", key)
+	}
+	return parsed, nil
 }
