@@ -94,7 +94,7 @@ func ValidateStartup(cfg *Config) error {
 		if err := chCfg.Validate(); err != nil {
 			errs = append(errs, fmt.Errorf("channels.%s: %w", name, err))
 		}
-		if name == defaultTelegramChannel && chCfg.Enabled && len(chCfg.AllowedUsers) == 0 {
+		if name == "telegram" && chCfg.Enabled && len(chCfg.AllowedUsers) == 0 {
 			logging.Logger().Warn("channels.telegram.allowed_users is empty. You will not be able to use Telegram until you set this value")
 		}
 	}

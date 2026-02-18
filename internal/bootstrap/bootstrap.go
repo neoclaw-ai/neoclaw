@@ -42,6 +42,11 @@ var defaultAllowedBins = []string{
 // Initialize creates the expected BetterClaw data tree if missing.
 func Initialize(cfg *config.Config) error {
 	agentDir := cfg.AgentDir()
+	defaultConfig, err := config.DefaultUserConfigTOML()
+	if err != nil {
+		return fmt.Errorf("render default config: %w", err)
+	}
+
 	dirs := []string{
 		cfg.DataDir,
 		filepath.Join(cfg.DataDir, "agents"),
@@ -63,7 +68,7 @@ func Initialize(cfg *config.Config) error {
 		path    string
 		content string
 	}{
-		{path: filepath.Join(cfg.DataDir, "config.toml"), content: defaultConfigTOML()},
+		{path: filepath.Join(cfg.DataDir, "config.toml"), content: defaultConfig},
 		{path: filepath.Join(cfg.DataDir, "allowed_domains.json"), content: defaultAllowedDomainsJSON()},
 		{path: filepath.Join(cfg.DataDir, "allowed_bins.json"), content: defaultAllowedBinsJSON()},
 		{path: filepath.Join(cfg.DataDir, "costs.jsonl"), content: ""},
@@ -112,20 +117,6 @@ func defaultAllowedBinsJSON() string {
 		return "[]\n"
 	}
 	return string(b) + "\n"
-}
-
-func defaultConfigTOML() string {
-	return `[llm.default]
-api_key = "$ANTHROPIC_API_KEY"
-provider = "anthropic"
-model = "claude-sonnet-4-6"
-request_timeout = "30s"
-
-[channels.telegram]
-enabled = true
-token = ""
-allowed_users = []
-`
 }
 
 func defaultSoulMarkdown() string {

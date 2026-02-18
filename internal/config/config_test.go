@@ -106,17 +106,17 @@ func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
 		t.Fatalf("expected data dir %q, got %q", dataDir, cfg.DataDir)
 	}
 	llm := cfg.DefaultLLM()
-	if llm.Provider != defaultConfig.LLM[defaultLLMProfile].Provider {
-		t.Fatalf("expected default provider %q, got %q", defaultConfig.LLM[defaultLLMProfile].Provider, llm.Provider)
+	if llm.Provider != defaultConfig.LLM["default"].Provider {
+		t.Fatalf("expected default provider %q, got %q", defaultConfig.LLM["default"].Provider, llm.Provider)
 	}
-	if llm.Model != defaultConfig.LLM[defaultLLMProfile].Model {
-		t.Fatalf("expected default model %q, got %q", defaultConfig.LLM[defaultLLMProfile].Model, llm.Model)
+	if llm.Model != defaultConfig.LLM["default"].Model {
+		t.Fatalf("expected default model %q, got %q", defaultConfig.LLM["default"].Model, llm.Model)
 	}
-	if llm.MaxTokens != defaultConfig.LLM[defaultLLMProfile].MaxTokens {
-		t.Fatalf("expected default max tokens %d, got %d", defaultConfig.LLM[defaultLLMProfile].MaxTokens, llm.MaxTokens)
+	if llm.MaxTokens != defaultConfig.LLM["default"].MaxTokens {
+		t.Fatalf("expected default max tokens %d, got %d", defaultConfig.LLM["default"].MaxTokens, llm.MaxTokens)
 	}
-	if llm.RequestTimeout != defaultConfig.LLM[defaultLLMProfile].RequestTimeout {
-		t.Fatalf("expected default request timeout %v, got %v", defaultConfig.LLM[defaultLLMProfile].RequestTimeout, llm.RequestTimeout)
+	if llm.RequestTimeout != defaultConfig.LLM["default"].RequestTimeout {
+		t.Fatalf("expected default request timeout %v, got %v", defaultConfig.LLM["default"].RequestTimeout, llm.RequestTimeout)
 	}
 	if cfg.Security.CommandTimeout != 5*time.Minute {
 		t.Fatalf("expected default timeout 5m, got %v", cfg.Security.CommandTimeout)

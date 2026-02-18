@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -21,9 +22,7 @@ const (
 	// SecurityModeDangerFullAccess disables sandbox protections.
 	SecurityModeDangerFullAccess = "danger-full-access"
 	// SecurityModeStrict enables stricter sandbox policy where supported.
-	SecurityModeStrict     = "strict"
-	defaultLLMProfile      = "default"
-	defaultTelegramChannel = "telegram"
+	SecurityModeStrict = "strict"
 )
 
 // Config is the runtime configuration loaded from defaults, config.toml, and env vars.
@@ -86,14 +85,14 @@ type WebSearchConfig struct {
 
 var defaultConfig = Config{
 	Channels: map[string]ChannelConfig{
-		defaultTelegramChannel: {
+		"telegram": {
 			Enabled:      true,
 			Token:        "",
 			AllowedUsers: []int64{},
 		},
 	},
 	LLM: map[string]LLMProviderConfig{
-		defaultLLMProfile: {
+		"default": {
 			APIKey:         "",
 			Provider:       "anthropic",
 			Model:          "claude-sonnet-4-6",
@@ -117,6 +116,27 @@ var defaultConfig = Config{
 	Web: WebConfig{
 		Search: WebSearchConfig{
 			Provider: "brave",
+		},
+	},
+}
+
+// defaultUserConfig is the minimal bootstrap config written for first-time
+// users. It intentionally contains only user-editable essentials and not the
+// full runtime default surface.
+var defaultUserConfig = Config{
+	Channels: map[string]ChannelConfig{
+		"telegram": {
+			Enabled:      true,
+			Token:        "",
+			AllowedUsers: []int64{},
+		},
+	},
+	LLM: map[string]LLMProviderConfig{
+		"default": {
+			APIKey:         "$ANTHROPIC_API_KEY",
+			Provider:       "anthropic",
+			Model:          "claude-sonnet-4-6",
+			RequestTimeout: 30 * time.Second,
 		},
 	},
 }
@@ -199,7 +219,7 @@ func Write(w io.Writer) error {
 	}
 
 	// Keep duration fields human-readable in generated TOML.
-	v.Set("llm."+defaultLLMProfile+".request_timeout", v.GetDuration("llm."+defaultLLMProfile+".request_timeout").String())
+	v.Set("llm.default.request_timeout", v.GetDuration("llm.default.request_timeout").String())
 	v.Set("security.command_timeout", v.GetDuration("security.command_timeout").String())
 	v.Set("costs.circuit_breaker_window", v.GetDuration("costs.circuit_breaker_window").String())
 
@@ -209,16 +229,40 @@ func Write(w io.Writer) error {
 	return nil
 }
 
-func setDefaults(v *viper.Viper, dataDir string) {
-	v.SetDefault("channels."+defaultTelegramChannel+".enabled", defaultConfig.Channels[defaultTelegramChannel].Enabled)
-	v.SetDefault("channels."+defaultTelegramChannel+".token", defaultConfig.Channels[defaultTelegramChannel].Token)
-	v.SetDefault("channels."+defaultTelegramChannel+".allowed_users", defaultConfig.Channels[defaultTelegramChannel].AllowedUsers)
+// DefaultUserConfigTOML renders the minimal bootstrap user config as TOML.
+func DefaultUserConfigTOML() (string, error) {
+	v := viper.New()
+	v.SetConfigType("toml")
 
-	v.SetDefault("llm."+defaultLLMProfile+".api_key", defaultConfig.LLM[defaultLLMProfile].APIKey)
-	v.SetDefault("llm."+defaultLLMProfile+".provider", defaultConfig.LLM[defaultLLMProfile].Provider)
-	v.SetDefault("llm."+defaultLLMProfile+".model", defaultConfig.LLM[defaultLLMProfile].Model)
-	v.SetDefault("llm."+defaultLLMProfile+".max_tokens", defaultConfig.LLM[defaultLLMProfile].MaxTokens)
-	v.SetDefault("llm."+defaultLLMProfile+".request_timeout", defaultConfig.LLM[defaultLLMProfile].RequestTimeout)
+	for profile, llm := range defaultUserConfig.LLM {
+		v.Set("llm."+profile+".api_key", llm.APIKey)
+		v.Set("llm."+profile+".provider", llm.Provider)
+		v.Set("llm."+profile+".model", llm.Model)
+		v.Set("llm."+profile+".request_timeout", llm.RequestTimeout.String())
+	}
+	for channel, ch := range defaultUserConfig.Channels {
+		v.Set("channels."+channel+".enabled", ch.Enabled)
+		v.Set("channels."+channel+".token", ch.Token)
+		v.Set("channels."+channel+".allowed_users", ch.AllowedUsers)
+	}
+
+	var out bytes.Buffer
+	if err := v.WriteConfigTo(&out); err != nil {
+		return "", fmt.Errorf("write default user config: %w", err)
+	}
+	return out.String(), nil
+}
+
+func setDefaults(v *viper.Viper, dataDir string) {
+	v.SetDefault("channels.telegram.enabled", defaultConfig.Channels["telegram"].Enabled)
+	v.SetDefault("channels.telegram.token", defaultConfig.Channels["telegram"].Token)
+	v.SetDefault("channels.telegram.allowed_users", defaultConfig.Channels["telegram"].AllowedUsers)
+
+	v.SetDefault("llm.default.api_key", defaultConfig.LLM["default"].APIKey)
+	v.SetDefault("llm.default.provider", defaultConfig.LLM["default"].Provider)
+	v.SetDefault("llm.default.model", defaultConfig.LLM["default"].Model)
+	v.SetDefault("llm.default.max_tokens", defaultConfig.LLM["default"].MaxTokens)
+	v.SetDefault("llm.default.request_timeout", defaultConfig.LLM["default"].RequestTimeout)
 
 	v.SetDefault("security.command_timeout", defaultConfig.Security.CommandTimeout)
 	v.SetDefault("security.mode", defaultConfig.Security.Mode)
@@ -246,18 +290,18 @@ func (c *Config) WorkspaceDir() string {
 
 // DefaultLLM returns the default LLM profile with fallback defaults.
 func (c *Config) DefaultLLM() LLMProviderConfig {
-	if llm, ok := c.LLM[defaultLLMProfile]; ok {
+	if llm, ok := c.LLM["default"]; ok {
 		return llm
 	}
-	return defaultConfig.LLM[defaultLLMProfile]
+	return defaultConfig.LLM["default"]
 }
 
 // TelegramChannel returns Telegram channel config with fallback defaults.
 func (c *Config) TelegramChannel() ChannelConfig {
-	if ch, ok := c.Channels[defaultTelegramChannel]; ok {
+	if ch, ok := c.Channels["telegram"]; ok {
 		return ch
 	}
-	return defaultConfig.Channels[defaultTelegramChannel]
+	return defaultConfig.Channels["telegram"]
 }
 
 func validateSecurityMode(mode string) error {
