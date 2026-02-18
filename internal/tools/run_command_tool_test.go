@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -101,6 +102,35 @@ func TestRunCommand_CombinedOutputOnFailure(t *testing.T) {
 	}
 	if !strings.Contains(res.Output, "[exit code: 7]") {
 		t.Fatalf("expected exit code marker on failure, got %q", res.Output)
+	}
+}
+
+func TestRunCommand_ContextCanceledStopsCommand(t *testing.T) {
+	workspace := t.TempDir()
+	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
+	if err := os.WriteFile(allowedPath, []byte("[\"sleep\"]\n"), 0o644); err != nil {
+		t.Fatalf("write allowed bins: %v", err)
+	}
+
+	tool := RunCommandTool{
+		WorkspaceDir:    workspace,
+		AllowedBinsPath: allowedPath,
+		Timeout:         5 * time.Minute,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+
+	startedAt := time.Now()
+	res, err := tool.Execute(ctx, map[string]any{"command": "sleep 5 && echo done"})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context canceled error, got result=%#v err=%v", res, err)
+	}
+	if elapsed := time.Since(startedAt); elapsed > 2*time.Second {
+		t.Fatalf("expected fast cancellation, took %s", elapsed)
 	}
 }
 

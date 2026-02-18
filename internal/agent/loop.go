@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -41,6 +42,9 @@ func Run(
 	totalUsage := provider.TokenUsage{}
 
 	for i := 0; i < maxIterations; i++ {
+		if err := ctx.Err(); err != nil {
+			return nil, history, err
+		}
 		// Each iteration sends the full conversation state and available tools.
 		// The model either returns final text or a set of tool calls.
 		logging.Logger().Info(
@@ -91,6 +95,9 @@ func Run(
 		})
 
 		for _, call := range resp.ToolCalls {
+			if err := ctx.Err(); err != nil {
+				return nil, history, err
+			}
 			startedAt := time.Now()
 			tool, ok := registry.Lookup(call.Name)
 			if !ok {
@@ -145,6 +152,15 @@ func Run(
 			// runtime execution errors are returned to the model uniformly.
 			result, err := approval.ExecuteTool(ctx, approver, tool, args, toolDescription(tool, args, call.Name))
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					logging.Logger().Info(
+						"tool call canceled",
+						"tool", call.Name,
+						"tool_call_id", call.ID,
+						"duration_ms", time.Since(startedAt).Milliseconds(),
+					)
+					return nil, history, err
+				}
 				logging.Logger().Warn(
 					"tool call failed",
 					"tool", call.Name,

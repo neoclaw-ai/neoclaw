@@ -118,11 +118,14 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 
 	cmd := exec.CommandContext(runCtx, "bash", "-lc", command)
 	cmd.Dir = workdir
+	configureCommandForCancellation(cmd)
 	combinedOut, runErr := cmd.CombinedOutput()
 	exitCode := 0
 	if runErr != nil {
 		var exitErr *exec.ExitError
 		switch {
+		case errors.Is(runCtx.Err(), context.Canceled):
+			return nil, context.Canceled
 		case errors.Is(runCtx.Err(), context.DeadlineExceeded):
 			// Use 124 for timeout to match common shell timeout conventions.
 			exitCode = 124
