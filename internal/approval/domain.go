@@ -39,7 +39,7 @@ func (c Checker) Allow(ctx context.Context, host string) error {
 
 	decision, err := c.Approver.RequestApproval(ctx, ApprovalRequest{
 		Tool:        "network_domain",
-		Description: fmt.Sprintf("allow network domain: %s", target),
+		Description: fmt.Sprintf("allow access to %s?", target),
 		Args: map[string]any{
 			"domain": target,
 		},

@@ -70,13 +70,17 @@ func TestLoad_ExpandsEnvVarsInStringValues(t *testing.T) {
 	}
 	t.Setenv("BETTERCLAW_HOME", dataDir)
 	t.Setenv("ANTHROPIC_API_KEY", "expanded-key")
+	t.Setenv("BRAVE_API_KEY", "expanded-brave-key")
 
 	configBody := `
-[llm.default]
-api_key = "$ANTHROPIC_API_KEY"
-provider = "anthropic"
-model = "claude-sonnet-4-6"
-`
+	[llm.default]
+	api_key = "$ANTHROPIC_API_KEY"
+	provider = "anthropic"
+	model = "claude-sonnet-4-6"
+
+	[web.search]
+	api_key = "$BRAVE_API_KEY"
+	`
 	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
@@ -87,6 +91,9 @@ model = "claude-sonnet-4-6"
 	}
 	if cfg.DefaultLLM().APIKey != "expanded-key" {
 		t.Fatalf("expected expanded api key %q, got %q", "expanded-key", cfg.DefaultLLM().APIKey)
+	}
+	if cfg.Web.Search.APIKey != "expanded-brave-key" {
+		t.Fatalf("expected expanded web search api key %q, got %q", "expanded-brave-key", cfg.Web.Search.APIKey)
 	}
 }
 

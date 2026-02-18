@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -40,8 +41,22 @@ func newCLICmd() *cobra.Command {
 			}
 
 			memoryStore := memory.New(filepath.Join(cfg.AgentDir(), "memory"))
+			trimmedPrompt := strings.TrimSpace(prompt)
+			var (
+				approver approval.Approver
+				listener *channels.CLIListener
+			)
+			if trimmedPrompt != "" {
+				if strings.HasPrefix(trimmedPrompt, "/") {
+					return fmt.Errorf("slash commands are not supported in one-shot -p mode")
+				}
+				approver = approval.NewCLIApprover(cmd.InOrStdin(), cmd.OutOrStdout())
+			} else {
+				listener = channels.NewCLI(cmd.InOrStdin(), cmd.OutOrStdout())
+				approver = listener
+			}
 
-			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore)
+			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore, approver)
 			if err != nil {
 				return err
 			}
@@ -50,17 +65,12 @@ func newCLICmd() *cobra.Command {
 				return err
 			}
 
-			if strings.TrimSpace(prompt) != "" {
-				if strings.HasPrefix(strings.TrimSpace(prompt), "/") {
-					return fmt.Errorf("slash commands are not supported in one-shot -p mode")
-				}
-				approver := approval.NewCLIApprover(cmd.InOrStdin(), cmd.OutOrStdout())
+			if trimmedPrompt != "" {
 				handler := agent.New(modelProvider, registry, approver, systemPrompt)
 				writer := &singleShotWriter{out: cmd.OutOrStdout()}
-				return handler.HandleMessage(cmd.Context(), writer, &runtime.Message{Text: prompt})
+				return handler.HandleMessage(cmd.Context(), writer, &runtime.Message{Text: trimmedPrompt})
 			}
 
-			listener := channels.NewCLI(cmd.InOrStdin(), cmd.OutOrStdout())
 			sessionStore := session.New(filepath.Join(cfg.AgentDir(), "sessions", "cli", "default.jsonl"))
 			handler := agent.NewWithSession(
 				modelProvider,
@@ -82,8 +92,16 @@ func newCLICmd() *cobra.Command {
 	return cmd
 }
 
-func buildToolRegistry(cfg *config.Config, out io.Writer, memoryStore *memory.Store) (*tools.Registry, error) {
+func buildToolRegistry(cfg *config.Config, out io.Writer, memoryStore *memory.Store, approver approval.Approver) (*tools.Registry, error) {
 	registry := tools.NewRegistry()
+	httpClient := &http.Client{
+		Transport: approval.RoundTripper{
+			Checker: approval.Checker{
+				AllowedDomainsPath: filepath.Join(cfg.DataDir, "allowed_domains.json"),
+				Approver:           approver,
+			},
+		},
+	}
 	coreTools := []tools.Tool{
 		tools.ReadFileTool{WorkspaceDir: cfg.WorkspaceDir()},
 		tools.ListDirTool{WorkspaceDir: cfg.WorkspaceDir()},
@@ -99,6 +117,12 @@ func buildToolRegistry(cfg *config.Config, out io.Writer, memoryStore *memory.St
 			Timeout:         cfg.Security.CommandTimeout,
 		},
 		tools.SendMessageTool{Writer: out},
+		tools.WebSearchTool{
+			Client:   httpClient,
+			Provider: cfg.Web.Search.Provider,
+			APIKey:   cfg.Web.Search.APIKey,
+		},
+		tools.HTTPRequestTool{Client: httpClient},
 	}
 	for _, tool := range coreTools {
 		if err := registry.Register(tool); err != nil {

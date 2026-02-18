@@ -82,6 +82,7 @@ type WebConfig struct {
 // WebSearchConfig configures the web search provider.
 type WebSearchConfig struct {
 	Provider string `mapstructure:"provider"`
+	APIKey   string `mapstructure:"api_key"`
 }
 
 var defaultConfig = Config{
@@ -117,6 +118,7 @@ var defaultConfig = Config{
 	Web: WebConfig{
 		Search: WebSearchConfig{
 			Provider: "brave",
+			APIKey:   "",
 		},
 	},
 }
@@ -277,6 +279,7 @@ func setDefaults(v *viper.Viper, dataDir string) {
 	v.SetDefault("costs.recent_messages", defaultConfig.Costs.RecentMessages)
 
 	v.SetDefault("web.search.provider", defaultConfig.Web.Search.Provider)
+	v.SetDefault("web.search.api_key", defaultConfig.Web.Search.APIKey)
 }
 
 // AgentDir returns the active agent directory under DataDir.
