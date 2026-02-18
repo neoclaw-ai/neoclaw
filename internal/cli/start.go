@@ -7,9 +7,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newServeCmd() *cobra.Command {
+func newStartCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "serve",
+		Use:   "start",
 		Short: "Start the server",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := config.Load()

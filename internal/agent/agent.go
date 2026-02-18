@@ -19,7 +19,7 @@ import (
 const defaultAgentMaxIterations = 10
 const defaultRequestTimeout = 30 * time.Second
 
-// DefaultSystemPrompt is the default system prompt used by the prompt command.
+// DefaultSystemPrompt is the default system prompt used by the cli command.
 const DefaultSystemPrompt = "You are BetterClaw, a lightweight personal AI assistant."
 
 // Agent implements the runtime Handler for one conversation.

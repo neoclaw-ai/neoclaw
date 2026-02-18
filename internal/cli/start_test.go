@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestServeLoadsDefaultsAndBootstraps(t *testing.T) {
+func TestStartLoadsDefaultsAndBootstraps(t *testing.T) {
 	dataDir := createTestHome(t)
 	writeValidConfig(t, dataDir)
 
@@ -16,14 +16,14 @@ func TestServeLoadsDefaultsAndBootstraps(t *testing.T) {
 	out := &bytes.Buffer{}
 	cmd.SetOut(out)
 	cmd.SetErr(out)
-	cmd.SetArgs([]string{"serve"})
+	cmd.SetArgs([]string{"start"})
 
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute serve: %v", err)
+		t.Fatalf("execute start: %v", err)
 	}
 
 	if !strings.Contains(out.String(), "starting server...") {
-		t.Fatalf("expected serve output to include startup message, got %q", out.String())
+		t.Fatalf("expected start output to include startup message, got %q", out.String())
 	}
 
 	soulFile := filepath.Join(dataDir, "agents", "default", "SOUL.md")

@@ -9,7 +9,7 @@ import (
 	"github.com/machinae/betterclaw/internal/provider"
 )
 
-func TestPromptFlagParsing(t *testing.T) {
+func TestCLIFlagParsing(t *testing.T) {
 	dataDir := createTestHome(t)
 	writeValidConfig(t, dataDir)
 
@@ -25,10 +25,10 @@ func TestPromptFlagParsing(t *testing.T) {
 	out := &bytes.Buffer{}
 	cmd.SetOut(out)
 	cmd.SetErr(out)
-	cmd.SetArgs([]string{"prompt", "-p", "hello"})
+	cmd.SetArgs([]string{"cli", "-p", "hello"})
 
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute prompt command: %v", err)
+		t.Fatalf("execute cli command: %v", err)
 	}
 
 	got := strings.TrimSpace(out.String())
@@ -37,7 +37,7 @@ func TestPromptFlagParsing(t *testing.T) {
 	}
 }
 
-func TestPromptInteractiveMode(t *testing.T) {
+func TestCLIInteractiveMode(t *testing.T) {
 	dataDir := createTestHome(t)
 	writeValidConfig(t, dataDir)
 
@@ -54,10 +54,10 @@ func TestPromptInteractiveMode(t *testing.T) {
 	cmd.SetIn(strings.NewReader("hello\nquit\n"))
 	cmd.SetOut(out)
 	cmd.SetErr(out)
-	cmd.SetArgs([]string{"prompt"})
+	cmd.SetArgs([]string{"cli"})
 
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute interactive prompt command: %v", err)
+		t.Fatalf("execute interactive cli command: %v", err)
 	}
 
 	got := out.String()
@@ -69,7 +69,7 @@ func TestPromptInteractiveMode(t *testing.T) {
 	}
 }
 
-func TestPromptOneShotRejectsSlashCommands(t *testing.T) {
+func TestCLIOneShotRejectsSlashCommands(t *testing.T) {
 	dataDir := createTestHome(t)
 	writeValidConfig(t, dataDir)
 
@@ -77,7 +77,7 @@ func TestPromptOneShotRejectsSlashCommands(t *testing.T) {
 	out := &bytes.Buffer{}
 	cmd.SetOut(out)
 	cmd.SetErr(out)
-	cmd.SetArgs([]string{"prompt", "-p", "/new"})
+	cmd.SetArgs([]string{"cli", "-p", "/new"})
 
 	err := cmd.Execute()
 	if err == nil {

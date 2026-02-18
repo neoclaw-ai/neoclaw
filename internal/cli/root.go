@@ -71,11 +71,19 @@ func NewRootCmd() *cobra.Command {
 
 			return nil
 		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Default to `claw start` when no subcommand is provided.
+			startCmd, _, err := cmd.Find([]string{"start"})
+			if err != nil {
+				return err
+			}
+			return startCmd.RunE(startCmd, args)
+		},
 	}
 
 	root.AddCommand(newConfigCmd())
-	root.AddCommand(newServeCmd())
-	root.AddCommand(newPromptCmd())
+	root.AddCommand(newStartCmd())
+	root.AddCommand(newCLICmd())
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (info level)")
 
 	return root

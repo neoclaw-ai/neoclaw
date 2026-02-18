@@ -12,11 +12,11 @@ func TestRootCommandRegistersSubcommands(t *testing.T) {
 	if c := findSubcommand(t, cmd, "config"); c.Name() != "config" {
 		t.Fatalf("config command not registered")
 	}
-	if c := findSubcommand(t, cmd, "serve"); c.Name() != "serve" {
-		t.Fatalf("serve command not registered")
+	if c := findSubcommand(t, cmd, "start"); c.Name() != "start" {
+		t.Fatalf("start command not registered")
 	}
-	if c := findSubcommand(t, cmd, "prompt"); c.Name() != "prompt" {
-		t.Fatalf("prompt command not registered")
+	if c := findSubcommand(t, cmd, "cli"); c.Name() != "cli" {
+		t.Fatalf("cli command not registered")
 	}
 }
 

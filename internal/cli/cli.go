@@ -18,12 +18,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newPromptCmd() *cobra.Command {
+func newCLICmd() *cobra.Command {
 	var prompt string
 
 	cmd := &cobra.Command{
-		Use:   "prompt",
-		Short: "Send a prompt message (or start interactive chat without -p)",
+		Use:   "cli",
+		Short: "Send a message (or start interactive chat without -p)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := config.Load()
 			if err != nil {
