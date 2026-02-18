@@ -1,3 +1,4 @@
+// Package approval defines the Approver interface and enforces permission checks before tool execution.
 package approval
 
 import (

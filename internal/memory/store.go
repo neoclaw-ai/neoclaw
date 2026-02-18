@@ -1,3 +1,4 @@
+// Package memory manages long-term memory and daily log files for an agent, providing append, remove, and search operations over markdown files.
 package memory
 
 import (

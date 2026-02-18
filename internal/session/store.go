@@ -1,3 +1,4 @@
+// Package session persists conversation history as JSONL records, one file per channel session, with append, rewrite, and reset operations.
 package session
 
 import (

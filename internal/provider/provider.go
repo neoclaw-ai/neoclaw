@@ -1,3 +1,4 @@
+// Package provider defines the Provider interface and shared types for LLM communication; concrete adapters implement it for Anthropic and OpenRouter.
 package provider
 
 import "context"

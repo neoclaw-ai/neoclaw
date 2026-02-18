@@ -1,3 +1,4 @@
+// Package channels provides runtime.Listener implementations for each supported input channel (CLI, and future Telegram, Discord, etc.).
 package channels
 
 import (

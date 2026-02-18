@@ -1,3 +1,4 @@
+// Package logging provides a single process-wide structured logger via slog, with colorized output on terminals and plain text elsewhere.
 package logging
 
 import (

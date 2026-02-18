@@ -1,3 +1,4 @@
+// Package tools defines the Tool interface, Registry, and ToolResult used by the agent loop, with optional interfaces for conditional approval and result summarization.
 package tools
 
 import (

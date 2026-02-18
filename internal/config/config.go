@@ -1,3 +1,4 @@
+// Package config loads BetterClaw runtime configuration from a TOML file and environment variables, exposing typed structs and accessors for all sections.
 package config
 
 import (

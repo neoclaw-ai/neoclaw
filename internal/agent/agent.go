@@ -1,3 +1,4 @@
+// Package agent implements the conversation handler, driving the LLM tool-use loop with per-conversation history and session persistence.
 package agent
 
 import (

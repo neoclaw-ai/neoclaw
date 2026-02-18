@@ -1,3 +1,4 @@
+// Package runtime defines the core channel contracts — Message, Handler, ResponseWriter, and Listener — following the pattern of net/http.
 package runtime
 
 import "context"

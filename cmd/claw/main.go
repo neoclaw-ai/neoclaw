@@ -1,3 +1,5 @@
+// Package main is the entry point for the claw binary.
+// It delegates immediately to the CLI command tree.
 package main
 
 import (

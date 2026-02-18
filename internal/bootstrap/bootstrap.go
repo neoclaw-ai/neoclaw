@@ -1,3 +1,4 @@
+// Package bootstrap handles first-run initialization of the BetterClaw data directory tree, creating directories, policy files, and a starter config idempotently.
 package bootstrap
 
 import (

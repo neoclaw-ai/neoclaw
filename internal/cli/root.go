@@ -1,3 +1,4 @@
+// Package cli wires Cobra subcommands to application dependencies; it is a thin controller with no business logic.
 package cli
 
 import (
