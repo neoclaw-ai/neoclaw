@@ -22,6 +22,16 @@ func (a *Agent) ensureHistoryLoaded(ctx context.Context) error {
 	return nil
 }
 
+// Reset clears conversation history and persisted session state.
+func (a *Agent) Reset(ctx context.Context) error {
+	if err := a.ensureHistoryLoaded(ctx); err != nil {
+		return err
+	}
+	historySnapshot := append([]provider.ChatMessage{}, a.history...)
+	a.summarizeSessionToDailyLogAsync(ctx, historySnapshot)
+	return a.resetSession(ctx)
+}
+
 func (a *Agent) resetSession(ctx context.Context) error {
 	a.history = nil
 	a.historyLoadedOnce = true
@@ -46,11 +56,6 @@ func (a *Agent) appendSessionDelta(ctx context.Context, base, history []provider
 		return a.sessionStore.Rewrite(ctx, history)
 	}
 	return a.sessionStore.Append(ctx, history[len(base):])
-}
-
-func isResetCommand(text string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(text))
-	return normalized == "/new" || normalized == "/reset"
 }
 
 func (a *Agent) summarizeSessionToDailyLogAsync(ctx context.Context, history []provider.ChatMessage) {

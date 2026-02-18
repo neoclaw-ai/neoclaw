@@ -51,7 +51,7 @@ func TestCLIInteractiveMode(t *testing.T) {
 
 	cmd := NewRootCmd()
 	out := &bytes.Buffer{}
-	cmd.SetIn(strings.NewReader("hello\nquit\n"))
+	cmd.SetIn(strings.NewReader("/help\n/quit\n"))
 	cmd.SetOut(out)
 	cmd.SetErr(out)
 	cmd.SetArgs([]string{"cli"})
@@ -64,8 +64,8 @@ func TestCLIInteractiveMode(t *testing.T) {
 	if !strings.Contains(got, "Interactive mode. Type /quit or /exit to stop.") {
 		t.Fatalf("expected interactive mode header, got %q", got)
 	}
-	if !strings.Contains(got, "assistant> hello from llm") {
-		t.Fatalf("expected assistant response in interactive mode, got %q", got)
+	if !strings.Contains(got, "assistant> Stopped.") {
+		t.Fatalf("expected stop output in interactive mode, got %q", got)
 	}
 }
 

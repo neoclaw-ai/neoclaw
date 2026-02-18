@@ -11,6 +11,7 @@ import (
 	"github.com/machinae/betterclaw/internal/agent"
 	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/channels"
+	"github.com/machinae/betterclaw/internal/commands"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/memory"
 	"github.com/machinae/betterclaw/internal/runtime"
@@ -83,7 +84,11 @@ func newCLICmd() *cobra.Command {
 				cfg.Costs.RecentMessages,
 				llmCfg.RequestTimeout,
 			)
-			return listener.Listen(cmd.Context(), handler)
+			router := commands.Router{
+				Commands: commands.New(handler),
+				Next:     handler,
+			}
+			return listener.Listen(cmd.Context(), router)
 		},
 	}
 

@@ -92,15 +92,6 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg
 		return err
 	}
 
-	if isResetCommand(msg.Text) {
-		historySnapshot := append([]provider.ChatMessage{}, a.history...)
-		a.summarizeSessionToDailyLogAsync(ctx, historySnapshot)
-		if err := a.resetSession(ctx); err != nil {
-			return err
-		}
-		return w.WriteMessage(ctx, "Session cleared.")
-	}
-
 	baseHistory := append([]provider.ChatMessage{}, a.history...)
 	messages := appendUserMessage(baseHistory, msg.Text)
 	uncompactedMessages := append([]provider.ChatMessage{}, messages...)

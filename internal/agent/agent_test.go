@@ -137,7 +137,7 @@ func TestAgentWithSessionLoadsHistoryAndAppendsTurn(t *testing.T) {
 	}
 }
 
-func TestAgentHandleMessageNewResetsSession(t *testing.T) {
+func TestAgentResetResetsSession(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "after reset"}},
@@ -152,16 +152,11 @@ func TestAgentHandleMessageNewResetsSession(t *testing.T) {
 	}
 
 	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, time.Second)
-	writer := &captureWriter{}
-
-	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "/new"}); err != nil {
-		t.Fatalf("handle /new: %v", err)
+	if err := ag.Reset(context.Background()); err != nil {
+		t.Fatalf("reset: %v", err)
 	}
 	if len(modelProvider.requests) != 0 {
-		t.Fatalf("expected no provider call for /new")
-	}
-	if len(writer.messages) != 1 || writer.messages[0] != "Session cleared." {
-		t.Fatalf("expected session cleared response, got %#v", writer.messages)
+		t.Fatalf("expected no provider call for reset")
 	}
 
 	loaded, err := sessionStore.Load(context.Background())
@@ -169,9 +164,10 @@ func TestAgentHandleMessageNewResetsSession(t *testing.T) {
 		t.Fatalf("load session: %v", err)
 	}
 	if len(loaded) != 0 {
-		t.Fatalf("expected empty session after /new, got %#v", loaded)
+		t.Fatalf("expected empty session after reset, got %#v", loaded)
 	}
 
+	writer := &captureWriter{}
 	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "fresh"}); err != nil {
 		t.Fatalf("handle post-reset message: %v", err)
 	}
@@ -183,7 +179,7 @@ func TestAgentHandleMessageNewResetsSession(t *testing.T) {
 	}
 }
 
-func TestAgentHandleMessageNewWritesSummaryToDailyLog(t *testing.T) {
+func TestAgentResetWritesSummaryToDailyLog(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "session summary"}},
@@ -200,13 +196,8 @@ func TestAgentHandleMessageNewWritesSummaryToDailyLog(t *testing.T) {
 	memoryDir := filepath.Join(t.TempDir(), "memory")
 	memoryStore := memory.New(memoryDir)
 	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, memoryStore, 4000, 10, time.Second)
-	writer := &captureWriter{}
-
-	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "/new"}); err != nil {
-		t.Fatalf("handle /new: %v", err)
-	}
-	if len(writer.messages) != 1 || writer.messages[0] != "Session cleared." {
-		t.Fatalf("expected session cleared response, got %#v", writer.messages)
+	if err := ag.Reset(context.Background()); err != nil {
+		t.Fatalf("reset: %v", err)
 	}
 
 	var dailyContent string
@@ -225,7 +216,7 @@ func TestAgentHandleMessageNewWritesSummaryToDailyLog(t *testing.T) {
 	}
 }
 
-func TestAgentHandleMessageNewSkipsSummaryOnEmptyHistory(t *testing.T) {
+func TestAgentResetSkipsSummaryOnEmptyHistory(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "unexpected summary call"}},
@@ -235,13 +226,8 @@ func TestAgentHandleMessageNewSkipsSummaryOnEmptyHistory(t *testing.T) {
 	memoryDir := filepath.Join(t.TempDir(), "memory")
 	memoryStore := memory.New(memoryDir)
 	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, memoryStore, 4000, 10, time.Second)
-	writer := &captureWriter{}
-
-	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "/new"}); err != nil {
-		t.Fatalf("handle /new: %v", err)
-	}
-	if len(writer.messages) != 1 || writer.messages[0] != "Session cleared." {
-		t.Fatalf("expected session cleared response, got %#v", writer.messages)
+	if err := ag.Reset(context.Background()); err != nil {
+		t.Fatalf("reset: %v", err)
 	}
 
 	time.Sleep(50 * time.Millisecond)

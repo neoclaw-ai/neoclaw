@@ -13,7 +13,7 @@ import (
 
 func TestCLIListenerListenDispatchesMessages(t *testing.T) {
 	out := &bytes.Buffer{}
-	listener := NewCLI(strings.NewReader("hello\nquit\n"), out)
+	listener := NewCLI(strings.NewReader("hello\n"), out)
 
 	handler := &testHandler{response: "ok"}
 	err := listener.Listen(context.Background(), handler)
@@ -30,7 +30,8 @@ func TestCLIListenerListenDispatchesMessages(t *testing.T) {
 }
 
 func TestCLIListenerListenExitsOnExitCommands(t *testing.T) {
-	listener := NewCLI(strings.NewReader("/exit\n"), &bytes.Buffer{})
+	out := &bytes.Buffer{}
+	listener := NewCLI(strings.NewReader("/exit\n"), out)
 	handler := &testHandler{response: "unused"}
 
 	err := listener.Listen(context.Background(), handler)
@@ -40,15 +41,39 @@ func TestCLIListenerListenExitsOnExitCommands(t *testing.T) {
 	if len(handler.messages) != 0 {
 		t.Fatalf("expected no handler calls, got %#v", handler.messages)
 	}
+	if got := out.String(); !strings.Contains(got, "assistant> Stopped.") {
+		t.Fatalf("expected stop output, got %q", got)
+	}
 }
 
-func TestCLIListenerListenPropagatesFatalHandlerError(t *testing.T) {
-	listener := NewCLI(strings.NewReader("hello\n"), &bytes.Buffer{})
+func TestCLIListenerListenHandlesStopWithoutDispatch(t *testing.T) {
+	out := &bytes.Buffer{}
+	listener := NewCLI(strings.NewReader("/stop\n/quit\n"), out)
+	handler := &testHandler{response: "unused"}
+
+	err := listener.Listen(context.Background(), handler)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	if len(handler.messages) != 0 {
+		t.Fatalf("expected no handler calls, got %#v", handler.messages)
+	}
+	if got := out.String(); strings.Count(got, "assistant> Stopped.") < 2 {
+		t.Fatalf("expected stop output for /stop and /quit, got %q", got)
+	}
+}
+
+func TestCLIListenerListenWritesFatalHandlerError(t *testing.T) {
+	out := &bytes.Buffer{}
+	listener := NewCLI(strings.NewReader("hello\n"), out)
 	handler := &testHandler{err: errors.New("fatal")}
 
 	err := listener.Listen(context.Background(), handler)
-	if err == nil || !strings.Contains(err.Error(), "fatal") {
-		t.Fatalf("expected fatal error, got %v", err)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	if got := out.String(); !strings.Contains(got, "assistant> error: fatal") {
+		t.Fatalf("expected error output, got %q", got)
 	}
 }
 
