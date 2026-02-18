@@ -2,10 +2,11 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+	"time"
 )
 
 func TestStartLoadsDefaultsAndBootstraps(t *testing.T) {
@@ -17,13 +18,15 @@ func TestStartLoadsDefaultsAndBootstraps(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(out)
 	cmd.SetArgs([]string{"start"})
+	ctx, cancel := context.WithCancel(context.Background())
+	cmd.SetContext(ctx)
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+	}()
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute start: %v", err)
-	}
-
-	if !strings.Contains(out.String(), "starting server...") {
-		t.Fatalf("expected start output to include startup message, got %q", out.String())
 	}
 
 	soulFile := filepath.Join(dataDir, "agents", "default", "SOUL.md")

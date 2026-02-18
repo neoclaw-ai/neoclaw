@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/machinae/betterclaw/internal/cli"
@@ -10,7 +11,7 @@ import (
 )
 
 func main() {
-	if err := cli.NewRootCmd().Execute(); err != nil {
+	if err := cli.NewRootCmd().ExecuteContext(context.Background()); err != nil {
 		logging.Logger().Error("fatal error", "err", err)
 		os.Exit(1)
 	}

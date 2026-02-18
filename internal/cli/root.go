@@ -78,6 +78,7 @@ func NewRootCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			startCmd.SetContext(cmd.Context())
 			return startCmd.RunE(startCmd, args)
 		},
 	}

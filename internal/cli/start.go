@@ -1,9 +1,12 @@
 package cli
 
 import (
-	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/machinae/betterclaw/internal/config"
+	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/spf13/cobra"
 )
 
@@ -21,15 +24,20 @@ func newStartCmd() *cobra.Command {
 			}
 
 			llm := cfg.DefaultLLM()
-			_, err = fmt.Fprintf(
-				cmd.OutOrStdout(),
-				"starting server... agent=%s provider=%s model=%s data_dir=%s\n",
-				cfg.Agent,
-				llm.Provider,
-				llm.Model,
-				cfg.DataDir,
+			logging.Logger().Info(
+				"starting server",
+				"agent", cfg.Agent,
+				"provider", llm.Provider,
+				"model", llm.Model,
+				"data_dir", cfg.DataDir,
 			)
-			return err
+
+			runCtx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+
+			<-runCtx.Done()
+			logging.Logger().Info("server stopped")
+			return nil
 		},
 	}
 }
