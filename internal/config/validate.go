@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/machinae/betterclaw/internal/logging"
 )
@@ -83,6 +84,9 @@ func ValidateStartup(cfg *Config) error {
 	}
 	if err := cfg.Web.Validate(); err != nil {
 		errs = append(errs, fmt.Errorf("web: %w", err))
+	}
+	if strings.EqualFold(strings.TrimSpace(cfg.Web.Search.Provider), "brave") && strings.TrimSpace(cfg.Web.Search.APIKey) == "" {
+		logging.Logger().Warn("web.search.api_key is empty while web.search.provider is brave. web_search tool will fail until this is set")
 	}
 
 	for name, llmCfg := range cfg.LLM {

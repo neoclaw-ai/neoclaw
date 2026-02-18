@@ -91,3 +91,23 @@ func TestValidateStartup_RequestTimeoutMustBePositive(t *testing.T) {
 		t.Fatalf("expected request_timeout validation error, got %v", err)
 	}
 }
+
+func TestValidateStartup_WebBraveMissingAPIKeyWarnsOnly(t *testing.T) {
+	cfg := &Config{
+		LLM: map[string]LLMProviderConfig{
+			"default": {Provider: "anthropic", APIKey: "k", Model: "m", RequestTimeout: time.Second},
+		},
+		Channels: map[string]ChannelConfig{
+			"telegram": {Enabled: true, Token: "t", AllowedUsers: []int64{1}},
+		},
+		Security: SecurityConfig{Mode: SecurityModeStandard},
+		Web: WebConfig{
+			Search: WebSearchConfig{Provider: "brave", APIKey: ""},
+		},
+	}
+
+	err := ValidateStartup(cfg)
+	if err != nil {
+		t.Fatalf("expected no hard error for missing brave web.search api key, got %v", err)
+	}
+}
