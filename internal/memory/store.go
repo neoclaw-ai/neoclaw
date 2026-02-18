@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,7 @@ const (
 // Store manages long-term memory and daily log files.
 type Store struct {
 	dir string
+	mu  sync.Mutex
 }
 
 // LogEntry is one timestamped daily log entry.
@@ -44,6 +46,9 @@ func (s *Store) ReadMemory() (string, error) {
 // AppendFact adds a fact to a section in memory.md.
 // No-op if the fact already exists in that section.
 func (s *Store) AppendFact(section, fact string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	section = strings.TrimSpace(section)
 	fact = strings.TrimSpace(fact)
 	if section == "" {
@@ -76,6 +81,9 @@ func (s *Store) AppendFact(section, fact string) error {
 
 // RemoveFact removes all matching bullet lines from memory.md. Returns count of removed lines.
 func (s *Store) RemoveFact(fact string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	fact = strings.TrimSpace(fact)
 	if fact == "" {
 		return 0, errors.New("fact is required")
@@ -117,6 +125,9 @@ func (s *Store) RemoveFact(fact string) (int, error) {
 
 // AppendDailyLog appends a timestamped entry to today's daily log file.
 func (s *Store) AppendDailyLog(now time.Time, entry string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	entry = strings.TrimSpace(entry)
 	if entry == "" {
 		return errors.New("entry is required")

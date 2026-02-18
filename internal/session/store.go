@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/machinae/betterclaw/internal/provider"
 )
@@ -15,6 +16,7 @@ import (
 // Store persists conversation history in a JSONL file.
 type Store struct {
 	path string
+	mu   sync.Mutex
 }
 
 type record struct {
@@ -79,6 +81,9 @@ func (s *Store) Load(ctx context.Context) ([]provider.ChatMessage, error) {
 
 // Append appends messages as JSONL records.
 func (s *Store) Append(ctx context.Context, messages []provider.ChatMessage) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -122,6 +127,9 @@ func (s *Store) Append(ctx context.Context, messages []provider.ChatMessage) err
 
 // Rewrite replaces the session file with the provided message list.
 func (s *Store) Rewrite(ctx context.Context, messages []provider.ChatMessage) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
