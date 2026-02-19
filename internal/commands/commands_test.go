@@ -3,13 +3,15 @@ package commands
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/machinae/betterclaw/internal/runtime"
+	"github.com/machinae/betterclaw/internal/scheduler"
 )
 
 func TestHelpCommand(t *testing.T) {
-	h := New(nil)
+	h := New(nil, nil)
 	w := &captureWriter{}
 
 	handled, err := h.Handle(context.Background(), "/help", w)
@@ -26,7 +28,7 @@ func TestHelpCommand(t *testing.T) {
 
 func TestResetAlias(t *testing.T) {
 	resetter := &fakeResetter{}
-	h := New(resetter)
+	h := New(resetter, nil)
 	w := &captureWriter{}
 
 	handled, err := h.Handle(context.Background(), "/reset", w)
@@ -45,7 +47,7 @@ func TestResetAlias(t *testing.T) {
 }
 
 func TestUnknownCommand(t *testing.T) {
-	h := New(nil)
+	h := New(nil, nil)
 	w := &captureWriter{}
 
 	handled, err := h.Handle(context.Background(), "/unknown", w)
@@ -60,10 +62,41 @@ func TestUnknownCommand(t *testing.T) {
 	}
 }
 
+func TestJobsCommand(t *testing.T) {
+	store := scheduler.NewStore(t.TempDir() + "/jobs.json")
+	_, err := store.Create(context.Background(), scheduler.CreateInput{
+		Description: "daily ping",
+		Cron:        "0 9 * * *",
+		Action:      scheduler.ActionSendMessage,
+		Args:        map[string]any{"message": "hello"},
+		ChannelID:   "cli",
+	})
+	if err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+
+	h := New(nil, store)
+	w := &captureWriter{}
+
+	handled, err := h.Handle(context.Background(), "/jobs", w)
+	if err != nil {
+		t.Fatalf("handle /jobs: %v", err)
+	}
+	if !handled {
+		t.Fatalf("expected /jobs handled")
+	}
+	if len(w.messages) != 1 {
+		t.Fatalf("expected one message, got %#v", w.messages)
+	}
+	if !strings.Contains(w.messages[0], "daily ping") {
+		t.Fatalf("expected job listing, got %q", w.messages[0])
+	}
+}
+
 func TestRouterForwardsNonCommands(t *testing.T) {
 	next := &fakeRuntimeHandler{}
 	router := Router{
-		Commands: New(nil),
+		Commands: New(nil, nil),
 		Next:     next,
 	}
 
@@ -78,7 +111,7 @@ func TestRouterForwardsNonCommands(t *testing.T) {
 func TestRouterHandlesSlashCommand(t *testing.T) {
 	next := &fakeRuntimeHandler{}
 	router := Router{
-		Commands: New(nil),
+		Commands: New(nil, nil),
 		Next:     next,
 	}
 	w := &captureWriter{}
@@ -93,7 +126,7 @@ func TestRouterHandlesSlashCommand(t *testing.T) {
 
 func TestResetErrorReturned(t *testing.T) {
 	resetter := &fakeResetter{err: errors.New("boom")}
-	h := New(resetter)
+	h := New(resetter, nil)
 
 	handled, err := h.Handle(context.Background(), "/new", &captureWriter{})
 	if !handled {

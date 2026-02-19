@@ -15,6 +15,7 @@ import (
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/memory"
 	"github.com/machinae/betterclaw/internal/runtime"
+	"github.com/machinae/betterclaw/internal/scheduler"
 	"github.com/machinae/betterclaw/internal/session"
 	"github.com/machinae/betterclaw/internal/tools"
 	"github.com/spf13/cobra"
@@ -42,6 +43,8 @@ func newCLICmd() *cobra.Command {
 			}
 
 			memoryStore := memory.New(filepath.Join(cfg.AgentDir(), "memory"))
+			jobsStore := newSchedulerStore(cfg)
+			schedulerService := newSchedulerService(cfg, cmd.OutOrStdout(), jobsStore)
 			trimmedPrompt := strings.TrimSpace(prompt)
 			var (
 				approver approval.Approver
@@ -57,7 +60,7 @@ func newCLICmd() *cobra.Command {
 				approver = listener
 			}
 
-			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore, approver)
+			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore, approver, jobsStore, schedulerService)
 			if err != nil {
 				return err
 			}
@@ -85,7 +88,7 @@ func newCLICmd() *cobra.Command {
 				llmCfg.RequestTimeout,
 			)
 			router := commands.Router{
-				Commands: commands.New(handler),
+				Commands: commands.New(handler, jobsStore),
 				Next:     handler,
 			}
 			return listener.Listen(cmd.Context(), router)
@@ -97,7 +100,14 @@ func newCLICmd() *cobra.Command {
 	return cmd
 }
 
-func buildToolRegistry(cfg *config.Config, out io.Writer, memoryStore *memory.Store, approver approval.Approver) (*tools.Registry, error) {
+func buildToolRegistry(
+	cfg *config.Config,
+	out io.Writer,
+	memoryStore *memory.Store,
+	approver approval.Approver,
+	jobsStore *scheduler.Store,
+	schedulerService *scheduler.Service,
+) (*tools.Registry, error) {
 	registry := tools.NewRegistry()
 	httpClient := &http.Client{
 		Transport: approval.RoundTripper{
@@ -116,6 +126,10 @@ func buildToolRegistry(cfg *config.Config, out io.Writer, memoryStore *memory.St
 		tools.MemoryRemoveTool{Store: memoryStore},
 		tools.DailyLogTool{Store: memoryStore},
 		tools.SearchLogsTool{Store: memoryStore},
+		tools.JobListTool{Store: jobsStore},
+		tools.JobCreateTool{Store: jobsStore, ChannelID: "cli"},
+		tools.JobDeleteTool{Store: jobsStore},
+		tools.JobRunTool{Service: schedulerService},
 		tools.RunCommandTool{
 			WorkspaceDir:    cfg.WorkspaceDir(),
 			AllowedBinsPath: filepath.Join(cfg.DataDir, "allowed_bins.json"),

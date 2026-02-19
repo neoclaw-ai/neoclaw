@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/logging"
@@ -32,10 +34,21 @@ func newStartCmd() *cobra.Command {
 				"data_dir", cfg.DataDir,
 			)
 
+			store := newSchedulerStore(cfg)
+			service := newSchedulerService(cfg, cmd.OutOrStdout(), store)
+
 			runCtx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
+			if err := service.Start(runCtx); err != nil {
+				return err
+			}
 
 			<-runCtx.Done()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := service.Stop(shutdownCtx); err != nil {
+				return err
+			}
 			logging.Logger().Info("server stopped")
 			return nil
 		},
