@@ -25,12 +25,12 @@ func TestCLIApprover_Approved(t *testing.T) {
 	if !strings.Contains(out.String(), "approve tool run_command?") {
 		t.Fatalf("expected prompt text, got %q", out.String())
 	}
-	if !strings.Contains(out.String(), "[y]es/[n]o/[a]lways") {
-		t.Fatalf("expected explicit yes/no/always prompt, got %q", out.String())
+	if !strings.Contains(out.String(), "[y/N]") {
+		t.Fatalf("expected explicit y/N prompt, got %q", out.String())
 	}
 }
 
-func TestCLIApprover_AlwaysApproved(t *testing.T) {
+func TestCLIApprover_DeniedOnUnknownAnswer(t *testing.T) {
 	in := strings.NewReader("always\n")
 	var out bytes.Buffer
 	approver := NewCLIApprover(in, &out)
@@ -42,8 +42,8 @@ func TestCLIApprover_AlwaysApproved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request approval: %v", err)
 	}
-	if decision != AlwaysApproved {
-		t.Fatalf("expected AlwaysApproved, got %v", decision)
+	if decision != Denied {
+		t.Fatalf("expected Denied, got %v", decision)
 	}
 }
 

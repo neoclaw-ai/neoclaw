@@ -84,7 +84,6 @@ func TestCLIListenerRequestApproval(t *testing.T) {
 		expected approval.ApprovalDecision
 	}{
 		{name: "approved", input: "y\n", expected: approval.Approved},
-		{name: "always approved", input: "a\n", expected: approval.AlwaysApproved},
 		{name: "denied", input: "n\n", expected: approval.Denied},
 	}
 
@@ -106,8 +105,8 @@ func TestCLIListenerRequestApproval(t *testing.T) {
 			if got := out.String(); !strings.Contains(got, "approve tool run_command?") {
 				t.Fatalf("expected prompt output, got %q", got)
 			}
-			if got := out.String(); !strings.Contains(got, "[y]es/[n]o/[a]lways") {
-				t.Fatalf("expected explicit yes/no/always prompt, got %q", got)
+			if got := out.String(); !strings.Contains(got, "[y/N]") {
+				t.Fatalf("expected explicit y/N prompt, got %q", got)
 			}
 		})
 	}

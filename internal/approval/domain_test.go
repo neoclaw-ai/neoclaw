@@ -76,20 +76,20 @@ func TestCheckerAllow_DenyUnknownDomainIncludesRecoveryMessage(t *testing.T) {
 	}
 }
 
-func TestCheckerAllow_AlwaysApprovedPersistsDomain(t *testing.T) {
+func TestCheckerAllow_ApprovedPersistsDomain(t *testing.T) {
 	allowedPath := filepath.Join(t.TempDir(), "allowed_domains.json")
 	if err := os.WriteFile(allowedPath, []byte("[\"brave.com\"]\n"), 0o644); err != nil {
 		t.Fatalf("write allowlist: %v", err)
 	}
 
-	approver := &mockDomainApprover{decision: AlwaysApproved}
+	approver := &mockDomainApprover{decision: Approved}
 	checker := Checker{
 		AllowedDomainsPath: allowedPath,
 		Approver:           approver,
 	}
 
 	if err := checker.Allow(context.Background(), "https://search.example.com/path?q=1"); err != nil {
-		t.Fatalf("allow with always-approve: %v", err)
+		t.Fatalf("allow with approval: %v", err)
 	}
 
 	raw, err := os.ReadFile(allowedPath)

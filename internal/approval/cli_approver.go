@@ -33,9 +33,9 @@ func NewCLIApproverFromReader(in *bufio.Reader, out io.Writer) *CLIApprover {
 	}
 }
 
-// RequestApproval prompts once and returns Approved, AlwaysApproved, or Denied.
+// RequestApproval prompts once and returns Approved or Denied.
 func (a *CLIApprover) RequestApproval(_ context.Context, req ApprovalRequest) (ApprovalDecision, error) {
-	if _, err := fmt.Fprintf(a.out, "approve tool %s? %s [y]es/[n]o/[a]lways: ", req.Tool, req.Description); err != nil {
+	if _, err := fmt.Fprintf(a.out, "approve tool %s? %s [y/N]: ", req.Tool, req.Description); err != nil {
 		return Denied, err
 	}
 
@@ -48,8 +48,6 @@ func (a *CLIApprover) RequestApproval(_ context.Context, req ApprovalRequest) (A
 	switch answer {
 	case "y", "yes":
 		return Approved, nil
-	case "a", "always":
-		return AlwaysApproved, nil
 	default:
 		return Denied, nil
 	}

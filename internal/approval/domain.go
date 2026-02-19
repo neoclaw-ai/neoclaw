@@ -22,7 +22,7 @@ type Checker struct {
 }
 
 // Allow checks whether host is permitted. Unknown domains are approved via the
-// configured approver, and AlwaysApproved decisions are persisted.
+// configured approver, and approved domains are persisted.
 func (c Checker) Allow(ctx context.Context, host string) error {
 	target, err := normalizeDomain(host)
 	if err != nil {
@@ -53,10 +53,10 @@ func (c Checker) Allow(ctx context.Context, host string) error {
 			target,
 		)
 	}
-	if decision == AlwaysApproved {
+	if decision == Approved {
 		if err := addAllowedDomain(c.AllowedDomainsPath, target); err != nil {
 			logging.Logger().Warn(
-				"failed to persist always-approved domain",
+				"failed to persist approved domain",
 				"domain", target,
 				"err", err,
 			)

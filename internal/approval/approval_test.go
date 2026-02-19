@@ -125,7 +125,7 @@ func TestExecuteTool_RunCommandNonAllowlistedRequiresApprover(t *testing.T) {
 	}
 }
 
-func TestExecuteTool_AlwaysApprovedPersistsRunCommandBinary(t *testing.T) {
+func TestExecuteTool_ApprovedPersistsRunCommandBinary(t *testing.T) {
 	workspace := t.TempDir()
 	allowedPath := filepath.Join(t.TempDir(), "allowed_bins.json")
 	if err := os.WriteFile(allowedPath, []byte("[\"pwd\"]\n"), 0o644); err != nil {
@@ -137,7 +137,7 @@ func TestExecuteTool_AlwaysApprovedPersistsRunCommandBinary(t *testing.T) {
 		AllowedBinsPath: allowedPath,
 		Timeout:         5 * time.Minute,
 	}
-	appr := &fakeApprover{decision: AlwaysApproved}
+	appr := &fakeApprover{decision: Approved}
 
 	if _, err := ExecuteTool(
 		context.Background(),

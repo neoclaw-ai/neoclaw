@@ -25,11 +25,8 @@ type ApprovalRequest struct {
 type ApprovalDecision int
 
 const (
-	// Approved indicates approval for this invocation only.
+	// Approved indicates the action is approved and may be persisted by policy.
 	Approved ApprovalDecision = iota
-	// AlwaysApproved indicates the action is approved and the decision should be persisted
-	// so future invocations of the same binary/domain are auto-approved.
-	AlwaysApproved
 	// Denied indicates the action was explicitly rejected.
 	Denied
 )
@@ -68,11 +65,11 @@ func ExecuteTool(ctx context.Context, approver Approver, tool tools.Tool, args m
 				tool.Name(),
 			)
 		}
-		if decision == AlwaysApproved {
+		if decision == Approved {
 			if persister, ok := tool.(tools.ApprovalPersister); ok {
-				if err := persister.PersistAlwaysApproval(args); err != nil {
+				if err := persister.PersistApproval(args); err != nil {
 					logging.Logger().Warn(
-						"failed to persist always approval",
+						"failed to persist approval",
 						"tool", tool.Name(),
 						"err", err,
 					)

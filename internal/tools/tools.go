@@ -45,9 +45,9 @@ type ConditionalApprover interface {
 }
 
 // ApprovalPersister is an optional interface for tools that can persist an
-// AlwaysApproved decision for future invocations.
+// approved decision for future invocations.
 type ApprovalPersister interface {
-	PersistAlwaysApproval(args map[string]any) error
+	PersistApproval(args map[string]any) error
 }
 
 // ToolResult is the normalized output returned by tools.
