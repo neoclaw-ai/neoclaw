@@ -170,6 +170,66 @@ func TestDispatcherWritesHandlerErrors(t *testing.T) {
 	}
 }
 
+func TestDispatcherWaitUntilIdle(t *testing.T) {
+	handler := &recordingHandler{}
+	writer := &recordingWriter{}
+	d := NewDispatcher(handler, writer, 20)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := d.Start(ctx); err != nil {
+		t.Fatalf("start dispatcher: %v", err)
+	}
+	if err := d.Enqueue(context.Background(), &Message{Text: "x"}); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	if err := d.WaitUntilIdle(waitCtx); err != nil {
+		t.Fatalf("wait until idle: %v", err)
+	}
+
+	cancel()
+	d.Wait()
+
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
+	if len(handler.messages) != 1 || handler.messages[0] != "x" {
+		t.Fatalf("expected processed message before idle, got %#v", handler.messages)
+	}
+}
+
+func TestDispatcherWaitUntilIdleDeadline(t *testing.T) {
+	handler := &stopHandler{firstCanceled: make(chan struct{}, 1)}
+	writer := &recordingWriter{}
+	d := NewDispatcher(handler, writer, 20)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := d.Start(ctx); err != nil {
+		t.Fatalf("start dispatcher: %v", err)
+	}
+	if err := d.Enqueue(context.Background(), &Message{Text: "first"}); err != nil {
+		t.Fatalf("enqueue first: %v", err)
+	}
+	waitFor(t, time.Second, func() bool {
+		handler.mu.Lock()
+		defer handler.mu.Unlock()
+		return handler.startedFirst
+	})
+
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer waitCancel()
+	if err := d.WaitUntilIdle(waitCtx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected deadline exceeded, got %v", err)
+	}
+
+	d.Stop()
+	cancel()
+	d.Wait()
+}
+
 func TestDispatcherSuppressesContextCanceledError(t *testing.T) {
 	handler := &errorHandler{err: context.Canceled}
 	writer := &recordingWriter{}

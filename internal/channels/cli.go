@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/chzyer/readline"
 	"github.com/machinae/betterclaw/internal/approval"
@@ -21,6 +22,8 @@ import (
 const (
 	defaultReplPrompt    = "you> "
 	defaultDispatchQueue = 20
+	// Allow queued input to finish when stdin closes before shutting down the dispatcher.
+	dispatchDrainTimeout = 5 * time.Second
 )
 
 var (
@@ -108,22 +111,26 @@ func (c *CLIListener) Listen(ctx context.Context, handler runtime.Handler) error
 				pendingApproval.response <- approvalInputResponse{err: err}
 				pendingApproval = nil
 			}
-		case event, ok := <-inputCh:
-			if !ok {
-				dispatcher.Stop()
-				return nil
-			}
-			if event.err != nil {
-				if pendingApproval != nil {
-					pendingApproval.response <- approvalInputResponse{err: event.err}
-					pendingApproval = nil
-				}
-				if errors.Is(event.err, io.EOF) || errors.Is(event.err, context.Canceled) {
-					dispatcher.Stop()
+			case event, ok := <-inputCh:
+				if !ok {
+					c.drainDispatcher(dispatcher)
 					return nil
 				}
-				return event.err
-			}
+				if event.err != nil {
+					if pendingApproval != nil {
+						pendingApproval.response <- approvalInputResponse{err: event.err}
+						pendingApproval = nil
+					}
+					if errors.Is(event.err, io.EOF) {
+						c.drainDispatcher(dispatcher)
+						return nil
+					}
+					if errors.Is(event.err, context.Canceled) {
+						dispatcher.Stop()
+						return nil
+					}
+					return event.err
+				}
 
 			line := strings.TrimSpace(event.line)
 			if pendingApproval != nil {
@@ -153,6 +160,14 @@ func (c *CLIListener) Listen(ctx context.Context, handler runtime.Handler) error
 				return err
 			}
 		}
+	}
+}
+
+func (c *CLIListener) drainDispatcher(dispatcher *runtime.Dispatcher) {
+	drainCtx, cancel := context.WithTimeout(context.Background(), dispatchDrainTimeout)
+	defer cancel()
+	if err := dispatcher.WaitUntilIdle(drainCtx); err != nil {
+		dispatcher.Stop()
 	}
 }
 

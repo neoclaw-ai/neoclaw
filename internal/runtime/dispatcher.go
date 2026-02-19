@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 )
 
 // Dispatcher executes queued messages sequentially against a Handler.
@@ -97,6 +98,30 @@ func (d *Dispatcher) Stop() {
 	}
 }
 
+// WaitUntilIdle blocks until no message is running and the queue is empty.
+func (d *Dispatcher) WaitUntilIdle(ctx context.Context) error {
+	if d == nil {
+		return errors.New("dispatcher is required")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		if d.isIdle() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
 // Wait blocks until the dispatch loop exits.
 func (d *Dispatcher) Wait() {
 	if d == nil {
@@ -156,4 +181,16 @@ func (d *Dispatcher) cancelCurrentRun() {
 	if cancel != nil {
 		cancel()
 	}
+}
+
+func (d *Dispatcher) isIdle() bool {
+	d.stateMu.Lock()
+	running := d.currentRun != nil
+	started := d.started
+	d.stateMu.Unlock()
+
+	if !started {
+		return true
+	}
+	return !running && len(d.queue) == 0
 }
