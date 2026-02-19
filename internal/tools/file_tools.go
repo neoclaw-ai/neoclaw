@@ -258,7 +258,7 @@ func (t WriteFileTool) Schema() map[string]any {
 
 // Permission declares default permission behavior for this tool.
 func (t WriteFileTool) Permission() Permission {
-	return RequiresApproval
+	return AutoApprove
 }
 
 // SummarizeArgs returns a concise approval prompt summary for write_file.
