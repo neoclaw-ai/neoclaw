@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/machinae/betterclaw/internal/config"
@@ -138,6 +139,7 @@ func (p *openRouterProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRe
 			InputTokens:  parsed.Usage.PromptTokens,
 			OutputTokens: parsed.Usage.CompletionTokens,
 			TotalTokens:  parsed.Usage.TotalTokens,
+			CostUSD:      parseOptionalCost(parsed.Usage.Cost),
 		},
 	}, nil
 }
@@ -182,7 +184,28 @@ type openRouterResponse struct {
 		PromptTokens     int `json:"prompt_tokens"`
 		CompletionTokens int `json:"completion_tokens"`
 		TotalTokens      int `json:"total_tokens"`
+		Cost             any `json:"cost"`
 	} `json:"usage"`
+}
+
+func parseOptionalCost(raw any) *float64 {
+	switch v := raw.(type) {
+	case float64:
+		out := v
+		return &out
+	case string:
+		value := strings.TrimSpace(v)
+		if value == "" {
+			return nil
+		}
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return nil
+		}
+		return &parsed
+	default:
+		return nil
+	}
 }
 
 func toOpenRouterMessages(messages []ChatMessage) []openRouterMessage {

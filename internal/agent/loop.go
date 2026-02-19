@@ -25,6 +25,7 @@ func Run(
 	systemPrompt string,
 	messages []provider.ChatMessage,
 	maxIterations int,
+	onLLMResponse func(usage provider.TokenUsage) error,
 ) (*provider.ChatResponse, []provider.ChatMessage, error) {
 	if modelProvider == nil {
 		return nil, nil, fmt.Errorf("provider is required")
@@ -75,6 +76,11 @@ func Run(
 		totalUsage.InputTokens += resp.Usage.InputTokens
 		totalUsage.OutputTokens += resp.Usage.OutputTokens
 		totalUsage.TotalTokens += resp.Usage.TotalTokens
+		if onLLMResponse != nil {
+			if err := onLLMResponse(resp.Usage); err != nil {
+				return nil, history, err
+			}
+		}
 
 		if len(resp.ToolCalls) == 0 {
 			// No tool calls means we are done for this turn.

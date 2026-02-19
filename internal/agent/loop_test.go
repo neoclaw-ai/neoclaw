@@ -35,6 +35,7 @@ func TestRun_DispatchesToolAndReturnsFinalResponse(t *testing.T) {
 		"system",
 		[]provider.ChatMessage{{Role: provider.RoleUser, Content: "read it"}},
 		10,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("run loop: %v", err)
@@ -88,6 +89,7 @@ func TestRun_MaxIterationsGuard(t *testing.T) {
 		"system",
 		[]provider.ChatMessage{{Role: provider.RoleUser, Content: "loop"}},
 		1,
+		nil,
 	)
 	if err == nil || !strings.Contains(err.Error(), "max iterations exceeded") {
 		t.Fatalf("expected max iterations error, got %v", err)
@@ -118,6 +120,7 @@ func TestRun_UnknownToolAppendsErrorAndContinues(t *testing.T) {
 		"system",
 		[]provider.ChatMessage{{Role: provider.RoleUser, Content: "do it"}},
 		2,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("expected loop to continue after unknown tool, got %v", err)

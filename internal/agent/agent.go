@@ -11,6 +11,8 @@ import (
 	"github.com/machinae/betterclaw/internal/runtime"
 
 	"github.com/machinae/betterclaw/internal/approval"
+	"github.com/machinae/betterclaw/internal/costs"
+	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/memory"
 	"github.com/machinae/betterclaw/internal/provider"
 	"github.com/machinae/betterclaw/internal/session"
@@ -37,6 +39,11 @@ type Agent struct {
 	memoryStore       *memory.Store
 	requestTimeout    time.Duration
 	historyLoadedOnce bool
+	costTracker       *costs.Tracker
+	costProvider      string
+	costModel         string
+	dailySpendLimit   float64
+	monthlySpendLimit float64
 }
 
 // New creates a conversation-scoped Agent.
@@ -77,6 +84,21 @@ func NewWithSession(
 	return ag
 }
 
+// ConfigureCosts enables cost tracking and optional daily/monthly spend limits.
+func (a *Agent) ConfigureCosts(
+	tracker *costs.Tracker,
+	providerName string,
+	model string,
+	dailyLimit float64,
+	monthlyLimit float64,
+) {
+	a.costTracker = tracker
+	a.costProvider = providerName
+	a.costModel = model
+	a.dailySpendLimit = dailyLimit
+	a.monthlySpendLimit = monthlyLimit
+}
+
 // HandleMessage processes one inbound message and writes the assistant response.
 func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg *runtime.Message) error {
 	if w == nil {
@@ -88,6 +110,15 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg
 	if strings.TrimSpace(msg.Text) == "" {
 		return nil
 	}
+
+	blocked, err := a.enforceSpendLimits(ctx, w, time.Now())
+	if err != nil {
+		return err
+	}
+	if blocked {
+		return nil
+	}
+
 	if err := a.ensureHistoryLoaded(ctx); err != nil {
 		return err
 	}
@@ -95,7 +126,7 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg
 	baseHistory := append([]provider.ChatMessage{}, a.history...)
 	messages := appendUserMessage(baseHistory, msg.Text)
 	uncompactedMessages := append([]provider.ChatMessage{}, messages...)
-	messages, err := a.compactHistoryIfNeeded(ctx, messages)
+	messages, err = a.compactHistoryIfNeeded(ctx, messages)
 	if err != nil {
 		return err
 	}
@@ -107,6 +138,12 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg
 		a.systemPrompt,
 		messages,
 		a.maxIter,
+		func(usage provider.TokenUsage) error {
+			if err := a.recordUsage(ctx, usage); err != nil {
+				logging.Logger().Warn("failed to record llm usage", "err", err)
+			}
+			return nil
+		},
 	)
 	if err != nil {
 		// Option 2 policy: return runtime/infrastructure errors so transports
@@ -130,4 +167,60 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg
 		return err
 	}
 	return nil
+}
+
+func (a *Agent) enforceSpendLimits(ctx context.Context, w runtime.ResponseWriter, now time.Time) (bool, error) {
+	if a.costTracker == nil {
+		return false, nil
+	}
+	if a.dailySpendLimit <= 0 && a.monthlySpendLimit <= 0 {
+		return false, nil
+	}
+
+	spend, err := a.costTracker.Spend(ctx, now)
+	if err != nil {
+		return false, err
+	}
+
+	if a.dailySpendLimit > 0 && spend.TodayUSD >= a.dailySpendLimit {
+		if err := w.WriteMessage(ctx, fmt.Sprintf("Daily spend limit reached: $%.4f / $%.4f", spend.TodayUSD, a.dailySpendLimit)); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if a.monthlySpendLimit > 0 && spend.MonthUSD >= a.monthlySpendLimit {
+		if err := w.WriteMessage(ctx, fmt.Sprintf("Monthly spend limit reached: $%.4f / $%.4f", spend.MonthUSD, a.monthlySpendLimit)); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func (a *Agent) recordUsage(ctx context.Context, usage provider.TokenUsage) error {
+	if a.costTracker == nil {
+		return nil
+	}
+
+	costUSD := 0.0
+	if usage.CostUSD != nil {
+		costUSD = *usage.CostUSD
+	} else if estimated, ok := costs.EstimateUSD(
+		a.costProvider,
+		a.costModel,
+		usage.InputTokens,
+		usage.OutputTokens,
+	); ok {
+		costUSD = estimated
+	}
+
+	return a.costTracker.Append(ctx, costs.Record{
+		Timestamp:    time.Now(),
+		Provider:     a.costProvider,
+		Model:        a.costModel,
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		TotalTokens:  usage.TotalTokens,
+		CostUSD:      costUSD,
+	})
 }

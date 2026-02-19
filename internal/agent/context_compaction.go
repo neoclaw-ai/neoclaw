@@ -79,6 +79,9 @@ func (a *Agent) summarizeMessages(ctx context.Context, messages []provider.ChatM
 	if resp == nil {
 		return "", fmt.Errorf("summary response is nil")
 	}
+	if err := a.recordUsage(ctx, resp.Usage); err != nil {
+		logging.Logger().Warn("failed to record summary usage", "err", err)
+	}
 	return resp.Content, nil
 }
 

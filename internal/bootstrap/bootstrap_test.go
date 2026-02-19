@@ -68,6 +68,9 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 	if !strings.Contains(configText, "[llm.default]") || !strings.Contains(configText, "[channels.telegram]") {
 		t.Fatalf("expected bootstrap config to contain minimal sections, got %q", configText)
 	}
+	if !strings.Contains(configText, "[costs]") || !strings.Contains(configText, "daily_limit = 0") || !strings.Contains(configText, "monthly_limit = 0") {
+		t.Fatalf("expected bootstrap config to expose disabled spend limits, got %q", configText)
+	}
 
 	binsPath := filepath.Join(dataDir, "allowed_bins.json")
 	binsRaw, err := os.ReadFile(binsPath)

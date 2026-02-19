@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/machinae/betterclaw/internal/runtime"
 
 	"github.com/machinae/betterclaw/internal/approval"
+	"github.com/machinae/betterclaw/internal/costs"
 	"github.com/machinae/betterclaw/internal/provider"
 	"github.com/machinae/betterclaw/internal/session"
 	"github.com/machinae/betterclaw/internal/tools"
@@ -340,6 +342,90 @@ func TestAgentSessionStoresTruncatedToolOutput(t *testing.T) {
 	}
 	if toolMsg.Content != strings.Repeat("x", 2000) {
 		t.Fatalf("expected stored tool output to be truncated 2000-byte prefix")
+	}
+}
+
+func TestAgentSpendLimitBlocksLLMCall(t *testing.T) {
+	registry := tools.NewRegistry()
+	modelProvider := &recordingProvider{
+		responses: []*provider.ChatResponse{{Content: "should not be called"}},
+	}
+	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
+	costPath := filepath.Join(t.TempDir(), "costs.jsonl")
+	tracker := costs.New(costPath)
+	if err := tracker.Append(context.Background(), costs.Record{
+		Timestamp:    time.Now(),
+		Provider:     "anthropic",
+		Model:        "claude-sonnet-4-6",
+		InputTokens:  1,
+		OutputTokens: 1,
+		TotalTokens:  2,
+		CostUSD:      1.0,
+	}); err != nil {
+		t.Fatalf("seed costs: %v", err)
+	}
+	ag.ConfigureCosts(tracker, "anthropic", "claude-sonnet-4-6", 1.0, 0)
+	writer := &captureWriter{}
+
+	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "hi"}); err != nil {
+		t.Fatalf("handle message: %v", err)
+	}
+	if len(modelProvider.requests) != 0 {
+		t.Fatalf("expected no provider calls when spend limit is hit, got %d", len(modelProvider.requests))
+	}
+	if len(writer.messages) != 1 || strings.TrimSpace(writer.messages[0]) == "" {
+		t.Fatalf("expected one non-empty spend-limit response, got %#v", writer.messages)
+	}
+}
+
+func TestAgentRecordsUsageForEachLLMCall(t *testing.T) {
+	registry := tools.NewRegistry()
+	if err := registry.Register(fakeTool{name: "read_file", out: "hello from file"}); err != nil {
+		t.Fatalf("register tool: %v", err)
+	}
+	modelProvider := &recordingProvider{
+		responses: []*provider.ChatResponse{
+			{
+				ToolCalls: []provider.ToolCall{{
+					ID:        "call_1",
+					Name:      "read_file",
+					Arguments: `{"path":"README.md"}`,
+				}},
+				Usage: provider.TokenUsage{InputTokens: 11, OutputTokens: 7, TotalTokens: 18},
+			},
+			{
+				Content: "done",
+				Usage:   provider.TokenUsage{InputTokens: 5, OutputTokens: 3, TotalTokens: 8},
+			},
+		},
+	}
+	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
+	costPath := filepath.Join(t.TempDir(), "costs.jsonl")
+	tracker := costs.New(costPath)
+	ag.ConfigureCosts(tracker, "anthropic", "claude-sonnet-4-6", 0, 0)
+	writer := &captureWriter{}
+
+	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "hi"}); err != nil {
+		t.Fatalf("handle message: %v", err)
+	}
+
+	f, err := os.Open(costPath)
+	if err != nil {
+		t.Fatalf("open costs log: %v", err)
+	}
+	defer f.Close()
+	lineCount := 0
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) != "" {
+			lineCount++
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("scan costs log: %v", err)
+	}
+	if lineCount != 2 {
+		t.Fatalf("expected 2 cost records for 2 LLM calls, got %d", lineCount)
 	}
 }
 

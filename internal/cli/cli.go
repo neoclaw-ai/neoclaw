@@ -13,6 +13,7 @@ import (
 	"github.com/machinae/betterclaw/internal/channels"
 	"github.com/machinae/betterclaw/internal/commands"
 	"github.com/machinae/betterclaw/internal/config"
+	"github.com/machinae/betterclaw/internal/costs"
 	"github.com/machinae/betterclaw/internal/memory"
 	"github.com/machinae/betterclaw/internal/runtime"
 	"github.com/machinae/betterclaw/internal/scheduler"
@@ -68,9 +69,17 @@ func newCLICmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			costTracker := costs.New(filepath.Join(cfg.DataDir, "costs.jsonl"))
 
 			if trimmedPrompt != "" {
 				handler := agent.New(modelProvider, registry, approver, systemPrompt)
+				handler.ConfigureCosts(
+					costTracker,
+					llmCfg.Provider,
+					llmCfg.Model,
+					cfg.Costs.DailyLimit,
+					cfg.Costs.MonthlyLimit,
+				)
 				writer := &singleShotWriter{out: cmd.OutOrStdout()}
 				return handler.HandleMessage(cmd.Context(), writer, &runtime.Message{Text: trimmedPrompt})
 			}
@@ -87,8 +96,15 @@ func newCLICmd() *cobra.Command {
 				cfg.Costs.RecentMessages,
 				llmCfg.RequestTimeout,
 			)
+			handler.ConfigureCosts(
+				costTracker,
+				llmCfg.Provider,
+				llmCfg.Model,
+				cfg.Costs.DailyLimit,
+				cfg.Costs.MonthlyLimit,
+			)
 			router := commands.Router{
-				Commands: commands.New(handler, jobsStore),
+				Commands: commands.New(handler, jobsStore, costTracker, cfg.Costs.DailyLimit, cfg.Costs.MonthlyLimit),
 				Next:     handler,
 			}
 			return listener.Listen(cmd.Context(), router)

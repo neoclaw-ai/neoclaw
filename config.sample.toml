@@ -18,9 +18,9 @@ command_timeout = "5m"
 mode = "standard" # one of: "standard", "danger-full-access", "strict"
 
 [costs]
-hourly_limit = 2.0
-daily_limit = 20.0
-monthly_limit = 100.0
+hourly_limit = 0.0
+daily_limit = 0.0
+monthly_limit = 0.0
 circuit_breaker_max_calls = 10
 circuit_breaker_window = "60s"
 max_context_tokens = 4000

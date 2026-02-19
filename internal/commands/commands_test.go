@@ -3,15 +3,18 @@ package commands
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/machinae/betterclaw/internal/costs"
 	"github.com/machinae/betterclaw/internal/runtime"
 	"github.com/machinae/betterclaw/internal/scheduler"
 )
 
 func TestHelpCommand(t *testing.T) {
-	h := New(nil, nil)
+	h := New(nil, nil, nil, 0, 0)
 	w := &captureWriter{}
 
 	handled, err := h.Handle(context.Background(), "/help", w)
@@ -28,7 +31,7 @@ func TestHelpCommand(t *testing.T) {
 
 func TestResetAlias(t *testing.T) {
 	resetter := &fakeResetter{}
-	h := New(resetter, nil)
+	h := New(resetter, nil, nil, 0, 0)
 	w := &captureWriter{}
 
 	handled, err := h.Handle(context.Background(), "/reset", w)
@@ -47,7 +50,7 @@ func TestResetAlias(t *testing.T) {
 }
 
 func TestUnknownCommand(t *testing.T) {
-	h := New(nil, nil)
+	h := New(nil, nil, nil, 0, 0)
 	w := &captureWriter{}
 
 	handled, err := h.Handle(context.Background(), "/unknown", w)
@@ -75,7 +78,7 @@ func TestJobsCommand(t *testing.T) {
 		t.Fatalf("create job: %v", err)
 	}
 
-	h := New(nil, store)
+	h := New(nil, store, nil, 0, 0)
 	w := &captureWriter{}
 
 	handled, err := h.Handle(context.Background(), "/jobs", w)
@@ -96,7 +99,7 @@ func TestJobsCommand(t *testing.T) {
 func TestRouterForwardsNonCommands(t *testing.T) {
 	next := &fakeRuntimeHandler{}
 	router := Router{
-		Commands: New(nil, nil),
+		Commands: New(nil, nil, nil, 0, 0),
 		Next:     next,
 	}
 
@@ -111,7 +114,7 @@ func TestRouterForwardsNonCommands(t *testing.T) {
 func TestRouterHandlesSlashCommand(t *testing.T) {
 	next := &fakeRuntimeHandler{}
 	router := Router{
-		Commands: New(nil, nil),
+		Commands: New(nil, nil, nil, 0, 0),
 		Next:     next,
 	}
 	w := &captureWriter{}
@@ -126,7 +129,7 @@ func TestRouterHandlesSlashCommand(t *testing.T) {
 
 func TestResetErrorReturned(t *testing.T) {
 	resetter := &fakeResetter{err: errors.New("boom")}
-	h := New(resetter, nil)
+	h := New(resetter, nil, nil, 0, 0)
 
 	handled, err := h.Handle(context.Background(), "/new", &captureWriter{})
 	if !handled {
@@ -134,6 +137,42 @@ func TestResetErrorReturned(t *testing.T) {
 	}
 	if err == nil || err.Error() != "boom" {
 		t.Fatalf("expected reset error, got %v", err)
+	}
+}
+
+func TestUsageCommand(t *testing.T) {
+	costPath := filepath.Join(t.TempDir(), "costs.jsonl")
+	tracker := costs.New(costPath)
+	if err := tracker.Append(context.Background(), costs.Record{
+		Timestamp:    time.Now(),
+		Provider:     "anthropic",
+		Model:        "claude-sonnet-4-6",
+		InputTokens:  10,
+		OutputTokens: 20,
+		TotalTokens:  30,
+		CostUSD:      1.5,
+	}); err != nil {
+		t.Fatalf("append costs record: %v", err)
+	}
+
+	h := New(nil, nil, tracker, 5, 20)
+	w := &captureWriter{}
+
+	handled, err := h.Handle(context.Background(), "/usage", w)
+	if err != nil {
+		t.Fatalf("handle /usage: %v", err)
+	}
+	if !handled {
+		t.Fatalf("expected /usage handled")
+	}
+	if len(w.messages) != 1 {
+		t.Fatalf("expected one /usage response message, got %#v", w.messages)
+	}
+	if !strings.Contains(w.messages[0], "Today:") {
+		t.Fatalf("expected usage output to include today summary, got %q", w.messages[0])
+	}
+	if !strings.Contains(w.messages[0], "This month:") {
+		t.Fatalf("expected usage output to include month summary, got %q", w.messages[0])
 	}
 }
 

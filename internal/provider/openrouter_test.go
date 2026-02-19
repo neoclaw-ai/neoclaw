@@ -94,4 +94,36 @@ func TestOpenRouterProviderChat_RequestAndResponse(t *testing.T) {
 	if resp.Usage.InputTokens != 11 || resp.Usage.OutputTokens != 7 || resp.Usage.TotalTokens != 18 {
 		t.Fatalf("unexpected usage: %+v", resp.Usage)
 	}
+	if resp.Usage.CostUSD != nil {
+		t.Fatalf("expected nil cost when API response has no cost field, got %v", *resp.Usage.CostUSD)
+	}
+}
+
+func TestOpenRouterProviderChat_ParsesUsageCost(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices":[{"message":{"role":"assistant","content":"ok"}}],
+			"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2,"cost":0.1234}
+		}`))
+	}))
+	defer srv.Close()
+
+	p, err := newOpenRouterProviderForTest("test-key", "deepseek/deepseek-chat", 8192, srv.URL+"/api/v1/chat/completions", srv.Client())
+	if err != nil {
+		t.Fatalf("new provider: %v", err)
+	}
+
+	resp, err := p.Chat(context.Background(), ChatRequest{
+		Messages: []ChatMessage{{Role: RoleUser, Content: "hi"}},
+	})
+	if err != nil {
+		t.Fatalf("chat failed: %v", err)
+	}
+	if resp.Usage.CostUSD == nil {
+		t.Fatalf("expected usage cost to be parsed")
+	}
+	if *resp.Usage.CostUSD <= 0 {
+		t.Fatalf("expected positive usage cost, got %v", *resp.Usage.CostUSD)
+	}
 }

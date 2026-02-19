@@ -107,9 +107,9 @@ var defaultConfig = Config{
 		Mode:           SecurityModeStandard,
 	},
 	Costs: CostsConfig{
-		HourlyLimit:            2.0,
-		DailyLimit:             20.0,
-		MonthlyLimit:           100.0,
+		HourlyLimit:            0,
+		DailyLimit:             0,
+		MonthlyLimit:           0,
 		CircuitBreakerMaxCalls: 10,
 		CircuitBreakerWindow:   60 * time.Second,
 		MaxContextTokens:       4000,
@@ -141,6 +141,11 @@ var defaultUserConfig = Config{
 			Model:          "claude-sonnet-4-6",
 			RequestTimeout: 30 * time.Second,
 		},
+	},
+	Costs: CostsConfig{
+		HourlyLimit:  0,
+		DailyLimit:   0,
+		MonthlyLimit: 0,
 	},
 }
 
@@ -248,6 +253,9 @@ func DefaultUserConfigTOML() (string, error) {
 		v.Set("channels."+channel+".token", ch.Token)
 		v.Set("channels."+channel+".allowed_users", ch.AllowedUsers)
 	}
+	v.Set("costs.hourly_limit", defaultUserConfig.Costs.HourlyLimit)
+	v.Set("costs.daily_limit", defaultUserConfig.Costs.DailyLimit)
+	v.Set("costs.monthly_limit", defaultUserConfig.Costs.MonthlyLimit)
 
 	var out bytes.Buffer
 	if err := v.WriteConfigTo(&out); err != nil {

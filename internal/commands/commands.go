@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/machinae/betterclaw/internal/costs"
 	"github.com/machinae/betterclaw/internal/runtime"
 	"github.com/machinae/betterclaw/internal/scheduler"
 )
 
-const helpText = "Commands: /help, /commands, /new, /reset, /stop, /jobs"
+const helpText = "Commands: /help, /commands, /new, /reset, /stop, /jobs, /usage"
 
 // Resetter resets the active conversation/session state.
 type Resetter interface {
@@ -22,11 +24,20 @@ type Resetter interface {
 type Handler struct {
 	resetter Resetter
 	jobs     *scheduler.Store
+	costs    *costs.Tracker
+	daily    float64
+	monthly  float64
 }
 
 // New creates a new slash command handler.
-func New(resetter Resetter, jobs *scheduler.Store) *Handler {
-	return &Handler{resetter: resetter, jobs: jobs}
+func New(resetter Resetter, jobs *scheduler.Store, costTracker *costs.Tracker, dailyLimit, monthlyLimit float64) *Handler {
+	return &Handler{
+		resetter: resetter,
+		jobs:     jobs,
+		costs:    costTracker,
+		daily:    dailyLimit,
+		monthly:  monthlyLimit,
+	}
 }
 
 // Handle executes one command and reports whether it was handled.
@@ -42,6 +53,8 @@ func (h *Handler) Handle(ctx context.Context, cmd string, w runtime.ResponseWrit
 		return true, h.handleReset(ctx, w)
 	case "/jobs":
 		return true, h.handleJobs(ctx, w)
+	case "/usage":
+		return true, h.handleUsage(ctx, w)
 	default:
 		return false, nil
 	}
@@ -85,6 +98,31 @@ func (h *Handler) handleJobs(ctx context.Context, w runtime.ResponseWriter) erro
 			b.WriteByte('\n')
 		}
 	}
+	return w.WriteMessage(ctx, b.String())
+}
+
+func (h *Handler) handleUsage(ctx context.Context, w runtime.ResponseWriter) error {
+	if h.costs == nil {
+		return errors.New("usage command is unavailable")
+	}
+
+	spend, err := h.costs.Spend(ctx, time.Now())
+	if err != nil {
+		return err
+	}
+
+	var b strings.Builder
+	_, _ = fmt.Fprintf(&b, "Today: $%.4f", spend.TodayUSD)
+	if h.daily > 0 {
+		_, _ = fmt.Fprintf(&b, " / $%.4f", h.daily)
+	}
+	b.WriteByte('\n')
+
+	_, _ = fmt.Fprintf(&b, "This month: $%.4f", spend.MonthUSD)
+	if h.monthly > 0 {
+		_, _ = fmt.Fprintf(&b, " / $%.4f", h.monthly)
+	}
+
 	return w.WriteMessage(ctx, b.String())
 }
 

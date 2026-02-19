@@ -50,6 +50,8 @@ type TokenUsage struct {
 	InputTokens  int
 	OutputTokens int
 	TotalTokens  int
+	// CostUSD is provider-reported request cost when available.
+	CostUSD *float64
 }
 
 // ChatRequest is the provider-agnostic request payload.
