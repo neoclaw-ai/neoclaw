@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/machinae/betterclaw/internal/store"
 	"golang.org/x/sys/unix"
 )
 
@@ -25,11 +26,11 @@ func isLandlockAvailable() bool {
 	}
 
 	// Fallback for environments where the syscall probe is blocked or filtered.
-	lsmRaw, err := os.ReadFile("/sys/kernel/security/lsm")
+	lsmRaw, err := store.ReadFile("/sys/kernel/security/lsm")
 	if err != nil {
 		return false
 	}
-	for _, item := range strings.Split(strings.TrimSpace(string(lsmRaw)), ",") {
+	for _, item := range strings.Split(strings.TrimSpace(lsmRaw), ",") {
 		if strings.TrimSpace(item) == "landlock" {
 			return true
 		}

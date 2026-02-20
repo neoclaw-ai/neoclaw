@@ -9,11 +9,12 @@ import (
 	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/scheduler"
+	"github.com/machinae/betterclaw/internal/store"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
 func newSchedulerStore(cfg *config.Config) *scheduler.Store {
-	return scheduler.NewStore(filepath.Join(cfg.AgentDir(), "jobs.json"))
+	return scheduler.NewStore(filepath.Join(cfg.AgentDir(), store.JobsFilePath))
 }
 
 func newSchedulerService(cfg *config.Config, out io.Writer, store *scheduler.Store) *scheduler.Service {
@@ -24,14 +25,14 @@ func newSchedulerRunner(cfg *config.Config, out io.Writer) *scheduler.Runner {
 	httpClient := &http.Client{
 		Transport: approval.RoundTripper{
 			Checker: approval.Checker{
-				AllowedDomainsPath: filepath.Join(cfg.DataDir, "allowed_domains.json"),
+				AllowedDomainsPath: filepath.Join(cfg.DataDir, store.AllowedDomainsFilePath),
 			},
 		},
 	}
 
 	runTool := tools.RunCommandTool{
 		WorkspaceDir:    cfg.WorkspaceDir(),
-		AllowedBinsPath: filepath.Join(cfg.DataDir, "allowed_bins.json"),
+		AllowedBinsPath: filepath.Join(cfg.DataDir, store.AllowedBinsFilePath),
 		Timeout:         cfg.Security.CommandTimeout,
 	}
 	httpTool := tools.HTTPRequestTool{Client: httpClient}

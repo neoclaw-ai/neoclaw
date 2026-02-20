@@ -5,16 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
-)
 
-const maxReadFileBytes = 50 * 1024
+	"github.com/machinae/betterclaw/internal/store"
+)
 
 func stringArg(args map[string]any, key string) (string, error) {
 	v, ok := args[key]
@@ -127,29 +126,17 @@ func (t ReadFileTool) Execute(_ context.Context, args map[string]any) (*ToolResu
 		return nil, err
 	}
 
-	f, err := os.Open(path)
+	content, err := store.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("open file: %w", err)
+		return nil, fmt.Errorf("read file: %w", err)
 	}
-	defer f.Close()
-
-	buf := make([]byte, maxReadFileBytes+1)
-	n, readErr := io.ReadFull(f, buf)
-	if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, io.ErrUnexpectedEOF) {
-		return nil, fmt.Errorf("read file: %w", readErr)
-	}
-	data := buf[:n]
+	data := []byte(content)
 
 	if isBinary(data) {
 		return nil, fmt.Errorf("file %q appears to be binary", path)
 	}
 
-	truncated := n > maxReadFileBytes
-	if truncated {
-		data = data[:maxReadFileBytes]
-	}
-
-	return &ToolResult{Output: string(data), Truncated: truncated}, nil
+	return &ToolResult{Output: string(data)}, nil
 }
 
 // ListDirTool lists directory entries from a workspace-scoped path.
@@ -296,10 +283,7 @@ func (t WriteFileTool) Execute(_ context.Context, args map[string]any) (*ToolRes
 		return nil, err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, fmt.Errorf("create parent directories: %w", err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := store.WriteFile(path, []byte(content)); err != nil {
 		return nil, fmt.Errorf("write file: %w", err)
 	}
 

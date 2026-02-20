@@ -18,6 +18,7 @@ import (
 	"github.com/machinae/betterclaw/internal/runtime"
 	"github.com/machinae/betterclaw/internal/scheduler"
 	"github.com/machinae/betterclaw/internal/session"
+	"github.com/machinae/betterclaw/internal/store"
 	"github.com/machinae/betterclaw/internal/tools"
 	"github.com/spf13/cobra"
 )
@@ -69,7 +70,7 @@ func newCLICmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			costTracker := costs.New(filepath.Join(cfg.DataDir, "costs.jsonl"))
+			costTracker := costs.New(filepath.Join(cfg.DataDir, store.CostsFilePath))
 
 			if trimmedPrompt != "" {
 				handler := agent.New(modelProvider, registry, approver, systemPrompt)
@@ -84,7 +85,7 @@ func newCLICmd() *cobra.Command {
 				return handler.HandleMessage(cmd.Context(), writer, &runtime.Message{Text: trimmedPrompt})
 			}
 
-			sessionStore := session.New(filepath.Join(cfg.AgentDir(), "sessions", "cli", "default.jsonl"))
+			sessionStore := session.New(filepath.Join(cfg.AgentDir(), store.SessionsDirPath, store.CLISessionsDirPath, store.DefaultSessionPath))
 			handler := agent.NewWithSession(
 				modelProvider,
 				registry,
@@ -128,7 +129,7 @@ func buildToolRegistry(
 	httpClient := &http.Client{
 		Transport: approval.RoundTripper{
 			Checker: approval.Checker{
-				AllowedDomainsPath: filepath.Join(cfg.DataDir, "allowed_domains.json"),
+				AllowedDomainsPath: filepath.Join(cfg.DataDir, store.AllowedDomainsFilePath),
 				Approver:           approver,
 			},
 		},
@@ -148,7 +149,7 @@ func buildToolRegistry(
 		tools.JobRunTool{Service: schedulerService},
 		tools.RunCommandTool{
 			WorkspaceDir:    cfg.WorkspaceDir(),
-			AllowedBinsPath: filepath.Join(cfg.DataDir, "allowed_bins.json"),
+			AllowedBinsPath: filepath.Join(cfg.DataDir, store.AllowedBinsFilePath),
 			Timeout:         cfg.Security.CommandTimeout,
 		},
 		tools.SendMessageTool{Writer: out},

@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/machinae/betterclaw/internal/memory"
+	"github.com/machinae/betterclaw/internal/store"
 )
 
 const autoRememberInstruction = "When you learn something important about the user (preferences, facts, relationships, ongoing constraints), write it to memory using memory_append without asking permission."
@@ -88,9 +89,9 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time) (s
 }
 
 func readOptionalFile(path string) (string, error) {
-	raw, err := os.ReadFile(path)
+	content, err := store.ReadFile(path)
 	if err == nil {
-		return string(raw), nil
+		return content, nil
 	}
 	if errors.Is(err, os.ErrNotExist) {
 		return "", nil

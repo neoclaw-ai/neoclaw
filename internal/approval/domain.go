@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/machinae/betterclaw/internal/logging"
+	"github.com/machinae/betterclaw/internal/store"
 )
 
 // Checker validates outbound domains against an allowlist and can request user
@@ -98,13 +98,13 @@ func isAllowedDomain(allowedDomainsPath, host string) bool {
 		return false
 	}
 
-	raw, err := os.ReadFile(allowedDomainsPath)
+	content, err := store.ReadFile(allowedDomainsPath)
 	if err != nil {
 		return false
 	}
 
 	var allowed []string
-	if err := json.Unmarshal(raw, &allowed); err != nil {
+	if err := json.Unmarshal([]byte(content), &allowed); err != nil {
 		return false
 	}
 
@@ -130,17 +130,12 @@ func addAllowedDomain(allowedDomainsPath, host string) error {
 		return err
 	}
 
-	dir := filepath.Dir(allowedDomainsPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create allowlist directory: %w", err)
-	}
-
 	allowed := make([]string, 0)
-	raw, err := os.ReadFile(allowedDomainsPath)
+	content, err := store.ReadFile(allowedDomainsPath)
 	switch {
 	case err == nil:
-		if len(strings.TrimSpace(string(raw))) > 0 {
-			if err := json.Unmarshal(raw, &allowed); err != nil {
+		if len(strings.TrimSpace(content)) > 0 {
+			if err := json.Unmarshal([]byte(content), &allowed); err != nil {
 				return fmt.Errorf("decode allowlist %q: %w", allowedDomainsPath, err)
 			}
 		}
@@ -167,23 +162,7 @@ func addAllowedDomain(allowedDomainsPath, host string) error {
 	}
 	encoded = append(encoded, '\n')
 
-	tempFile, err := os.CreateTemp(dir, "allowed_domains-*.tmp")
-	if err != nil {
-		return fmt.Errorf("create allowlist temp file: %w", err)
-	}
-	tempPath := tempFile.Name()
-	defer func() {
-		_ = os.Remove(tempPath)
-	}()
-
-	if _, err := tempFile.Write(encoded); err != nil {
-		_ = tempFile.Close()
-		return fmt.Errorf("write allowlist temp file: %w", err)
-	}
-	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("close allowlist temp file: %w", err)
-	}
-	if err := os.Rename(tempPath, allowedDomainsPath); err != nil {
+	if err := store.WriteFile(allowedDomainsPath, encoded); err != nil {
 		return fmt.Errorf("replace allowlist: %w", err)
 	}
 

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/machinae/betterclaw/internal/store"
 	"github.com/spf13/viper"
 )
 
@@ -170,7 +171,7 @@ func Load() (*Config, error) {
 
 	v := viper.New()
 	setDefaults(v, dataDir)
-	v.SetConfigFile(filepath.Join(dataDir, "config.toml"))
+	v.SetConfigFile(filepath.Join(dataDir, store.ConfigFilePath))
 	v.SetConfigType("toml")
 
 	if err := v.ReadInConfig(); err != nil {
@@ -213,7 +214,7 @@ func Write(w io.Writer) error {
 
 	v := viper.New()
 	setDefaults(v, dataDir)
-	v.SetConfigFile(filepath.Join(dataDir, "config.toml"))
+	v.SetConfigFile(filepath.Join(dataDir, store.ConfigFilePath))
 	v.SetConfigType("toml")
 
 	if err := v.ReadInConfig(); err != nil {
@@ -287,12 +288,12 @@ func setDefaults(v *viper.Viper, dataDir string) {
 
 // AgentDir returns the active agent directory under DataDir.
 func (c *Config) AgentDir() string {
-	return filepath.Join(c.DataDir, "agents", c.Agent)
+	return filepath.Join(c.DataDir, store.AgentsDirPath, c.Agent)
 }
 
 // WorkspaceDir returns the active agent workspace directory.
 func (c *Config) WorkspaceDir() string {
-	return filepath.Join(c.AgentDir(), "workspace")
+	return filepath.Join(c.AgentDir(), store.WorkspaceDirPath)
 }
 
 // DefaultLLM returns the default LLM profile with fallback defaults.

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/machinae/betterclaw/internal/store"
 )
 
 // RunCommandTool executes shell commands within the configured workspace.
@@ -230,13 +232,13 @@ func isAllowedBinary(allowedBinsPath, bin string) bool {
 
 	// Load on each check so edits to allowed_bins.json take effect immediately
 	// without restarting the process.
-	raw, err := os.ReadFile(allowedBinsPath)
+	content, err := store.ReadFile(allowedBinsPath)
 	if err != nil {
 		return false
 	}
 
 	var allowed []string
-	if err := json.Unmarshal(raw, &allowed); err != nil {
+	if err := json.Unmarshal([]byte(content), &allowed); err != nil {
 		return false
 	}
 
@@ -255,17 +257,12 @@ func addAllowedBinary(allowedBinsPath, bin string) error {
 		return fmt.Errorf("allowed bins path is required")
 	}
 
-	dir := filepath.Dir(allowedBinsPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create allowlist directory: %w", err)
-	}
-
 	allowed := make([]string, 0)
-	raw, err := os.ReadFile(allowedBinsPath)
+	content, err := store.ReadFile(allowedBinsPath)
 	switch {
 	case err == nil:
-		if len(strings.TrimSpace(string(raw))) > 0 {
-			if err := json.Unmarshal(raw, &allowed); err != nil {
+		if len(strings.TrimSpace(content)) > 0 {
+			if err := json.Unmarshal([]byte(content), &allowed); err != nil {
 				return fmt.Errorf("decode allowlist %q: %w", allowedBinsPath, err)
 			}
 		}
@@ -293,23 +290,7 @@ func addAllowedBinary(allowedBinsPath, bin string) error {
 	}
 	encoded = append(encoded, '\n')
 
-	tempFile, err := os.CreateTemp(dir, "allowed_bins-*.tmp")
-	if err != nil {
-		return fmt.Errorf("create allowlist temp file: %w", err)
-	}
-	tempPath := tempFile.Name()
-	defer func() {
-		_ = os.Remove(tempPath)
-	}()
-
-	if _, err := tempFile.Write(encoded); err != nil {
-		_ = tempFile.Close()
-		return fmt.Errorf("write allowlist temp file: %w", err)
-	}
-	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("close allowlist temp file: %w", err)
-	}
-	if err := os.Rename(tempPath, allowedBinsPath); err != nil {
+	if err := store.WriteFile(allowedBinsPath, encoded); err != nil {
 		return fmt.Errorf("replace allowlist: %w", err)
 	}
 

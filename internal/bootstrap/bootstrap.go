@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/machinae/betterclaw/internal/config"
+	"github.com/machinae/betterclaw/internal/store"
 )
 
 var defaultAllowedDomains = []string{
@@ -50,13 +51,13 @@ func Initialize(cfg *config.Config) error {
 
 	dirs := []string{
 		cfg.DataDir,
-		filepath.Join(cfg.DataDir, "agents"),
+		filepath.Join(cfg.DataDir, store.AgentsDirPath),
 		agentDir,
-		filepath.Join(agentDir, "workspace"),
-		filepath.Join(agentDir, "memory"),
-		filepath.Join(agentDir, "memory", "daily"),
-		filepath.Join(agentDir, "sessions"),
-		filepath.Join(agentDir, "sessions", "cli"),
+		filepath.Join(agentDir, store.WorkspaceDirPath),
+		filepath.Join(agentDir, store.MemoryDirPath),
+		filepath.Join(agentDir, store.MemoryDirPath, store.DailyDirPath),
+		filepath.Join(agentDir, store.SessionsDirPath),
+		filepath.Join(agentDir, store.SessionsDirPath, store.CLISessionsDirPath),
 	}
 
 	for _, dir := range dirs {
@@ -69,15 +70,15 @@ func Initialize(cfg *config.Config) error {
 		path    string
 		content string
 	}{
-		{path: filepath.Join(cfg.DataDir, "config.toml"), content: defaultConfig},
-		{path: filepath.Join(cfg.DataDir, "allowed_domains.json"), content: defaultAllowedDomainsJSON()},
-		{path: filepath.Join(cfg.DataDir, "allowed_bins.json"), content: defaultAllowedBinsJSON()},
-		{path: filepath.Join(cfg.DataDir, "costs.jsonl"), content: ""},
+		{path: filepath.Join(cfg.DataDir, store.ConfigFilePath), content: defaultConfig},
+		{path: filepath.Join(cfg.DataDir, store.AllowedDomainsFilePath), content: defaultAllowedDomainsJSON()},
+		{path: filepath.Join(cfg.DataDir, store.AllowedBinsFilePath), content: defaultAllowedBinsJSON()},
+		{path: filepath.Join(cfg.DataDir, store.CostsFilePath), content: ""},
 
-		{path: filepath.Join(agentDir, "SOUL.md"), content: defaultSoulMarkdown()},
-		{path: filepath.Join(agentDir, "jobs.json"), content: "[]\n"},
-		{path: filepath.Join(agentDir, "memory", "memory.md"), content: "# Memory\n"},
-		{path: filepath.Join(agentDir, "sessions", "cli", "default.jsonl"), content: ""},
+		{path: filepath.Join(agentDir, store.SoulFilePath), content: defaultSoulMarkdown()},
+		{path: filepath.Join(agentDir, store.JobsFilePath), content: "[]\n"},
+		{path: filepath.Join(agentDir, store.MemoryDirPath, store.MemoryFilePath), content: "# Memory\n"},
+		{path: filepath.Join(agentDir, store.SessionsDirPath, store.CLISessionsDirPath, store.DefaultSessionPath), content: ""},
 	}
 
 	for _, file := range files {
@@ -96,7 +97,7 @@ func writeFileIfMissing(path, content string) error {
 		return fmt.Errorf("stat %q: %w", path, err)
 	}
 
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := store.WriteFile(path, []byte(content)); err != nil {
 		return fmt.Errorf("write file %q: %w", path, err)
 	}
 	return nil

@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/machinae/betterclaw/internal/store"
 )
 
 // Record is one persisted usage entry.
@@ -55,21 +57,12 @@ func (t *Tracker) Append(ctx context.Context, rec Record) error {
 	if rec.Timestamp.IsZero() {
 		rec.Timestamp = time.Now()
 	}
-	if err := os.MkdirAll(filepath.Dir(t.path), 0o755); err != nil {
-		return fmt.Errorf("create costs directory: %w", err)
-	}
-
-	f, err := os.OpenFile(t.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("open costs file: %w", err)
-	}
-	defer f.Close()
-
 	encoded, err := json.Marshal(rec)
 	if err != nil {
 		return fmt.Errorf("marshal costs record: %w", err)
 	}
-	if _, err := f.Write(append(encoded, '\n')); err != nil {
+	encoded = append(encoded, '\n')
+	if err := store.AppendFile(t.path, encoded); err != nil {
 		return fmt.Errorf("append costs record: %w", err)
 	}
 
@@ -90,19 +83,18 @@ func (t *Tracker) Spend(ctx context.Context, now time.Time) (Spend, error) {
 		now = time.Now()
 	}
 
-	f, err := os.Open(t.path)
+	content, err := store.ReadFile(t.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return totals, nil
 	}
 	if err != nil {
-		return Spend{}, fmt.Errorf("open costs file: %w", err)
+		return Spend{}, fmt.Errorf("read costs file: %w", err)
 	}
-	defer f.Close()
 
 	nowLocal := now.In(time.Local)
 	todayYear, todayMonth, todayDay := nowLocal.Date()
 
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(strings.NewReader(content))
 	for scanner.Scan() {
 		if err := ctx.Err(); err != nil {
 			return Spend{}, err

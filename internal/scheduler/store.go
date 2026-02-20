@@ -7,11 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/machinae/betterclaw/internal/store"
 	"github.com/robfig/cron/v3"
 )
 
@@ -167,7 +167,7 @@ func (s *Store) readLocked() ([]Job, error) {
 		return nil, errors.New("jobs store path is required")
 	}
 
-	raw, err := os.ReadFile(s.path)
+	content, err := store.ReadFile(s.path)
 	switch {
 	case err == nil:
 	case errors.Is(err, os.ErrNotExist):
@@ -176,12 +176,12 @@ func (s *Store) readLocked() ([]Job, error) {
 		return nil, fmt.Errorf("read jobs file %q: %w", s.path, err)
 	}
 
-	if len(strings.TrimSpace(string(raw))) == 0 {
+	if len(strings.TrimSpace(content)) == 0 {
 		return []Job{}, nil
 	}
 
 	var jobs []Job
-	if err := json.Unmarshal(raw, &jobs); err != nil {
+	if err := json.Unmarshal([]byte(content), &jobs); err != nil {
 		return nil, fmt.Errorf("decode jobs file %q: %w", s.path, err)
 	}
 	for _, job := range jobs {
@@ -197,32 +197,13 @@ func (s *Store) writeLocked(jobs []Job) error {
 		return errors.New("jobs store path is required")
 	}
 
-	dir := filepath.Dir(s.path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create jobs directory %q: %w", dir, err)
-	}
-
 	encoded, err := json.MarshalIndent(jobs, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode jobs: %w", err)
 	}
 	encoded = append(encoded, '\n')
 
-	tempFile, err := os.CreateTemp(dir, "jobs-*.tmp")
-	if err != nil {
-		return fmt.Errorf("create jobs temp file: %w", err)
-	}
-	tempPath := tempFile.Name()
-	defer func() { _ = os.Remove(tempPath) }()
-
-	if _, err := tempFile.Write(encoded); err != nil {
-		_ = tempFile.Close()
-		return fmt.Errorf("write jobs temp file: %w", err)
-	}
-	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("close jobs temp file: %w", err)
-	}
-	if err := os.Rename(tempPath, s.path); err != nil {
+	if err := store.WriteFile(s.path, encoded); err != nil {
 		return fmt.Errorf("replace jobs file: %w", err)
 	}
 	return nil

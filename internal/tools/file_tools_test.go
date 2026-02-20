@@ -42,10 +42,10 @@ func TestReadFile_BinaryFileErrors(t *testing.T) {
 	}
 }
 
-func TestReadFile_LargeFileTruncated(t *testing.T) {
+func TestReadFile_LargeFileReturnsFullContent(t *testing.T) {
 	workspace := t.TempDir()
 	path := filepath.Join(workspace, "large.txt")
-	data := strings.Repeat("a", maxReadFileBytes+500)
+	data := strings.Repeat("a", 50*1024+500)
 	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}
@@ -55,11 +55,11 @@ func TestReadFile_LargeFileTruncated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read file: %v", err)
 	}
-	if !res.Truncated {
-		t.Fatalf("expected truncated result")
+	if res.Truncated {
+		t.Fatalf("expected non-truncated read")
 	}
-	if len(res.Output) != maxReadFileBytes {
-		t.Fatalf("expected %d bytes, got %d", maxReadFileBytes, len(res.Output))
+	if res.Output != data {
+		t.Fatalf("expected full content, got %d bytes", len(res.Output))
 	}
 }
 

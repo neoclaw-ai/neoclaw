@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/machinae/betterclaw/internal/store"
 )
 
 const (
@@ -71,10 +73,7 @@ func (s *Store) AppendFact(section, fact string) error {
 	if !changed {
 		return nil
 	}
-	if err := os.MkdirAll(s.dir, 0o755); err != nil {
-		return fmt.Errorf("create memory directory: %w", err)
-	}
-	if err := os.WriteFile(path, []byte(next), 0o644); err != nil {
+	if err := store.WriteFile(path, []byte(next)); err != nil {
 		return fmt.Errorf("write memory file: %w", err)
 	}
 	return nil
@@ -118,7 +117,7 @@ func (s *Store) RemoveFact(fact string) (int, error) {
 	if !strings.HasSuffix(next, "\n") {
 		next += "\n"
 	}
-	if err := os.WriteFile(path, []byte(next), 0o644); err != nil {
+	if err := store.WriteFile(path, []byte(next)); err != nil {
 		return 0, fmt.Errorf("write memory file: %w", err)
 	}
 	return removed, nil
@@ -142,22 +141,17 @@ func (s *Store) AppendDailyLog(now time.Time, entry string) error {
 	}
 
 	path := filepath.Join(dailyDir, dailyLogFilename(now))
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+	if _, err := store.ReadFile(path); errors.Is(err, os.ErrNotExist) {
 		header := "# " + now.Format("2006-01-02") + "\n\n"
-		if err := os.WriteFile(path, []byte(header), 0o644); err != nil {
+		if err := store.WriteFile(path, []byte(header)); err != nil {
 			return fmt.Errorf("initialize daily log: %w", err)
 		}
 	} else if err != nil {
-		return fmt.Errorf("stat daily log: %w", err)
+		return fmt.Errorf("read daily log: %w", err)
 	}
 
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("open daily log: %w", err)
-	}
-	defer f.Close()
-
-	if _, err := f.WriteString(formatDailyLogLine(LogEntry{Timestamp: now, Entry: entry}) + "\n"); err != nil {
+	line := formatDailyLogLine(LogEntry{Timestamp: now, Entry: entry}) + "\n"
+	if err := store.AppendFile(path, []byte(line)); err != nil {
 		return fmt.Errorf("append daily log: %w", err)
 	}
 	return nil
@@ -284,13 +278,13 @@ func (s *Store) dailyDirPath() (string, error) {
 }
 
 func readOrInitializeMemory(path string) (string, error) {
-	raw, err := os.ReadFile(path)
+	content, err := store.ReadFile(path)
 	switch {
 	case err == nil:
-		if len(raw) == 0 {
+		if len(content) == 0 {
 			return "# Memory\n", nil
 		}
-		content := strings.ReplaceAll(string(raw), "\r\n", "\n")
+		content = strings.ReplaceAll(content, "\r\n", "\n")
 		if !strings.HasSuffix(content, "\n") {
 			content += "\n"
 		}
@@ -356,10 +350,10 @@ func addFact(content, section, fact string) (string, bool) {
 }
 
 func readOptionalFile(path string) (string, error) {
-	raw, err := os.ReadFile(path)
+	content, err := store.ReadFile(path)
 	switch {
 	case err == nil:
-		return string(raw), nil
+		return content, nil
 	case errors.Is(err, os.ErrNotExist):
 		return "", nil
 	default:
@@ -417,14 +411,12 @@ func normalizeTimeRange(fromTime, toTime time.Time) (time.Time, time.Time, error
 }
 
 func readAllLines(path string) ([]string, error) {
-	f, err := os.Open(path)
+	content, err := store.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-
 	lines := make([]string, 0)
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(strings.NewReader(content))
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}

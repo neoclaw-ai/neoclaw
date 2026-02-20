@@ -8,10 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/store"
 )
 
 // Store persists conversation history in a JSONL file.
@@ -43,17 +44,16 @@ func (s *Store) Load(ctx context.Context) ([]provider.ChatMessage, error) {
 		return nil, errors.New("session path is required")
 	}
 
-	f, err := os.Open(s.path)
+	content, err := store.ReadFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return []provider.ChatMessage{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("open session file: %w", err)
+		return nil, fmt.Errorf("read session file: %w", err)
 	}
-	defer f.Close()
 
 	messages := make([]provider.ChatMessage, 0)
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(strings.NewReader(content))
 	for scanner.Scan() {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -94,15 +94,7 @@ func (s *Store) Append(ctx context.Context, messages []provider.ChatMessage) err
 	if s == nil || s.path == "" {
 		return errors.New("session path is required")
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return fmt.Errorf("create session directory: %w", err)
-	}
-
-	f, err := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("open session file: %w", err)
-	}
-	defer f.Close()
+	var b strings.Builder
 
 	for _, msg := range messages {
 		if err := ctx.Err(); err != nil {
@@ -119,9 +111,12 @@ func (s *Store) Append(ctx context.Context, messages []provider.ChatMessage) err
 		if err != nil {
 			return fmt.Errorf("marshal session record: %w", err)
 		}
-		if _, err := f.Write(append(encoded, '\n')); err != nil {
-			return fmt.Errorf("append session record: %w", err)
-		}
+		b.Write(encoded)
+		b.WriteByte('\n')
+	}
+
+	if err := store.AppendFile(s.path, []byte(b.String())); err != nil {
+		return fmt.Errorf("append session record: %w", err)
 	}
 	return nil
 }
@@ -137,14 +132,7 @@ func (s *Store) Rewrite(ctx context.Context, messages []provider.ChatMessage) er
 	if s == nil || s.path == "" {
 		return errors.New("session path is required")
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return fmt.Errorf("create session directory: %w", err)
-	}
-	f, err := os.OpenFile(s.path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("open session file: %w", err)
-	}
-	defer f.Close()
+	var b strings.Builder
 
 	for _, msg := range messages {
 		if err := ctx.Err(); err != nil {
@@ -161,9 +149,12 @@ func (s *Store) Rewrite(ctx context.Context, messages []provider.ChatMessage) er
 		if err != nil {
 			return fmt.Errorf("marshal session record: %w", err)
 		}
-		if _, err := f.Write(append(encoded, '\n')); err != nil {
-			return fmt.Errorf("rewrite session record: %w", err)
-		}
+		b.Write(encoded)
+		b.WriteByte('\n')
+	}
+
+	if err := store.WriteFile(s.path, []byte(b.String())); err != nil {
+		return fmt.Errorf("rewrite session record: %w", err)
 	}
 	return nil
 }
