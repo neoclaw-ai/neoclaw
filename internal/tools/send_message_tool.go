@@ -69,8 +69,6 @@ func (t SendMessageTool) Execute(ctx context.Context, args map[string]any) (*Too
 	if writer == nil {
 		writer = os.Stdout
 	}
-	if _, err := fmt.Fprintln(writer, message); err != nil {
-		return nil, fmt.Errorf("write message output: %w", err)
-	}
+	fmt.Fprintln(writer, message)
 	return &ToolResult{Output: "sent"}, nil
 }

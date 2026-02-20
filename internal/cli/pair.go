@@ -50,13 +50,11 @@ func newPairCmd() *cobra.Command {
 				}
 				return err
 			}
-			if _, err := fmt.Fprintf(
+			fmt.Fprintf(
 				cmd.OutOrStdout(),
 				"Bot connected: @%s. Code sent to Telegram. Enter the pairing code:\n",
 				session.BotUsername(),
-			); err != nil {
-				return err
-			}
+			)
 
 			reader := bufio.NewReader(cmd.InOrStdin())
 			for {
@@ -92,14 +90,14 @@ func newPairCmd() *cobra.Command {
 				if name == "" {
 					name = "Unknown"
 				}
-				_, err = fmt.Fprintf(
+				fmt.Fprintf(
 					cmd.OutOrStdout(),
 					"Paired: %s (@%s | ID %s)\n",
 					name,
 					session.Username(),
 					session.UserID(),
 				)
-				return err
+				return nil
 			}
 		},
 	}

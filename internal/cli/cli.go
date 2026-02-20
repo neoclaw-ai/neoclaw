@@ -174,6 +174,6 @@ type singleShotWriter struct {
 
 // WriteMessage writes one response message for one-shot prompt mode.
 func (w *singleShotWriter) WriteMessage(_ context.Context, text string) error {
-	_, err := fmt.Fprintln(w.out, text)
-	return err
+	fmt.Fprintln(w.out, text)
+	return nil
 }

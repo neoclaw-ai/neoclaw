@@ -61,13 +61,11 @@ func NewRootCmd() *cobra.Command {
 			if firstRun {
 				// First-run bootstrap is an onboarding path, not a fatal error.
 				// Print guidance and exit cleanly so logs do not report failures.
-				if _, err := fmt.Fprintf(
+				fmt.Fprintf(
 					cmd.ErrOrStderr(),
 					"First run setup complete.\nEdit config file: %s\nRestart BetterClaw.\n",
 					configPath,
-				); err != nil {
-					return err
-				}
+				)
 				os.Exit(0)
 			}
 

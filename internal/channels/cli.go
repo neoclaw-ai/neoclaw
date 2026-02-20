@@ -38,8 +38,8 @@ type CLIWriter struct {
 
 // WriteMessage writes one assistant message line.
 func (w *CLIWriter) WriteMessage(_ context.Context, text string) error {
-	_, err := fmt.Fprintf(w.out, "assistant> %s\n\n", text)
-	return err
+	fmt.Fprintf(w.out, "assistant> %s\n\n", text)
+	return nil
 }
 
 // CLIListener listens for interactive terminal input and dispatches messages.
@@ -72,9 +72,7 @@ func (c *CLIListener) Listen(ctx context.Context, handler runtime.Handler) error
 		defer c.rl.Close()
 	}
 
-	if _, err := fmt.Fprintln(c.out, "Interactive mode. Type /quit or /exit to stop."); err != nil {
-		return err
-	}
+	fmt.Fprintln(c.out, "Interactive mode. Type /quit or /exit to stop.")
 
 	writer := &CLIWriter{out: c.out}
 	dispatchCtx, cancelDispatch := context.WithCancel(ctx)
@@ -107,30 +105,27 @@ func (c *CLIListener) Listen(ctx context.Context, handler runtime.Handler) error
 				continue
 			}
 			pendingApproval = &req
-			if _, err := fmt.Fprint(c.out, req.prompt); err != nil {
-				pendingApproval.response <- approvalInputResponse{err: err}
-				pendingApproval = nil
+			fmt.Fprint(c.out, req.prompt)
+		case event, ok := <-inputCh:
+			if !ok {
+				c.drainDispatcher(dispatcher)
+				return nil
 			}
-			case event, ok := <-inputCh:
-				if !ok {
+			if event.err != nil {
+				if pendingApproval != nil {
+					pendingApproval.response <- approvalInputResponse{err: event.err}
+					pendingApproval = nil
+				}
+				if errors.Is(event.err, io.EOF) {
 					c.drainDispatcher(dispatcher)
 					return nil
 				}
-				if event.err != nil {
-					if pendingApproval != nil {
-						pendingApproval.response <- approvalInputResponse{err: event.err}
-						pendingApproval = nil
-					}
-					if errors.Is(event.err, io.EOF) {
-						c.drainDispatcher(dispatcher)
-						return nil
-					}
-					if errors.Is(event.err, context.Canceled) {
-						dispatcher.Stop()
-						return nil
-					}
-					return event.err
+				if errors.Is(event.err, context.Canceled) {
+					dispatcher.Stop()
+					return nil
 				}
+				return event.err
+			}
 
 			line := strings.TrimSpace(event.line)
 			if pendingApproval != nil {
@@ -222,9 +217,7 @@ func (c *CLIListener) requestApprovalDirect(prompt string) (approval.ApprovalDec
 		}
 		answer = line
 	} else {
-		if _, err := fmt.Fprint(c.out, prompt); err != nil {
-			return approval.Denied, err
-		}
+		fmt.Fprint(c.out, prompt)
 		line, err := c.fallback.ReadString('\n')
 		if err != nil {
 			return approval.Denied, err
@@ -275,9 +268,7 @@ func (c *CLIListener) readLine(ctx context.Context) (string, error) {
 		return line, nil
 	}
 
-	if _, err := fmt.Fprint(c.out, defaultReplPrompt); err != nil {
-		return "", err
-	}
+	fmt.Fprint(c.out, defaultReplPrompt)
 	line, err := c.fallback.ReadString('\n')
 	if err != nil {
 		if len(line) > 0 {
