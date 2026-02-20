@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -109,6 +110,31 @@ func TestCLIListenerRequestApproval(t *testing.T) {
 				t.Fatalf("expected explicit y/N prompt, got %q", got)
 			}
 		})
+	}
+}
+
+func TestTelegramPairSessionSubmitCodeWrongReturnsErrWrongCode(t *testing.T) {
+	session := &TelegramPairSession{
+		expectedCode: "123456",
+	}
+
+	err := session.SubmitCode(context.Background(), "000000")
+	if !errors.Is(err, ErrWrongCode) {
+		t.Fatalf("expected ErrWrongCode, got %v", err)
+	}
+}
+
+func TestGenerateTelegramPairCode_IsSixDigits(t *testing.T) {
+	re := regexp.MustCompile(`^\d{6}$`)
+
+	for range 20 {
+		code, err := generateTelegramPairCode()
+		if err != nil {
+			t.Fatalf("generate code: %v", err)
+		}
+		if !re.MatchString(code) {
+			t.Fatalf("expected 6-digit code, got %q", code)
+		}
 	}
 }
 

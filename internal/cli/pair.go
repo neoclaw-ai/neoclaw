@@ -1,16 +1,22 @@
 package cli
 
 import (
+	"bufio"
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
-	"github.com/go-telegram/bot"
+	"github.com/machinae/betterclaw/internal/channels"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/spf13/cobra"
 )
+
+const pairTimeout = 15 * time.Minute
 
 func newPairCmd() *cobra.Command {
 	return &cobra.Command{
@@ -29,31 +35,72 @@ func newPairCmd() *cobra.Command {
 
 			pidFilePath := filepath.Join(cfg.DataDir, "claw.pid")
 			if _, err := os.Stat(pidFilePath); err == nil {
-				return errors.New("server appears to be running. Stop it first, then run claw pair")
+				return errors.New("server is already running. Stop it first, then run claw pair")
 			} else if !errors.Is(err, os.ErrNotExist) {
 				return fmt.Errorf("stat pid file %q: %w", pidFilePath, err)
 			}
 
-			b, err := bot.New(token)
-			if err != nil {
-				return fmt.Errorf("connect to telegram bot: %w", err)
-			}
+			pairingCtx, cancel := context.WithTimeout(cmd.Context(), pairTimeout)
+			defer cancel()
 
-			me, err := b.GetMe(cmd.Context())
+			session, err := channels.BeginTelegramPairing(pairingCtx, token)
 			if err != nil {
-				return fmt.Errorf("fetch telegram bot profile: %w", err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					fmt.Fprintln(cmd.OutOrStdout(), "Pairing timed out.")
+				}
+				return err
 			}
-
-			username := strings.TrimSpace(me.Username)
-			if username == "" {
-				username = "unknown"
-			}
-			_, err = fmt.Fprintf(
+			if _, err := fmt.Fprintf(
 				cmd.OutOrStdout(),
-				"Bot connected: @%s. Pairing mode active for 15 minutes. Message your bot in Telegram to receive a pairing code.\n",
-				username,
-			)
-			return err
+				"Bot connected: @%s. Code sent to Telegram. Enter the pairing code:\n",
+				session.BotUsername(),
+			); err != nil {
+				return err
+			}
+
+			reader := bufio.NewReader(cmd.InOrStdin())
+			for {
+				if err := pairingCtx.Err(); err != nil {
+					if errors.Is(err, context.DeadlineExceeded) {
+						fmt.Fprintln(cmd.OutOrStdout(), "Pairing timed out.")
+					}
+					return err
+				}
+
+				line, err := reader.ReadString('\n')
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						return io.EOF
+					}
+					return err
+				}
+				entered := strings.TrimSpace(line)
+
+				err = session.SubmitCode(pairingCtx, entered)
+				if errors.Is(err, channels.ErrWrongCode) {
+					fmt.Fprintln(cmd.OutOrStdout(), "Incorrect code. Try again:")
+					continue
+				}
+				if err != nil {
+					if errors.Is(err, context.DeadlineExceeded) {
+						fmt.Fprintln(cmd.OutOrStdout(), "Pairing timed out.")
+					}
+					return err
+				}
+
+				name := session.Name()
+				if name == "" {
+					name = "Unknown"
+				}
+				_, err = fmt.Fprintf(
+					cmd.OutOrStdout(),
+					"Paired: %s (@%s | ID %s)\n",
+					name,
+					session.Username(),
+					session.UserID(),
+				)
+				return err
+			}
 		},
 	}
 }
