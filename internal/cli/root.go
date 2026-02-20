@@ -87,6 +87,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newConfigCmd())
 	root.AddCommand(newStartCmd())
 	root.AddCommand(newCLICmd())
+	root.AddCommand(newPairCmd())
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (info level)")
 
 	return root

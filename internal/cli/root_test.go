@@ -18,6 +18,9 @@ func TestRootCommandRegistersSubcommands(t *testing.T) {
 	if c := findSubcommand(t, cmd, "cli"); c.Name() != "cli" {
 		t.Fatalf("cli command not registered")
 	}
+	if c := findSubcommand(t, cmd, "pair"); c.Name() != "pair" {
+		t.Fatalf("pair command not registered")
+	}
 }
 
 func findSubcommand(t *testing.T, root *cobra.Command, name string) *cobra.Command {
