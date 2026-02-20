@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 
+	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/store"
 )
 
 const maxInlineOutputChars = 2000
@@ -63,7 +66,16 @@ func TruncateOutput(output string) (*ToolResult, error) {
 		return &ToolResult{Output: output}, nil
 	}
 
-	tempFile, err := os.CreateTemp("", "betterclaw-tool-output-*.txt")
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("load config for tool output path: %w", err)
+	}
+	tmpDir := filepath.Join(cfg.WorkspaceDir(), store.TmpDirPath)
+	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create workspace directory for tool output: %w", err)
+	}
+
+	tempFile, err := os.CreateTemp(tmpDir, "betterclaw-tool-output-*.txt")
 	if err != nil {
 		return nil, fmt.Errorf("create temp output file: %w", err)
 	}

@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -78,6 +79,10 @@ func TestTruncateOutput_NoTruncationForSmallOutput(t *testing.T) {
 }
 
 func TestTruncateOutput_StoresLargeOutputInTempFile(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("BETTERCLAW_HOME", dataDir)
+	tmpDir := filepath.Join(dataDir, "agents", "default", "workspace", "tmp")
+
 	long := make([]byte, 2100)
 	for i := range long {
 		long[i] = 'a'
@@ -95,6 +100,9 @@ func TestTruncateOutput_StoresLargeOutputInTempFile(t *testing.T) {
 	}
 	if res.FullOutputPath == "" {
 		t.Fatalf("expected full output path")
+	}
+	if filepath.Dir(res.FullOutputPath) != tmpDir {
+		t.Fatalf("expected full output path under %q, got %q", tmpDir, res.FullOutputPath)
 	}
 
 	full, err := os.ReadFile(res.FullOutputPath)

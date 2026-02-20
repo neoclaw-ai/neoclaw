@@ -20,6 +20,7 @@ const (
 	// Agent directory layout under BETTERCLAW_HOME/agents/{agent}/.
 	AgentsDirPath      = "agents"
 	WorkspaceDirPath   = "workspace"
+	TmpDirPath         = "tmp"
 	MemoryDirPath      = "memory"
 	DailyDirPath       = "daily"
 	SessionsDirPath    = "sessions"
