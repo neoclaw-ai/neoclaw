@@ -30,7 +30,6 @@ model = "claude-sonnet-4-6"
 [channels.telegram]
 enabled = true
 token = "telegram-token"
-allowed_users = [123456789]
 `
 	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)

@@ -25,6 +25,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		filepath.Join(dataDir, "config.toml"),
 		filepath.Join(dataDir, "allowed_domains.json"),
 		filepath.Join(dataDir, "allowed_bins.json"),
+		filepath.Join(dataDir, "allowed_users.json"),
 		filepath.Join(dataDir, "costs.jsonl"),
 		filepath.Join(dataDir, "agents", "default", "SOUL.md"),
 		filepath.Join(dataDir, "agents", "default", "jobs.json"),
@@ -83,6 +84,27 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 	}
 	if len(bins) == 0 {
 		t.Fatalf("expected bootstrap allowed bins file to have at least one entry")
+	}
+
+	usersPath := filepath.Join(dataDir, "allowed_users.json")
+	usersRaw, err := os.ReadFile(usersPath)
+	if err != nil {
+		t.Fatalf("read allowed users file: %v", err)
+	}
+	var usersDoc map[string]any
+	if err := json.Unmarshal(usersRaw, &usersDoc); err != nil {
+		t.Fatalf("parse allowed users file as json object: %v", err)
+	}
+	usersValue, ok := usersDoc["users"]
+	if !ok {
+		t.Fatalf("expected allowed users file to include users key")
+	}
+	usersSlice, ok := usersValue.([]any)
+	if !ok {
+		t.Fatalf("expected users key to be array, got %T", usersValue)
+	}
+	if len(usersSlice) != 0 {
+		t.Fatalf("expected bootstrap allowed users file to start empty, got %d entries", len(usersSlice))
 	}
 }
 

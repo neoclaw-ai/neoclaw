@@ -15,6 +15,7 @@ const (
 	ConfigFilePath         = "config.toml"
 	AllowedDomainsFilePath = "allowed_domains.json"
 	AllowedBinsFilePath    = "allowed_bins.json"
+	AllowedUsersFilePath   = "allowed_users.json"
 	CostsFilePath          = "costs.jsonl"
 
 	// Agent directory layout under BETTERCLAW_HOME/agents/{agent}/.

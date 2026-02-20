@@ -42,9 +42,8 @@ type Config struct {
 
 // ChannelConfig configures one inbound/outbound channel.
 type ChannelConfig struct {
-	Enabled      bool    `mapstructure:"enabled"`
-	Token        string  `mapstructure:"token"`
-	AllowedUsers []int64 `mapstructure:"allowed_users"`
+	Enabled bool   `mapstructure:"enabled"`
+	Token   string `mapstructure:"token"`
 }
 
 // LLMProviderConfig configures one LLM provider profile.
@@ -88,9 +87,8 @@ type WebSearchConfig struct {
 var defaultConfig = Config{
 	Channels: map[string]ChannelConfig{
 		"telegram": {
-			Enabled:      true,
-			Token:        "",
-			AllowedUsers: []int64{},
+			Enabled: true,
+			Token:   "",
 		},
 	},
 	LLM: map[string]LLMProviderConfig{
@@ -128,9 +126,8 @@ var defaultConfig = Config{
 var defaultUserConfig = Config{
 	Channels: map[string]ChannelConfig{
 		"telegram": {
-			Enabled:      true,
-			Token:        "",
-			AllowedUsers: []int64{},
+			Enabled: true,
+			Token:   "",
 		},
 	},
 	LLM: map[string]LLMProviderConfig{
@@ -249,7 +246,6 @@ func DefaultUserConfigTOML() (string, error) {
 	for channel, ch := range defaultUserConfig.Channels {
 		v.Set("channels."+channel+".enabled", ch.Enabled)
 		v.Set("channels."+channel+".token", ch.Token)
-		v.Set("channels."+channel+".allowed_users", ch.AllowedUsers)
 	}
 	v.Set("costs.daily_limit", defaultUserConfig.Costs.DailyLimit)
 	v.Set("costs.monthly_limit", defaultUserConfig.Costs.MonthlyLimit)
@@ -264,7 +260,6 @@ func DefaultUserConfigTOML() (string, error) {
 func setDefaults(v *viper.Viper, dataDir string) {
 	v.SetDefault("channels.telegram.enabled", defaultConfig.Channels["telegram"].Enabled)
 	v.SetDefault("channels.telegram.token", defaultConfig.Channels["telegram"].Token)
-	v.SetDefault("channels.telegram.allowed_users", defaultConfig.Channels["telegram"].AllowedUsers)
 
 	v.SetDefault("llm.default.api_key", defaultConfig.LLM["default"].APIKey)
 	v.SetDefault("llm.default.provider", defaultConfig.LLM["default"].Provider)

@@ -26,7 +26,6 @@ request_timeout = "45s"
 [channels.telegram]
 enabled = false
 token = "bot-token"
-allowed_users = [123]
 `
 	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -57,9 +56,6 @@ allowed_users = [123]
 	}
 	if telegram.Token != "bot-token" {
 		t.Fatalf("expected telegram token from file, got %q", telegram.Token)
-	}
-	if len(telegram.AllowedUsers) != 1 || telegram.AllowedUsers[0] != 123 {
-		t.Fatalf("expected allowed_users [123], got %v", telegram.AllowedUsers)
 	}
 }
 

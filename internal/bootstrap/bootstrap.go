@@ -73,6 +73,7 @@ func Initialize(cfg *config.Config) error {
 		{path: filepath.Join(cfg.DataDir, store.ConfigFilePath), content: defaultConfig},
 		{path: filepath.Join(cfg.DataDir, store.AllowedDomainsFilePath), content: defaultAllowedDomainsJSON()},
 		{path: filepath.Join(cfg.DataDir, store.AllowedBinsFilePath), content: defaultAllowedBinsJSON()},
+		{path: filepath.Join(cfg.DataDir, store.AllowedUsersFilePath), content: defaultAllowedUsersJSON()},
 		{path: filepath.Join(cfg.DataDir, store.CostsFilePath), content: ""},
 
 		{path: filepath.Join(agentDir, store.SoulFilePath), content: defaultSoulMarkdown()},
@@ -119,6 +120,10 @@ func defaultAllowedBinsJSON() string {
 		return "[]\n"
 	}
 	return string(b) + "\n"
+}
+
+func defaultAllowedUsersJSON() string {
+	return "{\n  \"users\": []\n}\n"
 }
 
 func defaultSoulMarkdown() string {
