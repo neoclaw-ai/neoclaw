@@ -65,7 +65,6 @@ type SecurityConfig struct {
 
 // CostsConfig defines soft spending and circuit-breaker limits.
 type CostsConfig struct {
-	HourlyLimit            float64       `mapstructure:"hourly_limit"`
 	DailyLimit             float64       `mapstructure:"daily_limit"`
 	MonthlyLimit           float64       `mapstructure:"monthly_limit"`
 	CircuitBreakerMaxCalls int           `mapstructure:"circuit_breaker_max_calls"`
@@ -107,7 +106,6 @@ var defaultConfig = Config{
 		Mode:           SecurityModeStandard,
 	},
 	Costs: CostsConfig{
-		HourlyLimit:            0,
 		DailyLimit:             0,
 		MonthlyLimit:           0,
 		CircuitBreakerMaxCalls: 10,
@@ -143,7 +141,6 @@ var defaultUserConfig = Config{
 		},
 	},
 	Costs: CostsConfig{
-		HourlyLimit:  0,
 		DailyLimit:   0,
 		MonthlyLimit: 0,
 	},
@@ -253,7 +250,6 @@ func DefaultUserConfigTOML() (string, error) {
 		v.Set("channels."+channel+".token", ch.Token)
 		v.Set("channels."+channel+".allowed_users", ch.AllowedUsers)
 	}
-	v.Set("costs.hourly_limit", defaultUserConfig.Costs.HourlyLimit)
 	v.Set("costs.daily_limit", defaultUserConfig.Costs.DailyLimit)
 	v.Set("costs.monthly_limit", defaultUserConfig.Costs.MonthlyLimit)
 
@@ -278,7 +274,6 @@ func setDefaults(v *viper.Viper, dataDir string) {
 	v.SetDefault("security.command_timeout", defaultConfig.Security.CommandTimeout)
 	v.SetDefault("security.mode", defaultConfig.Security.Mode)
 
-	v.SetDefault("costs.hourly_limit", defaultConfig.Costs.HourlyLimit)
 	v.SetDefault("costs.daily_limit", defaultConfig.Costs.DailyLimit)
 	v.SetDefault("costs.monthly_limit", defaultConfig.Costs.MonthlyLimit)
 	v.SetDefault("costs.circuit_breaker_max_calls", defaultConfig.Costs.CircuitBreakerMaxCalls)
