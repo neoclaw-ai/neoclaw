@@ -149,7 +149,7 @@ func (d *Dispatcher) run(ctx context.Context) {
 			if err == nil || errors.Is(err, context.Canceled) {
 				continue
 			}
-			_ = d.writer.WriteMessage(ctx, fmt.Sprintf("error: %v", err))
+			d.writer.WriteMessage(ctx, fmt.Sprintf("error: %v", err))
 		}
 	}
 }

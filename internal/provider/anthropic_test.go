@@ -22,7 +22,7 @@ func TestAnthropicProviderChat_RequestAndResponse(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
+		w.Write([]byte(`{
 			"id":"msg_1",
 			"type":"message",
 			"role":"assistant",

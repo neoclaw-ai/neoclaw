@@ -23,7 +23,7 @@ func TestOpenRouterProviderChat_RequestAndResponse(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
+		w.Write([]byte(`{
 			"choices":[
 				{
 					"message":{
@@ -102,7 +102,7 @@ func TestOpenRouterProviderChat_RequestAndResponse(t *testing.T) {
 func TestOpenRouterProviderChat_ParsesUsageCost(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
+		w.Write([]byte(`{
 			"choices":[{"message":{"role":"assistant","content":"ok"}}],
 			"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2,"cost":0.1234}
 		}`))

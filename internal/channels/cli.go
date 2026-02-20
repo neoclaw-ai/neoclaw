@@ -145,11 +145,11 @@ func (c *CLIListener) Listen(ctx context.Context, handler runtime.Handler) error
 			switch strings.ToLower(line) {
 			case "/stop", "stop":
 				dispatcher.Stop()
-				_ = writer.WriteMessage(ctx, "Stopped.")
+				writer.WriteMessage(ctx, "Stopped.")
 				continue
 			case "/quit", "quit", "/exit", "exit":
 				dispatcher.Stop()
-				_ = writer.WriteMessage(ctx, "Stopped.")
+				writer.WriteMessage(ctx, "Stopped.")
 				return nil
 			}
 

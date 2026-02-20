@@ -72,15 +72,15 @@ func WriteFile(path string, data []byte) error {
 	}
 	tempPath := tempFile.Name()
 	defer func() {
-		_ = os.Remove(tempPath)
+		os.Remove(tempPath)
 	}()
 
 	if _, err := tempFile.Write(data); err != nil {
-		_ = tempFile.Close()
+		tempFile.Close()
 		return fmt.Errorf("write temp file for %q: %w", cleanPath, err)
 	}
 	if err := tempFile.Chmod(0o644); err != nil {
-		_ = tempFile.Close()
+		tempFile.Close()
 		return fmt.Errorf("chmod temp file for %q: %w", cleanPath, err)
 	}
 	if err := tempFile.Close(); err != nil {

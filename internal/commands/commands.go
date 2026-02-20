@@ -92,8 +92,8 @@ func (h *Handler) handleJobs(ctx context.Context, w runtime.ResponseWriter) erro
 		if job.Enabled {
 			status = "enabled"
 		}
-		_, _ = fmt.Fprintf(&b, "%d. %s (%s) - %s\n", i+1, job.Description, job.Cron, status)
-		_, _ = fmt.Fprintf(&b, "   id: %s, action: %s", job.ID, job.Action)
+		fmt.Fprintf(&b, "%d. %s (%s) - %s\n", i+1, job.Description, job.Cron, status)
+		fmt.Fprintf(&b, "   id: %s, action: %s", job.ID, job.Action)
 		if i < len(jobs)-1 {
 			b.WriteByte('\n')
 		}
@@ -112,15 +112,15 @@ func (h *Handler) handleUsage(ctx context.Context, w runtime.ResponseWriter) err
 	}
 
 	var b strings.Builder
-	_, _ = fmt.Fprintf(&b, "Today: $%.4f", spend.TodayUSD)
+	fmt.Fprintf(&b, "Today: $%.4f", spend.TodayUSD)
 	if h.daily > 0 {
-		_, _ = fmt.Fprintf(&b, " / $%.4f", h.daily)
+		fmt.Fprintf(&b, " / $%.4f", h.daily)
 	}
 	b.WriteByte('\n')
 
-	_, _ = fmt.Fprintf(&b, "This month: $%.4f", spend.MonthUSD)
+	fmt.Fprintf(&b, "This month: $%.4f", spend.MonthUSD)
 	if h.monthly > 0 {
-		_, _ = fmt.Fprintf(&b, " / $%.4f", h.monthly)
+		fmt.Fprintf(&b, " / $%.4f", h.monthly)
 	}
 
 	return w.WriteMessage(ctx, b.String())

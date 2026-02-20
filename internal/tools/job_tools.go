@@ -57,8 +57,8 @@ func (t JobListTool) Execute(ctx context.Context, _ map[string]any) (*ToolResult
 		if job.Enabled {
 			status = "enabled"
 		}
-		_, _ = fmt.Fprintf(&b, "%d. %s (%s) - %s\n", i+1, job.Description, job.Cron, status)
-		_, _ = fmt.Fprintf(&b, "   id: %s, action: %s, channel: %s", job.ID, job.Action, job.ChannelID)
+		fmt.Fprintf(&b, "%d. %s (%s) - %s\n", i+1, job.Description, job.Cron, status)
+		fmt.Fprintf(&b, "   id: %s, action: %s, channel: %s", job.ID, job.Action, job.ChannelID)
 		if i < len(jobs)-1 {
 			b.WriteByte('\n')
 		}
