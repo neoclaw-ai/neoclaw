@@ -11,7 +11,7 @@ import (
 func TestDispatcherFIFO(t *testing.T) {
 	handler := &recordingHandler{}
 	writer := &recordingWriter{}
-	d := NewDispatcher(handler, writer, 20)
+	d := NewDispatcher(handler, 20)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -19,10 +19,10 @@ func TestDispatcherFIFO(t *testing.T) {
 		t.Fatalf("start dispatcher: %v", err)
 	}
 
-	if err := d.Enqueue(context.Background(), &Message{Text: "first"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "first"}, writer); err != nil {
 		t.Fatalf("enqueue first: %v", err)
 	}
-	if err := d.Enqueue(context.Background(), &Message{Text: "second"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "second"}, writer); err != nil {
 		t.Fatalf("enqueue second: %v", err)
 	}
 
@@ -52,18 +52,18 @@ func TestDispatcherQueuesBehindRunningMessage(t *testing.T) {
 		secondStarted: secondStarted,
 	}
 	writer := &recordingWriter{}
-	d := NewDispatcher(handler, writer, 20)
+	d := NewDispatcher(handler, 20)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := d.Start(ctx); err != nil {
 		t.Fatalf("start dispatcher: %v", err)
 	}
-	if err := d.Enqueue(context.Background(), &Message{Text: "first"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "first"}, writer); err != nil {
 		t.Fatalf("enqueue first: %v", err)
 	}
 	<-firstStarted
-	if err := d.Enqueue(context.Background(), &Message{Text: "second"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "second"}, writer); err != nil {
 		t.Fatalf("enqueue second: %v", err)
 	}
 
@@ -90,7 +90,7 @@ func TestDispatcherStopCancelsInFlightAndDrainsQueue(t *testing.T) {
 		firstCanceled: firstCanceled,
 	}
 	writer := &recordingWriter{}
-	d := NewDispatcher(handler, writer, 20)
+	d := NewDispatcher(handler, 20)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -98,7 +98,7 @@ func TestDispatcherStopCancelsInFlightAndDrainsQueue(t *testing.T) {
 		t.Fatalf("start dispatcher: %v", err)
 	}
 
-	if err := d.Enqueue(context.Background(), &Message{Text: "first"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "first"}, writer); err != nil {
 		t.Fatalf("enqueue first: %v", err)
 	}
 	waitFor(t, time.Second, func() bool {
@@ -106,10 +106,10 @@ func TestDispatcherStopCancelsInFlightAndDrainsQueue(t *testing.T) {
 		defer handler.mu.Unlock()
 		return handler.startedFirst
 	})
-	if err := d.Enqueue(context.Background(), &Message{Text: "second"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "second"}, writer); err != nil {
 		t.Fatalf("enqueue second: %v", err)
 	}
-	if err := d.Enqueue(context.Background(), &Message{Text: "third"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "third"}, writer); err != nil {
 		t.Fatalf("enqueue third: %v", err)
 	}
 
@@ -130,7 +130,7 @@ func TestDispatcherStopCancelsInFlightAndDrainsQueue(t *testing.T) {
 }
 
 func TestDispatcherStopWithoutInFlightIsNoop(t *testing.T) {
-	d := NewDispatcher(&recordingHandler{}, &recordingWriter{}, 20)
+	d := NewDispatcher(&recordingHandler{}, 20)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := d.Start(ctx); err != nil {
@@ -144,14 +144,14 @@ func TestDispatcherStopWithoutInFlightIsNoop(t *testing.T) {
 func TestDispatcherWritesHandlerErrors(t *testing.T) {
 	handler := &errorHandler{err: errors.New("boom")}
 	writer := &recordingWriter{}
-	d := NewDispatcher(handler, writer, 20)
+	d := NewDispatcher(handler, 20)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := d.Start(ctx); err != nil {
 		t.Fatalf("start dispatcher: %v", err)
 	}
-	if err := d.Enqueue(context.Background(), &Message{Text: "x"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "x"}, writer); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
 
@@ -173,14 +173,14 @@ func TestDispatcherWritesHandlerErrors(t *testing.T) {
 func TestDispatcherWaitUntilIdle(t *testing.T) {
 	handler := &recordingHandler{}
 	writer := &recordingWriter{}
-	d := NewDispatcher(handler, writer, 20)
+	d := NewDispatcher(handler, 20)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := d.Start(ctx); err != nil {
 		t.Fatalf("start dispatcher: %v", err)
 	}
-	if err := d.Enqueue(context.Background(), &Message{Text: "x"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "x"}, writer); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
 
@@ -203,14 +203,14 @@ func TestDispatcherWaitUntilIdle(t *testing.T) {
 func TestDispatcherWaitUntilIdleDeadline(t *testing.T) {
 	handler := &stopHandler{firstCanceled: make(chan struct{}, 1)}
 	writer := &recordingWriter{}
-	d := NewDispatcher(handler, writer, 20)
+	d := NewDispatcher(handler, 20)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := d.Start(ctx); err != nil {
 		t.Fatalf("start dispatcher: %v", err)
 	}
-	if err := d.Enqueue(context.Background(), &Message{Text: "first"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "first"}, writer); err != nil {
 		t.Fatalf("enqueue first: %v", err)
 	}
 	waitFor(t, time.Second, func() bool {
@@ -233,14 +233,14 @@ func TestDispatcherWaitUntilIdleDeadline(t *testing.T) {
 func TestDispatcherSuppressesContextCanceledError(t *testing.T) {
 	handler := &errorHandler{err: context.Canceled}
 	writer := &recordingWriter{}
-	d := NewDispatcher(handler, writer, 20)
+	d := NewDispatcher(handler, 20)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := d.Start(ctx); err != nil {
 		t.Fatalf("start dispatcher: %v", err)
 	}
-	if err := d.Enqueue(context.Background(), &Message{Text: "x"}); err != nil {
+	if err := d.Enqueue(context.Background(), &Message{Text: "x"}, writer); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
 

@@ -77,7 +77,7 @@ func (c *CLIListener) Listen(ctx context.Context, handler runtime.Handler) error
 	writer := &CLIWriter{out: c.out}
 	dispatchCtx, cancelDispatch := context.WithCancel(ctx)
 
-	dispatcher := runtime.NewDispatcher(handler, writer, defaultDispatchQueue)
+	dispatcher := runtime.NewDispatcher(handler, defaultDispatchQueue)
 	if err := dispatcher.Start(dispatchCtx); err != nil {
 		cancelDispatch()
 		return err
@@ -148,7 +148,7 @@ func (c *CLIListener) Listen(ctx context.Context, handler runtime.Handler) error
 				return nil
 			}
 
-			if err := dispatcher.Enqueue(ctx, &runtime.Message{Text: line}); err != nil {
+			if err := dispatcher.Enqueue(ctx, &runtime.Message{Text: line}, writer); err != nil {
 				if errors.Is(err, context.Canceled) {
 					return nil
 				}

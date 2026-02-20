@@ -11,9 +11,8 @@ import (
 // Dispatcher executes queued messages sequentially against a Handler.
 type Dispatcher struct {
 	handler Handler
-	writer  ResponseWriter
 
-	queue chan *Message
+	queue chan dispatchItem
 	done  chan struct{}
 
 	stateMu    sync.Mutex
@@ -22,15 +21,19 @@ type Dispatcher struct {
 	currentRun context.CancelFunc
 }
 
+type dispatchItem struct {
+	msg    *Message
+	writer ResponseWriter
+}
+
 // NewDispatcher creates a dispatcher with a fixed-size queue.
-func NewDispatcher(handler Handler, writer ResponseWriter, queueSize int) *Dispatcher {
+func NewDispatcher(handler Handler, queueSize int) *Dispatcher {
 	if queueSize <= 0 {
 		queueSize = 1
 	}
 	return &Dispatcher{
 		handler: handler,
-		writer:  writer,
-		queue:   make(chan *Message, queueSize),
+		queue:   make(chan dispatchItem, queueSize),
 		done:    make(chan struct{}),
 	}
 }
@@ -42,9 +45,6 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 	}
 	if d.handler == nil {
 		return errors.New("handler is required")
-	}
-	if d.writer == nil {
-		return errors.New("response writer is required")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -64,9 +64,12 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 }
 
 // Enqueue submits one message for FIFO processing.
-func (d *Dispatcher) Enqueue(ctx context.Context, msg *Message) error {
+func (d *Dispatcher) Enqueue(ctx context.Context, msg *Message, writer ResponseWriter) error {
 	if msg == nil {
 		return errors.New("message is required")
+	}
+	if writer == nil {
+		return errors.New("response writer is required")
 	}
 	rootCtx, started := d.dispatchContext()
 	if !started {
@@ -81,7 +84,7 @@ func (d *Dispatcher) Enqueue(ctx context.Context, msg *Message) error {
 		return rootCtx.Err()
 	case <-ctx.Done():
 		return ctx.Err()
-	case d.queue <- msg:
+	case d.queue <- dispatchItem{msg: msg, writer: writer}:
 		return nil
 	}
 }
@@ -137,19 +140,19 @@ func (d *Dispatcher) run(ctx context.Context) {
 		case <-ctx.Done():
 			d.cancelCurrentRun()
 			return
-		case msg := <-d.queue:
-			if msg == nil {
+		case item := <-d.queue:
+			if item.msg == nil || item.writer == nil {
 				continue
 			}
 			runCtx, cancel := context.WithCancel(ctx)
 			d.setCurrentRun(cancel)
-			err := d.handler.HandleMessage(runCtx, d.writer, msg)
+			err := d.handler.HandleMessage(runCtx, item.writer, item.msg)
 			d.clearCurrentRun()
 			cancel()
 			if err == nil || errors.Is(err, context.Canceled) {
 				continue
 			}
-			d.writer.WriteMessage(ctx, fmt.Sprintf("error: %v", err))
+			item.writer.WriteMessage(ctx, fmt.Sprintf("error: %v", err))
 		}
 	}
 }
