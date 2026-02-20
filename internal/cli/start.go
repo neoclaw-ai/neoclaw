@@ -2,8 +2,10 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -33,6 +35,14 @@ func newStartCmd() *cobra.Command {
 				"model", llm.Model,
 				"data_dir", cfg.DataDir,
 			)
+
+			pidFilePath := filepath.Join(cfg.DataDir, "claw.pid")
+			if err := os.WriteFile(pidFilePath, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0o644); err != nil {
+				return fmt.Errorf("write pid file %q: %w", pidFilePath, err)
+			}
+			defer func() {
+				os.Remove(pidFilePath)
+			}()
 
 			store := newSchedulerStore(cfg)
 			service := newSchedulerService(cfg, cmd.OutOrStdout(), store)
