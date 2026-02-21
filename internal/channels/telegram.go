@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -71,6 +72,7 @@ type telegramPendingApproval struct {
 type telegramSendMessageFunc func(context.Context, *bot.SendMessageParams) (*models.Message, error)
 type telegramAnswerCallbackQueryFunc func(context.Context, *bot.AnswerCallbackQueryParams) (bool, error)
 type telegramEditMessageReplyMarkupFunc func(context.Context, *bot.EditMessageReplyMarkupParams) (*models.Message, error)
+type telegramSendChatActionFunc func(context.Context, *bot.SendChatActionParams) (bool, error)
 
 // TelegramListener receives Telegram updates and dispatches authorized messages.
 type TelegramListener struct {
@@ -82,6 +84,7 @@ type TelegramListener struct {
 	sendMessage            telegramSendMessageFunc
 	answerCallbackQuery    telegramAnswerCallbackQueryFunc
 	editMessageReplyMarkup telegramEditMessageReplyMarkupFunc
+	sendChatAction         telegramSendChatActionFunc
 
 	approvalMu           sync.Mutex
 	activeApprovalTarget *telegramApprovalTarget
@@ -281,6 +284,7 @@ func (t *TelegramListener) Listen(ctx context.Context, handler runtime.Handler) 
 	t.sendMessage = b.SendMessage
 	t.answerCallbackQuery = b.AnswerCallbackQuery
 	t.editMessageReplyMarkup = b.EditMessageReplyMarkup
+	t.sendChatAction = b.SendChatAction
 
 	if err := dispatcher.Start(dispatchCtx); err != nil {
 		cancelDispatch()
@@ -506,6 +510,9 @@ func (h *telegramApprovalHandler) HandleMessage(ctx context.Context, w runtime.R
 		if writer, ok := w.(*telegramWriter); ok {
 			h.listener.setActiveApprovalTarget(writer.userID, writer.username, writer.chatID)
 			defer h.listener.clearActiveApprovalTarget()
+			if msg != nil && !strings.HasPrefix(strings.TrimSpace(msg.Text), "/") {
+				go h.listener.runTypingIndicator(ctx, writer.chatID)
+			}
 		}
 	}
 	return h.handler.HandleMessage(ctx, w, msg)
@@ -594,6 +601,33 @@ func (t *TelegramListener) editTelegramReplyMarkup(ctx context.Context, params *
 		return nil, errors.New("telegram bot is not connected")
 	}
 	return edit(ctx, params)
+}
+
+func (t *TelegramListener) runTypingIndicator(ctx context.Context, chatID int64) {
+	t.sendTypingAction(ctx, chatID)
+
+	ticker := time.NewTicker(4 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			t.sendTypingAction(ctx, chatID)
+		}
+	}
+}
+
+func (t *TelegramListener) sendTypingAction(ctx context.Context, chatID int64) {
+	send := t.sendChatAction
+	if send == nil {
+		return
+	}
+	send(ctx, &bot.SendChatActionParams{
+		ChatID: chatID,
+		Action: models.ChatActionTyping,
+	})
 }
 
 func generateTelegramApprovalToken() (string, error) {

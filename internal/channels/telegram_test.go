@@ -255,6 +255,106 @@ func TestTelegramListener_EnqueueIsNonBlocking(t *testing.T) {
 	close(block)
 }
 
+func TestTelegramApprovalHandler_SendsTypingForNonSlash(t *testing.T) {
+	listener := NewTelegram("token", "")
+	actionCalls := make(chan *bot.SendChatActionParams, 1)
+	listener.sendChatAction = func(_ context.Context, params *bot.SendChatActionParams) (bool, error) {
+		select {
+		case actionCalls <- params:
+		default:
+		}
+		return true, nil
+	}
+
+	block := make(chan struct{})
+	handler := &telegramApprovalHandler{
+		listener: listener,
+		handler:  &telegramBlockingHandler{block: block},
+	}
+	writer := &telegramWriter{
+		listener: listener,
+		chatID:   42,
+		userID:   "111",
+		username: "alice",
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- handler.HandleMessage(ctx, writer, &runtime.Message{Text: "hello"})
+	}()
+
+	select {
+	case params := <-actionCalls:
+		if got := chatIDFromAny(params.ChatID); got != 42 {
+			t.Fatalf("unexpected typing chat id: %d", got)
+		}
+		if params.Action != models.ChatActionTyping {
+			t.Fatalf("unexpected chat action: %q", params.Action)
+		}
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("expected typing action for non-slash message")
+	}
+
+	close(block)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("handler failed: %v", err)
+		}
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("handler did not complete")
+	}
+}
+
+func TestTelegramApprovalHandler_DoesNotSendTypingForSlash(t *testing.T) {
+	listener := NewTelegram("token", "")
+	actionCalls := make(chan *bot.SendChatActionParams, 1)
+	listener.sendChatAction = func(_ context.Context, params *bot.SendChatActionParams) (bool, error) {
+		select {
+		case actionCalls <- params:
+		default:
+		}
+		return true, nil
+	}
+
+	block := make(chan struct{})
+	handler := &telegramApprovalHandler{
+		listener: listener,
+		handler:  &telegramBlockingHandler{block: block},
+	}
+	writer := &telegramWriter{
+		listener: listener,
+		chatID:   42,
+		userID:   "111",
+		username: "alice",
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- handler.HandleMessage(ctx, writer, &runtime.Message{Text: "/help"})
+	}()
+
+	select {
+	case <-actionCalls:
+		t.Fatal("did not expect typing action for slash command")
+	case <-time.After(120 * time.Millisecond):
+	}
+
+	close(block)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("handler failed: %v", err)
+		}
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("handler did not complete")
+	}
+}
+
 func TestMessagePreview_TruncatesToLimit(t *testing.T) {
 	full := strings.Repeat("x", 120)
 	got := messagePreview(full, 100)
@@ -584,5 +684,8 @@ func configureTelegramSendCapture(listener *TelegramListener, outbound *outbound
 			ID:   params.MessageID,
 			Chat: models.Chat{ID: chatIDFromAny(params.ChatID)},
 		}, nil
+	}
+	listener.sendChatAction = func(context.Context, *bot.SendChatActionParams) (bool, error) {
+		return true, nil
 	}
 }
