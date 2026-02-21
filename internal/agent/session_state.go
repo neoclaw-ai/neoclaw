@@ -68,7 +68,7 @@ func (a *Agent) summarizeSessionToDailyLogAsync(ctx context.Context, history []p
 	}
 
 	snapshot := append([]provider.ChatMessage{}, history...)
-	go a.runSessionSummary(ctx, timeout, snapshot)
+	go a.runSessionSummary(context.WithoutCancel(ctx), timeout, snapshot)
 }
 
 func (a *Agent) runSessionSummary(ctx context.Context, timeout time.Duration, snapshot []provider.ChatMessage) {
