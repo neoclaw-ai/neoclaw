@@ -13,6 +13,7 @@ import (
 
 	"github.com/machinae/betterclaw/internal/channels"
 	"github.com/machinae/betterclaw/internal/config"
+	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/spf13/cobra"
 )
 
@@ -43,6 +44,11 @@ func newPairCmd() *cobra.Command {
 			pairingCtx, cancel := context.WithTimeout(cmd.Context(), pairTimeout)
 			defer cancel()
 
+			logging.Logger().Info(
+				"connecting to telegram and waiting for first inbound message",
+				"timeout", pairTimeout.String(),
+			)
+
 			session, err := channels.BeginTelegramPairing(pairingCtx, token)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
@@ -65,6 +71,7 @@ func newPairCmd() *cobra.Command {
 					return err
 				}
 
+				fmt.Fprint(cmd.OutOrStdout(), "Code: ")
 				line, err := reader.ReadString('\n')
 				if err != nil {
 					if errors.Is(err, io.EOF) {

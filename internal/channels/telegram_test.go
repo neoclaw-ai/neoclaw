@@ -49,7 +49,7 @@ func TestTelegramListener_LoadAllowedUsersOnce(t *testing.T) {
 }
 `)
 
-	listener := NewTelegram("token", path, nil)
+	listener := NewTelegram("token", path)
 	if err := listener.loadAllowedUsers(); err != nil {
 		t.Fatalf("load users: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestTelegramListener_UnauthorizedUserIsDropped(t *testing.T) {
 }
 `)
 
-	listener := NewTelegram("token", path, nil)
+	listener := NewTelegram("token", path)
 	if err := listener.loadAllowedUsers(); err != nil {
 		t.Fatalf("load users: %v", err)
 	}
@@ -129,13 +129,17 @@ func TestTelegramListener_HelpCommandHandledByCommandsHandler(t *testing.T) {
 }
 `)
 
-	listener := NewTelegram("token", path, commands.New(nil, nil, nil, 0, 0))
+	listener := NewTelegram("token", path)
 	if err := listener.loadAllowedUsers(); err != nil {
 		t.Fatalf("load users: %v", err)
 	}
 
-	handler := &telegramTestHandler{done: make(chan *runtime.Message, 2)}
-	dispatcher, stop := startTestDispatcher(t, handler)
+	next := &telegramTestHandler{done: make(chan *runtime.Message, 2)}
+	router := commands.Router{
+		Commands: commands.New(nil, nil, nil, 0, 0),
+		Next:     next,
+	}
+	dispatcher, stop := startTestDispatcher(t, router)
 	defer stop()
 
 	outbound := &outboundMessages{}
@@ -151,7 +155,7 @@ func TestTelegramListener_HelpCommandHandledByCommandsHandler(t *testing.T) {
 	)
 
 	select {
-	case <-handler.done:
+	case <-next.done:
 		t.Fatal("expected /help to be handled before agent dispatch")
 	case <-time.After(80 * time.Millisecond):
 	}
@@ -171,13 +175,17 @@ func TestTelegramListener_UnknownSlashFallsThroughToAgent(t *testing.T) {
 }
 `)
 
-	listener := NewTelegram("token", path, commands.New(nil, nil, nil, 0, 0))
+	listener := NewTelegram("token", path)
 	if err := listener.loadAllowedUsers(); err != nil {
 		t.Fatalf("load users: %v", err)
 	}
 
-	handler := &telegramTestHandler{done: make(chan *runtime.Message, 2)}
-	dispatcher, stop := startTestDispatcher(t, handler)
+	next := &telegramTestHandler{done: make(chan *runtime.Message, 2)}
+	router := commands.Router{
+		Commands: commands.New(nil, nil, nil, 0, 0),
+		Next:     next,
+	}
+	dispatcher, stop := startTestDispatcher(t, router)
 	defer stop()
 
 	outbound := &outboundMessages{}
@@ -193,7 +201,7 @@ func TestTelegramListener_UnknownSlashFallsThroughToAgent(t *testing.T) {
 	)
 
 	select {
-	case msg := <-handler.done:
+	case msg := <-next.done:
 		if msg.Text != "/doesnotexist" {
 			t.Fatalf("unexpected dispatched text: %q", msg.Text)
 		}
@@ -210,7 +218,7 @@ func TestTelegramListener_EnqueueIsNonBlocking(t *testing.T) {
 }
 `)
 
-	listener := NewTelegram("token", path, nil)
+	listener := NewTelegram("token", path)
 	if err := listener.loadAllowedUsers(); err != nil {
 		t.Fatalf("load users: %v", err)
 	}
@@ -256,7 +264,7 @@ func TestMessagePreview_TruncatesToLimit(t *testing.T) {
 }
 
 func TestTelegramListenerRequestApproval_Approve(t *testing.T) {
-	listener := NewTelegram("token", "", nil)
+	listener := NewTelegram("token", "")
 	listener.setActiveApprovalTarget("111", "alice", 42)
 
 	api := newMockTelegramAPI()
@@ -317,7 +325,7 @@ func TestTelegramListenerRequestApproval_Approve(t *testing.T) {
 }
 
 func TestTelegramListenerRequestApproval_Deny(t *testing.T) {
-	listener := NewTelegram("token", "", nil)
+	listener := NewTelegram("token", "")
 	listener.setActiveApprovalTarget("111", "alice", 42)
 
 	api := newMockTelegramAPI()
@@ -378,7 +386,7 @@ func TestTelegramListenerRequestApproval_Deny(t *testing.T) {
 }
 
 func TestTelegramListenerRequestApproval_ContextCanceledReturnsDenied(t *testing.T) {
-	listener := NewTelegram("token", "", nil)
+	listener := NewTelegram("token", "")
 	listener.setActiveApprovalTarget("111", "alice", 42)
 
 	api := newMockTelegramAPI()

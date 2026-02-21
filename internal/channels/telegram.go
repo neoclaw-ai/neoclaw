@@ -15,7 +15,6 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/machinae/betterclaw/internal/approval"
-	"github.com/machinae/betterclaw/internal/commands"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/runtime"
@@ -77,7 +76,6 @@ type telegramEditMessageReplyMarkupFunc func(context.Context, *bot.EditMessageRe
 type TelegramListener struct {
 	token            string
 	allowedUsersPath string
-	commands         *commands.Handler
 
 	allowedTelegramUsers map[string]struct{}
 	dispatchMu           sync.RWMutex
@@ -115,6 +113,7 @@ func BeginTelegramPairing(ctx context.Context, token string) (*TelegramPairSessi
 	if err != nil {
 		return nil, fmt.Errorf("fetch telegram bot profile: %w", err)
 	}
+	logging.Logger().Info(fmt.Sprintf("Connected to Telegram Bot @%s", strings.TrimSpace(me.Username)))
 
 	go b.Start(ctx)
 
@@ -237,11 +236,10 @@ var _ runtime.Listener = (*TelegramListener)(nil)
 var _ approval.Approver = (*TelegramListener)(nil)
 
 // NewTelegram creates a Telegram listener over one bot token and allowlist path.
-func NewTelegram(token, allowedUsersPath string, commandsHandler *commands.Handler) *TelegramListener {
+func NewTelegram(token, allowedUsersPath string) *TelegramListener {
 	return &TelegramListener{
 		token:            token,
 		allowedUsersPath: allowedUsersPath,
-		commands:         commandsHandler,
 		pendingApprovals: make(map[string]telegramPendingApproval),
 	}
 }
@@ -265,6 +263,13 @@ func (t *TelegramListener) Listen(ctx context.Context, handler runtime.Handler) 
 	if err != nil {
 		return fmt.Errorf("create telegram bot: %w", err)
 	}
+
+	me, err := b.GetMe(ctx)
+	if err != nil {
+		return fmt.Errorf("fetch telegram bot profile: %w", err)
+	}
+	logging.Logger().Info(fmt.Sprintf("Connected to Telegram Bot @%s", strings.TrimSpace(me.Username)))
+
 	t.setTelegramOps(b.SendMessage, b.AnswerCallbackQuery, b.EditMessageReplyMarkup)
 	defer t.clearTelegramOps()
 
@@ -459,18 +464,6 @@ func (t *TelegramListener) handleInboundMessage(
 		username: username,
 	}
 	trimmedText := strings.TrimSpace(text)
-	if strings.HasPrefix(trimmedText, "/") && t.commands != nil {
-		handled, err := t.commands.Handle(ctx, trimmedText, writer)
-		if err != nil {
-			logging.Logger().Warn("telegram command failed", "user_id", userID, "username", username, "err", err)
-			writer.WriteMessage(ctx, fmt.Sprintf("error: %v", err))
-			return
-		}
-		if handled {
-			return
-		}
-	}
-
 	if err := dispatcher.Enqueue(ctx, &runtime.Message{Text: trimmedText}, writer); err != nil {
 		logging.Logger().Warn("telegram enqueue failed", "user_id", userID, "username", username, "err", err)
 	}
@@ -593,6 +586,15 @@ func (t *TelegramListener) sendChatMessage(ctx context.Context, chatID int64, te
 		Text:   text,
 	})
 	return err
+}
+
+// Send delivers a channel message to the active Telegram chat for the current request.
+func (t *TelegramListener) Send(ctx context.Context, message string) error {
+	target, ok := t.activeApprovalTargetSnapshot()
+	if !ok {
+		return errors.New("telegram chat target is unavailable")
+	}
+	return t.sendChatMessage(ctx, target.chatID, message)
 }
 
 func (t *TelegramListener) setDispatcher(dispatcher *runtime.Dispatcher) {

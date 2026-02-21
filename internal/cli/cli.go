@@ -62,7 +62,7 @@ func newCLICmd() *cobra.Command {
 				approver = listener
 			}
 
-			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore, approver, jobsStore, schedulerService)
+			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore, approver, jobsStore, schedulerService, nil)
 			if err != nil {
 				return err
 			}
@@ -124,6 +124,7 @@ func buildToolRegistry(
 	approver approval.Approver,
 	jobsStore *scheduler.Store,
 	schedulerService *scheduler.Service,
+	channelSender tools.ChannelMessageSender,
 ) (*tools.Registry, error) {
 	registry := tools.NewRegistry()
 	httpClient := &http.Client{
@@ -152,7 +153,10 @@ func buildToolRegistry(
 			AllowedBinsPath: filepath.Join(cfg.DataDir, store.AllowedBinsFilePath),
 			Timeout:         cfg.Security.CommandTimeout,
 		},
-		tools.SendMessageTool{Writer: out},
+		tools.SendMessageTool{
+			Sender: channelSender,
+			Writer: out,
+		},
 		tools.WebSearchTool{
 			Client:   httpClient,
 			Provider: cfg.Web.Search.Provider,
