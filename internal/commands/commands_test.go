@@ -66,8 +66,8 @@ func TestUnknownCommand(t *testing.T) {
 }
 
 func TestJobsCommand(t *testing.T) {
-	store := scheduler.NewStore(t.TempDir() + "/jobs.json")
-	_, err := store.Create(context.Background(), scheduler.CreateInput{
+	service := scheduler.NewService(t.TempDir()+"/jobs.json", scheduler.NewRunner(scheduler.ActionRunners{}, nil))
+	_, err := service.Create(context.Background(), scheduler.CreateInput{
 		Description: "daily ping",
 		Cron:        "0 9 * * *",
 		Action:      scheduler.ActionSendMessage,
@@ -78,7 +78,7 @@ func TestJobsCommand(t *testing.T) {
 		t.Fatalf("create job: %v", err)
 	}
 
-	h := New(nil, store, nil, 0, 0)
+	h := New(nil, service, nil, 0, 0)
 	w := &captureWriter{}
 
 	handled, err := h.Handle(context.Background(), "/jobs", w)

@@ -10,7 +10,7 @@ import (
 func TestStoreListMissingFileReturnsEmpty(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(filepath.Join(t.TempDir(), "jobs.json"))
+	store := newJobStore(filepath.Join(t.TempDir(), "jobs.json"))
 	jobs, err := store.List(context.Background())
 	if err != nil {
 		t.Fatalf("list jobs: %v", err)
@@ -23,7 +23,7 @@ func TestStoreListMissingFileReturnsEmpty(t *testing.T) {
 func TestStoreCreateListGetDelete(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(filepath.Join(t.TempDir(), "jobs.json"))
+	store := newJobStore(filepath.Join(t.TempDir(), "jobs.json"))
 	created, err := store.Create(context.Background(), CreateInput{
 		Description: "daily check-in",
 		Cron:        "0 9 * * *",
@@ -54,7 +54,7 @@ func TestStoreCreateListGetDelete(t *testing.T) {
 		t.Fatalf("expected 1 job, got %d", len(jobs))
 	}
 
-	got, err := store.Get(context.Background(), created.ID)
+	got, err := store.get(context.Background(), created.ID)
 	if err != nil {
 		t.Fatalf("get job: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestStoreCreateListGetDelete(t *testing.T) {
 func TestStoreEmptyArgsRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(filepath.Join(t.TempDir(), "jobs.json"))
+	store := newJobStore(filepath.Join(t.TempDir(), "jobs.json"))
 	created, err := store.Create(context.Background(), CreateInput{
 		Description: "empty args",
 		Cron:        "0 9 * * *",
@@ -107,7 +107,7 @@ func TestStoreEmptyArgsRoundTrip(t *testing.T) {
 func TestStoreCreateValidation(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(filepath.Join(t.TempDir(), "jobs.json"))
+	store := newJobStore(filepath.Join(t.TempDir(), "jobs.json"))
 	_, err := store.Create(context.Background(), CreateInput{
 		Description: "bad cron",
 		Cron:        "invalid",
@@ -145,8 +145,8 @@ func TestStoreCreateValidation(t *testing.T) {
 func TestStoreGetNotFound(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(filepath.Join(t.TempDir(), "jobs.json"))
-	_, err := store.Get(context.Background(), "missing")
+	store := newJobStore(filepath.Join(t.TempDir(), "jobs.json"))
+	_, err := store.get(context.Background(), "missing")
 	if err == nil {
 		t.Fatalf("expected not found error")
 	}
@@ -155,7 +155,7 @@ func TestStoreGetNotFound(t *testing.T) {
 func TestStoreContextCancel(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(filepath.Join(t.TempDir(), "jobs.json"))
+	store := newJobStore(filepath.Join(t.TempDir(), "jobs.json"))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 

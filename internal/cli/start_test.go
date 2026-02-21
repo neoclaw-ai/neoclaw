@@ -27,7 +27,6 @@ func TestStartLoadsDefaultsAndBootstraps(t *testing.T) {
 		*config.Config,
 		io.Writer,
 		map[string]io.Writer,
-		*scheduler.Store,
 		*scheduler.Service,
 	) (<-chan error, error) {
 		return nil, nil

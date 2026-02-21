@@ -11,7 +11,7 @@ import (
 
 // JobListTool lists scheduled jobs from jobs.json.
 type JobListTool struct {
-	Store *scheduler.Store
+	Service *scheduler.Service
 }
 
 // Name returns the tool name.
@@ -39,10 +39,10 @@ func (t JobListTool) Permission() Permission {
 
 // Execute lists all scheduled jobs.
 func (t JobListTool) Execute(ctx context.Context, _ map[string]any) (*ToolResult, error) {
-	if t.Store == nil {
-		return nil, errors.New("job store is required")
+	if t.Service == nil {
+		return nil, errors.New("job service is required")
 	}
-	jobs, err := t.Store.List(ctx)
+	jobs, err := t.Service.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (t JobListTool) Execute(ctx context.Context, _ map[string]any) (*ToolResult
 
 // JobCreateTool creates a scheduled job.
 type JobCreateTool struct {
-	Store            *scheduler.Store
+	Service          *scheduler.Service
 	ChannelID        string
 	ResolveChannelID func() string
 }
@@ -116,8 +116,8 @@ func (t JobCreateTool) Permission() Permission {
 
 // Execute validates and persists a new scheduled job.
 func (t JobCreateTool) Execute(ctx context.Context, args map[string]any) (*ToolResult, error) {
-	if t.Store == nil {
-		return nil, errors.New("job store is required")
+	if t.Service == nil {
+		return nil, errors.New("job service is required")
 	}
 	description, err := stringArg(args, "description")
 	if err != nil {
@@ -149,13 +149,15 @@ func (t JobCreateTool) Execute(ctx context.Context, args map[string]any) (*ToolR
 	if channelID == "" {
 		channelID = "cli"
 	}
-	job, err := t.Store.Create(ctx, scheduler.CreateInput{
+	createInput := scheduler.CreateInput{
 		Description: description,
 		Cron:        cronSpec,
 		Action:      action,
 		Args:        jobArgs,
 		ChannelID:   channelID,
-	})
+	}
+
+	job, err := t.Service.Create(ctx, createInput)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +167,7 @@ func (t JobCreateTool) Execute(ctx context.Context, args map[string]any) (*ToolR
 
 // JobDeleteTool deletes a scheduled job by ID.
 type JobDeleteTool struct {
-	Store *scheduler.Store
+	Service *scheduler.Service
 }
 
 // Name returns the tool name.
@@ -199,14 +201,14 @@ func (t JobDeleteTool) Permission() Permission {
 
 // Execute deletes one scheduled job.
 func (t JobDeleteTool) Execute(ctx context.Context, args map[string]any) (*ToolResult, error) {
-	if t.Store == nil {
-		return nil, errors.New("job store is required")
+	if t.Service == nil {
+		return nil, errors.New("job service is required")
 	}
 	id, err := stringArg(args, "id")
 	if err != nil {
 		return nil, err
 	}
-	if err := t.Store.Delete(ctx, id); err != nil {
+	if err := t.Service.Delete(ctx, id); err != nil {
 		return nil, err
 	}
 	return &ToolResult{Output: "deleted"}, nil

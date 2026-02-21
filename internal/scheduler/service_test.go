@@ -10,8 +10,16 @@ import (
 func TestRunNowValidJobReturnsOutput(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(t.TempDir() + "/jobs.json")
-	job, err := store.Create(context.Background(), CreateInput{
+	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{
+		RunCommand: func(_ context.Context, args map[string]any) (string, error) {
+			if args["command"] != "echo hello" {
+				t.Fatalf("expected command echo hello, got %#v", args["command"])
+			}
+			return "ok", nil
+		},
+	}, nil))
+
+	job, err := svc.Create(context.Background(), CreateInput{
 		Description: "run now",
 		Cron:        "0 9 * * *",
 		Action:      ActionRunCommand,
@@ -21,15 +29,6 @@ func TestRunNowValidJobReturnsOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create job: %v", err)
 	}
-
-	svc := NewService(store, NewRunner(ActionRunners{
-		RunCommand: func(_ context.Context, args map[string]any) (string, error) {
-			if args["command"] != "echo hello" {
-				t.Fatalf("expected command echo hello, got %#v", args["command"])
-			}
-			return "ok", nil
-		},
-	}, nil))
 
 	output, err := svc.RunNow(context.Background(), job.ID)
 	if err != nil {
@@ -43,8 +42,7 @@ func TestRunNowValidJobReturnsOutput(t *testing.T) {
 func TestRunNowMissingJobReturnsError(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(t.TempDir() + "/jobs.json")
-	svc := NewService(store, NewRunner(ActionRunners{
+	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{
 		RunCommand: func(_ context.Context, _ map[string]any) (string, error) {
 			return "", nil
 		},
@@ -59,20 +57,8 @@ func TestRunNowMissingJobReturnsError(t *testing.T) {
 func TestStartRunNowStopRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(t.TempDir() + "/jobs.json")
-	job, err := store.Create(context.Background(), CreateInput{
-		Description: "round trip",
-		Cron:        "0 9 * * *",
-		Action:      ActionSendMessage,
-		Args:        map[string]any{"message": "hello"},
-		ChannelID:   "cli",
-	})
-	if err != nil {
-		t.Fatalf("create job: %v", err)
-	}
-
 	called := 0
-	svc := NewService(store, NewRunner(ActionRunners{
+	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{
 		SendMessage: func(_ context.Context, _ io.Writer, args map[string]any) (string, error) {
 			called++
 			if args["message"] != "hello" {
@@ -83,6 +69,16 @@ func TestStartRunNowStopRoundTrip(t *testing.T) {
 	}, map[string]io.Writer{
 		"cli": io.Discard,
 	}))
+	job, err := svc.Create(context.Background(), CreateInput{
+		Description: "round trip",
+		Cron:        "0 9 * * *",
+		Action:      ActionSendMessage,
+		Args:        map[string]any{"message": "hello"},
+		ChannelID:   "cli",
+	})
+	if err != nil {
+		t.Fatalf("create job: %v", err)
+	}
 
 	startCtx, startCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer startCancel()
@@ -111,8 +107,7 @@ func TestStartRunNowStopRoundTrip(t *testing.T) {
 func TestStartTwiceReturnsError(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(t.TempDir() + "/jobs.json")
-	svc := NewService(store, NewRunner(ActionRunners{}, nil))
+	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{}, nil))
 
 	if err := svc.Start(context.Background()); err != nil {
 		t.Fatalf("first start: %v", err)
@@ -126,13 +121,52 @@ func TestStartTwiceReturnsError(t *testing.T) {
 func TestStopExpiredContextOnUnstartedServiceReturnsNil(t *testing.T) {
 	t.Parallel()
 
-	store := NewStore(t.TempDir() + "/jobs.json")
-	svc := NewService(store, NewRunner(ActionRunners{}, nil))
+	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{}, nil))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	err := svc.Stop(ctx)
 	if err != nil {
 		t.Fatalf("expected nil stop error for unstarted service, got %v", err)
+	}
+}
+
+func TestRegisterAndUnregisterManageEntryMapping(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{
+		SendMessage: func(_ context.Context, _ io.Writer, _ map[string]any) (string, error) {
+			return "sent", nil
+		},
+	}, map[string]io.Writer{
+		"cli": io.Discard,
+	}))
+
+	if err := svc.Start(context.Background()); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	defer svc.Stop(context.Background())
+
+	job, err := svc.Create(context.Background(), CreateInput{
+		Description: "dynamic register",
+		Cron:        "0 9 * * *",
+		Action:      ActionSendMessage,
+		Args:        map[string]any{"message": "hello"},
+		ChannelID:   "cli",
+	})
+	if err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+
+	if err := svc.register(context.Background(), job); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if _, ok := svc.store.entryID(job.ID); !ok {
+		t.Fatalf("expected cron entry mapping for job %q", job.ID)
+	}
+
+	svc.unregister(job.ID)
+	if _, ok := svc.store.entryID(job.ID); ok {
+		t.Fatalf("expected cron entry mapping removed for job %q", job.ID)
 	}
 }

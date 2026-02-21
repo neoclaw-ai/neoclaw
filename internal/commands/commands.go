@@ -23,14 +23,14 @@ type Resetter interface {
 // Handler dispatches supported slash commands.
 type Handler struct {
 	resetter Resetter
-	jobs     *scheduler.Store
+	jobs     *scheduler.Service
 	costs    *costs.Tracker
 	daily    float64
 	monthly  float64
 }
 
 // New creates a new slash command handler.
-func New(resetter Resetter, jobs *scheduler.Store, costTracker *costs.Tracker, dailyLimit, monthlyLimit float64) *Handler {
+func New(resetter Resetter, jobs *scheduler.Service, costTracker *costs.Tracker, dailyLimit, monthlyLimit float64) *Handler {
 	return &Handler{
 		resetter: resetter,
 		jobs:     jobs,

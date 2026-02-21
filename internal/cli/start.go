@@ -62,12 +62,11 @@ func newStartCmd() *cobra.Command {
 			channelWriters := map[string]io.Writer{
 				"cli": cmd.OutOrStdout(),
 			}
-			jobsStore := newSchedulerStore(cfg)
-			service := newSchedulerService(cfg, channelWriters, jobsStore)
+			service := newSchedulerService(cfg, channelWriters)
 
 			runCtx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			telegramErrCh, err := startTelegramFunc(runCtx, cfg, cmd.OutOrStdout(), channelWriters, jobsStore, service)
+			telegramErrCh, err := startTelegramFunc(runCtx, cfg, cmd.OutOrStdout(), channelWriters, service)
 			if err != nil {
 				return err
 			}
@@ -119,7 +118,6 @@ func startTelegram(
 	cfg *config.Config,
 	out io.Writer,
 	channelWriters map[string]io.Writer,
-	jobsStore *scheduler.Store,
 	schedulerService *scheduler.Service,
 ) (<-chan error, error) {
 	telegramCfg := cfg.TelegramChannel()
@@ -146,7 +144,7 @@ func startTelegram(
 	}
 
 	memoryStore := memory.New(filepath.Join(cfg.AgentDir(), store.MemoryDirPath))
-	registry, err := buildToolRegistry(cfg, out, memoryStore, listener, jobsStore, schedulerService, listener, listener.CurrentChannelID)
+	registry, err := buildToolRegistry(cfg, out, memoryStore, listener, schedulerService, listener, listener.CurrentChannelID)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +176,7 @@ func startTelegram(
 	)
 
 	router := commands.Router{
-		Commands: commands.New(handler, jobsStore, costTracker, cfg.Costs.DailyLimit, cfg.Costs.MonthlyLimit),
+		Commands: commands.New(handler, schedulerService, costTracker, cfg.Costs.DailyLimit, cfg.Costs.MonthlyLimit),
 		Next:     handler,
 	}
 

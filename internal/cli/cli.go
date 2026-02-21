@@ -45,9 +45,8 @@ func newCLICmd() *cobra.Command {
 			}
 
 			memoryStore := memory.New(filepath.Join(cfg.AgentDir(), "memory"))
-			jobsStore := newSchedulerStore(cfg)
 			channelWriters := map[string]io.Writer{"cli": cmd.OutOrStdout()}
-			schedulerService := newSchedulerService(cfg, channelWriters, jobsStore)
+			schedulerService := newSchedulerService(cfg, channelWriters)
 			trimmedPrompt := strings.TrimSpace(prompt)
 			var (
 				approver approval.Approver
@@ -63,7 +62,7 @@ func newCLICmd() *cobra.Command {
 				approver = listener
 			}
 
-			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore, approver, jobsStore, schedulerService, nil, nil)
+			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore, approver, schedulerService, nil, nil)
 			if err != nil {
 				return err
 			}
@@ -106,7 +105,7 @@ func newCLICmd() *cobra.Command {
 				cfg.Costs.MonthlyLimit,
 			)
 			router := commands.Router{
-				Commands: commands.New(handler, jobsStore, costTracker, cfg.Costs.DailyLimit, cfg.Costs.MonthlyLimit),
+				Commands: commands.New(handler, schedulerService, costTracker, cfg.Costs.DailyLimit, cfg.Costs.MonthlyLimit),
 				Next:     handler,
 			}
 			return listener.Listen(cmd.Context(), router)
@@ -123,7 +122,6 @@ func buildToolRegistry(
 	out io.Writer,
 	memoryStore *memory.Store,
 	approver approval.Approver,
-	jobsStore *scheduler.Store,
 	schedulerService *scheduler.Service,
 	channelSender tools.ChannelMessageSender,
 	resolveChannelID func() string,
@@ -146,13 +144,13 @@ func buildToolRegistry(
 		tools.MemoryRemoveTool{Store: memoryStore},
 		tools.DailyLogTool{Store: memoryStore},
 		tools.SearchLogsTool{Store: memoryStore},
-		tools.JobListTool{Store: jobsStore},
+		tools.JobListTool{Service: schedulerService},
 		tools.JobCreateTool{
-			Store:            jobsStore,
+			Service:          schedulerService,
 			ChannelID:        "cli",
 			ResolveChannelID: resolveChannelID,
 		},
-		tools.JobDeleteTool{Store: jobsStore},
+		tools.JobDeleteTool{Service: schedulerService},
 		tools.JobRunTool{Service: schedulerService},
 		tools.RunCommandTool{
 			WorkspaceDir:    cfg.WorkspaceDir(),

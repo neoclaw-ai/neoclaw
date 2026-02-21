@@ -13,12 +13,8 @@ import (
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
-func newSchedulerStore(cfg *config.Config) *scheduler.Store {
-	return scheduler.NewStore(filepath.Join(cfg.AgentDir(), store.JobsFilePath))
-}
-
-func newSchedulerService(cfg *config.Config, channelWriters map[string]io.Writer, store *scheduler.Store) *scheduler.Service {
-	return scheduler.NewService(store, newSchedulerRunner(cfg, channelWriters))
+func newSchedulerService(cfg *config.Config, channelWriters map[string]io.Writer) *scheduler.Service {
+	return scheduler.NewService(filepath.Join(cfg.AgentDir(), store.JobsFilePath), newSchedulerRunner(cfg, channelWriters))
 }
 
 func newSchedulerRunner(cfg *config.Config, channelWriters map[string]io.Writer) *scheduler.Runner {

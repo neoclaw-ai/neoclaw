@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/store"
 	"github.com/robfig/cron/v3"
 )
@@ -49,24 +50,22 @@ type CreateInput struct {
 	ChannelID   string
 }
 
-// Store manages CRUD operations for jobs persisted at one jobs.json path.
-type Store struct {
-	path string
-	mu   sync.Mutex
+// jobStore manages CRUD operations for jobs persisted at one jobs.json path.
+type jobStore struct {
+	path     string
+	mu       sync.Mutex
+	entryIDs map[string]cron.EntryID
 }
 
-// NewStore constructs a jobs store over one jobs.json file path.
-func NewStore(path string) *Store {
-	return &Store{path: path}
-}
-
-// Path returns the configured jobs.json path.
-func (s *Store) Path() string {
-	return s.path
+func newJobStore(path string) *jobStore {
+	return &jobStore{
+		path:     path,
+		entryIDs: make(map[string]cron.EntryID),
+	}
 }
 
 // List returns all jobs from jobs.json.
-func (s *Store) List(ctx context.Context) ([]Job, error) {
+func (s *jobStore) List(ctx context.Context) ([]Job, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -75,8 +74,7 @@ func (s *Store) List(ctx context.Context) ([]Job, error) {
 	return s.readLocked()
 }
 
-// Get returns one job by ID.
-func (s *Store) Get(ctx context.Context, id string) (Job, error) {
+func (s *jobStore) get(ctx context.Context, id string) (Job, error) {
 	if err := ctx.Err(); err != nil {
 		return Job{}, err
 	}
@@ -100,7 +98,7 @@ func (s *Store) Get(ctx context.Context, id string) (Job, error) {
 }
 
 // Create validates and persists a new enabled job.
-func (s *Store) Create(ctx context.Context, in CreateInput) (Job, error) {
+func (s *jobStore) Create(ctx context.Context, in CreateInput) (Job, error) {
 	if err := ctx.Err(); err != nil {
 		return Job{}, err
 	}
@@ -133,11 +131,19 @@ func (s *Store) Create(ctx context.Context, in CreateInput) (Job, error) {
 	if err := s.writeLocked(jobs); err != nil {
 		return Job{}, err
 	}
+	logging.Logger().Info(
+		"scheduled job created",
+		"job_id", job.ID,
+		"description", job.Description,
+		"cron", job.Cron,
+		"action", job.Action,
+		"channel_id", job.ChannelID,
+	)
 	return job, nil
 }
 
 // Delete removes one job by ID.
-func (s *Store) Delete(ctx context.Context, id string) error {
+func (s *jobStore) Delete(ctx context.Context, id string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -157,12 +163,41 @@ func (s *Store) Delete(ctx context.Context, id string) error {
 			continue
 		}
 		jobs = append(jobs[:i], jobs[i+1:]...)
-		return s.writeLocked(jobs)
+		if err := s.writeLocked(jobs); err != nil {
+			return err
+		}
+		logging.Logger().Info("scheduled job deleted", "job_id", target)
+		return nil
 	}
 	return fmt.Errorf("job %q not found", target)
 }
 
-func (s *Store) readLocked() ([]Job, error) {
+func (s *jobStore) setEntryID(jobID string, entryID cron.EntryID) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.entryIDs[jobID] = entryID
+}
+
+func (s *jobStore) entryID(jobID string) (cron.EntryID, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entryID, ok := s.entryIDs[jobID]
+	return entryID, ok
+}
+
+func (s *jobStore) deleteEntryID(jobID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.entryIDs, jobID)
+}
+
+func (s *jobStore) clearEntryIDs() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	clear(s.entryIDs)
+}
+
+func (s *jobStore) readLocked() ([]Job, error) {
 	if strings.TrimSpace(s.path) == "" {
 		return nil, errors.New("jobs store path is required")
 	}
@@ -192,7 +227,7 @@ func (s *Store) readLocked() ([]Job, error) {
 	return jobs, nil
 }
 
-func (s *Store) writeLocked(jobs []Job) error {
+func (s *jobStore) writeLocked(jobs []Job) error {
 	if strings.TrimSpace(s.path) == "" {
 		return errors.New("jobs store path is required")
 	}

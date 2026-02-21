@@ -12,10 +12,10 @@ import (
 func TestJobCreateListDeleteTools(t *testing.T) {
 	t.Parallel()
 
-	store := scheduler.NewStore(t.TempDir() + "/jobs.json")
-	createTool := JobCreateTool{Store: store, ChannelID: "cli"}
-	listTool := JobListTool{Store: store}
-	deleteTool := JobDeleteTool{Store: store}
+	svc := scheduler.NewService(t.TempDir()+"/jobs.json", scheduler.NewRunner(scheduler.ActionRunners{}, nil))
+	createTool := JobCreateTool{Service: svc, ChannelID: "cli"}
+	listTool := JobListTool{Service: svc}
+	deleteTool := JobDeleteTool{Service: svc}
 
 	created, err := createTool.Execute(context.Background(), map[string]any{
 		"description": "daily ping",
@@ -40,7 +40,7 @@ func TestJobCreateListDeleteTools(t *testing.T) {
 		t.Fatalf("expected list output to contain description, got %q", listed.Output)
 	}
 
-	jobs, err := store.List(context.Background())
+	jobs, err := svc.List(context.Background())
 	if err != nil {
 		t.Fatalf("store list: %v", err)
 	}
@@ -68,8 +68,8 @@ func TestJobCreateListDeleteTools(t *testing.T) {
 func TestJobCreateToolDefaultsChannelID(t *testing.T) {
 	t.Parallel()
 
-	store := scheduler.NewStore(t.TempDir() + "/jobs.json")
-	createTool := JobCreateTool{Store: store}
+	svc := scheduler.NewService(t.TempDir()+"/jobs.json", scheduler.NewRunner(scheduler.ActionRunners{}, nil))
+	createTool := JobCreateTool{Service: svc}
 
 	_, err := createTool.Execute(context.Background(), map[string]any{
 		"description": "daily ping",
@@ -83,7 +83,7 @@ func TestJobCreateToolDefaultsChannelID(t *testing.T) {
 		t.Fatalf("create tool execute: %v", err)
 	}
 
-	jobs, err := store.List(context.Background())
+	jobs, err := svc.List(context.Background())
 	if err != nil {
 		t.Fatalf("store list: %v", err)
 	}
@@ -98,9 +98,9 @@ func TestJobCreateToolDefaultsChannelID(t *testing.T) {
 func TestJobCreateToolUsesResolvedChannelID(t *testing.T) {
 	t.Parallel()
 
-	store := scheduler.NewStore(t.TempDir() + "/jobs.json")
+	svc := scheduler.NewService(t.TempDir()+"/jobs.json", scheduler.NewRunner(scheduler.ActionRunners{}, nil))
 	createTool := JobCreateTool{
-		Store:            store,
+		Service:          svc,
 		ChannelID:        "cli",
 		ResolveChannelID: func() string { return "telegram-12345" },
 	}
@@ -117,7 +117,7 @@ func TestJobCreateToolUsesResolvedChannelID(t *testing.T) {
 		t.Fatalf("create tool execute: %v", err)
 	}
 
-	jobs, err := store.List(context.Background())
+	jobs, err := svc.List(context.Background())
 	if err != nil {
 		t.Fatalf("store list: %v", err)
 	}
@@ -132,8 +132,17 @@ func TestJobCreateToolUsesResolvedChannelID(t *testing.T) {
 func TestJobRunToolRunsService(t *testing.T) {
 	t.Parallel()
 
-	store := scheduler.NewStore(t.TempDir() + "/jobs.json")
-	job, err := store.Create(context.Background(), scheduler.CreateInput{
+	svc := scheduler.NewService(t.TempDir()+"/jobs.json", scheduler.NewRunner(scheduler.ActionRunners{
+		SendMessage: func(_ context.Context, _ io.Writer, args map[string]any) (string, error) {
+			if args["message"] != "hello" {
+				t.Fatalf("expected message hello, got %#v", args["message"])
+			}
+			return "run ok", nil
+		},
+	}, map[string]io.Writer{
+		"cli": io.Discard,
+	}))
+	job, err := svc.Create(context.Background(), scheduler.CreateInput{
 		Description: "run now",
 		Cron:        "0 9 * * *",
 		Action:      scheduler.ActionSendMessage,
@@ -145,17 +154,6 @@ func TestJobRunToolRunsService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("store create: %v", err)
 	}
-
-	svc := scheduler.NewService(store, scheduler.NewRunner(scheduler.ActionRunners{
-		SendMessage: func(_ context.Context, _ io.Writer, args map[string]any) (string, error) {
-			if args["message"] != "hello" {
-				t.Fatalf("expected message hello, got %#v", args["message"])
-			}
-			return "run ok", nil
-		},
-	}, map[string]io.Writer{
-		"cli": io.Discard,
-	}))
 
 	runTool := JobRunTool{Service: svc}
 	result, err := runTool.Execute(context.Background(), map[string]any{"id": job.ID})
