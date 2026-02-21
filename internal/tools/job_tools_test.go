@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"io"
 	"strings"
 	"testing"
 
@@ -94,6 +95,40 @@ func TestJobCreateToolDefaultsChannelID(t *testing.T) {
 	}
 }
 
+func TestJobCreateToolUsesResolvedChannelID(t *testing.T) {
+	t.Parallel()
+
+	store := scheduler.NewStore(t.TempDir() + "/jobs.json")
+	createTool := JobCreateTool{
+		Store:            store,
+		ChannelID:        "cli",
+		ResolveChannelID: func() string { return "telegram-12345" },
+	}
+
+	_, err := createTool.Execute(context.Background(), map[string]any{
+		"description": "daily ping",
+		"cron":        "0 9 * * *",
+		"action":      "send_message",
+		"args": map[string]any{
+			"message": "hello",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create tool execute: %v", err)
+	}
+
+	jobs, err := store.List(context.Background())
+	if err != nil {
+		t.Fatalf("store list: %v", err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(jobs))
+	}
+	if jobs[0].ChannelID != "telegram-12345" {
+		t.Fatalf("expected resolved channel id telegram-12345, got %q", jobs[0].ChannelID)
+	}
+}
+
 func TestJobRunToolRunsService(t *testing.T) {
 	t.Parallel()
 
@@ -112,12 +147,14 @@ func TestJobRunToolRunsService(t *testing.T) {
 	}
 
 	svc := scheduler.NewService(store, scheduler.NewRunner(scheduler.ActionRunners{
-		SendMessage: func(_ context.Context, args map[string]any) (string, error) {
+		SendMessage: func(_ context.Context, _ io.Writer, args map[string]any) (string, error) {
 			if args["message"] != "hello" {
 				t.Fatalf("expected message hello, got %#v", args["message"])
 			}
 			return "run ok", nil
 		},
+	}, map[string]io.Writer{
+		"cli": io.Discard,
 	}))
 
 	runTool := JobRunTool{Service: svc}

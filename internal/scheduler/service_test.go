@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 )
@@ -28,7 +29,7 @@ func TestRunNowValidJobReturnsOutput(t *testing.T) {
 			}
 			return "ok", nil
 		},
-	}))
+	}, nil))
 
 	output, err := svc.RunNow(context.Background(), job.ID)
 	if err != nil {
@@ -47,7 +48,7 @@ func TestRunNowMissingJobReturnsError(t *testing.T) {
 		RunCommand: func(_ context.Context, _ map[string]any) (string, error) {
 			return "", nil
 		},
-	}))
+	}, nil))
 
 	_, err := svc.RunNow(context.Background(), "missing")
 	if err == nil {
@@ -72,13 +73,15 @@ func TestStartRunNowStopRoundTrip(t *testing.T) {
 
 	called := 0
 	svc := NewService(store, NewRunner(ActionRunners{
-		SendMessage: func(_ context.Context, args map[string]any) (string, error) {
+		SendMessage: func(_ context.Context, _ io.Writer, args map[string]any) (string, error) {
 			called++
 			if args["message"] != "hello" {
 				t.Fatalf("expected message hello, got %#v", args["message"])
 			}
 			return "sent", nil
 		},
+	}, map[string]io.Writer{
+		"cli": io.Discard,
 	}))
 
 	startCtx, startCancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -109,7 +112,7 @@ func TestStartTwiceReturnsError(t *testing.T) {
 	t.Parallel()
 
 	store := NewStore(t.TempDir() + "/jobs.json")
-	svc := NewService(store, NewRunner(ActionRunners{}))
+	svc := NewService(store, NewRunner(ActionRunners{}, nil))
 
 	if err := svc.Start(context.Background()); err != nil {
 		t.Fatalf("first start: %v", err)
@@ -124,7 +127,7 @@ func TestStopExpiredContextOnUnstartedServiceReturnsNil(t *testing.T) {
 	t.Parallel()
 
 	store := NewStore(t.TempDir() + "/jobs.json")
-	svc := NewService(store, NewRunner(ActionRunners{}))
+	svc := NewService(store, NewRunner(ActionRunners{}, nil))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

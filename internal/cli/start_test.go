@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/machinae/betterclaw/internal/channels"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/scheduler"
+	"github.com/machinae/betterclaw/internal/store"
 )
 
 func TestStartLoadsDefaultsAndBootstraps(t *testing.T) {
@@ -24,6 +26,7 @@ func TestStartLoadsDefaultsAndBootstraps(t *testing.T) {
 		context.Context,
 		*config.Config,
 		io.Writer,
+		map[string]io.Writer,
 		*scheduler.Store,
 		*scheduler.Service,
 	) (<-chan error, error) {
@@ -49,5 +52,32 @@ func TestStartLoadsDefaultsAndBootstraps(t *testing.T) {
 	soulFile := filepath.Join(dataDir, "agents", "default", "SOUL.md")
 	if _, err := os.Stat(soulFile); err != nil {
 		t.Fatalf("expected bootstrap file %q to exist: %v", soulFile, err)
+	}
+}
+
+func TestRegisterTelegramChannelWriters(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "allowed_users.json")
+	if err := store.WriteFile(path, []byte(`{
+  "users": [
+    {"id":"111","channel":"telegram","username":"alice","name":"Alice","added_at":"2026-02-21T00:00:00Z"},
+    {"id":"not-a-number","channel":"telegram","username":"broken","name":"Broken","added_at":"2026-02-21T00:00:00Z"},
+    {"id":"222","channel":"slack","username":"bob","name":"Bob","added_at":"2026-02-21T00:00:00Z"}
+  ]
+}
+`)); err != nil {
+		t.Fatalf("write users file: %v", err)
+	}
+
+	listener := channels.NewTelegram("token", path)
+	channelWriters := map[string]io.Writer{}
+	if err := registerTelegramChannelWriters(channelWriters, path, listener); err != nil {
+		t.Fatalf("register telegram channel writers: %v", err)
+	}
+
+	if _, ok := channelWriters["telegram-111"]; !ok {
+		t.Fatalf("expected telegram writer for channel telegram-111")
+	}
+	if len(channelWriters) != 1 {
+		t.Fatalf("expected one valid telegram writer entry, got %d", len(channelWriters))
 	}
 }

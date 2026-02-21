@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"path/filepath"
 	"strconv"
@@ -500,6 +501,30 @@ func (w *telegramWriter) WriteMessage(ctx context.Context, text string) error {
 	return w.listener.sendChatMessage(ctx, w.chatID, text)
 }
 
+type telegramChannelWriter struct {
+	listener *TelegramListener
+	chatID   int64
+}
+
+func (w telegramChannelWriter) Write(p []byte) (int, error) {
+	text := strings.TrimSpace(string(p))
+	if text == "" {
+		return len(p), nil
+	}
+	if err := w.listener.sendChatMessage(context.Background(), w.chatID, text); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+// ChannelWriter returns an io.Writer that delivers scheduler messages to one Telegram chat.
+func (t *TelegramListener) ChannelWriter(chatID int64) io.Writer {
+	return telegramChannelWriter{
+		listener: t,
+		chatID:   chatID,
+	}
+}
+
 type telegramApprovalHandler struct {
 	listener *TelegramListener
 	handler  runtime.Handler
@@ -585,6 +610,15 @@ func (t *TelegramListener) Send(ctx context.Context, message string) error {
 		return errors.New("telegram chat target is unavailable")
 	}
 	return t.sendChatMessage(ctx, target.chatID, message)
+}
+
+// CurrentChannelID returns the active scheduler channel key for the in-flight Telegram request.
+func (t *TelegramListener) CurrentChannelID() string {
+	target, ok := t.activeApprovalTargetSnapshot()
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("telegram-%d", target.chatID)
 }
 
 func (t *TelegramListener) answerTelegramCallback(ctx context.Context, params *bot.AnswerCallbackQueryParams) (bool, error) {

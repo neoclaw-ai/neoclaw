@@ -68,8 +68,9 @@ func (t JobListTool) Execute(ctx context.Context, _ map[string]any) (*ToolResult
 
 // JobCreateTool creates a scheduled job.
 type JobCreateTool struct {
-	Store     *scheduler.Store
-	ChannelID string
+	Store            *scheduler.Store
+	ChannelID        string
+	ResolveChannelID func() string
 }
 
 // Name returns the tool name.
@@ -140,6 +141,11 @@ func (t JobCreateTool) Execute(ctx context.Context, args map[string]any) (*ToolR
 	}
 
 	channelID := strings.TrimSpace(t.ChannelID)
+	if t.ResolveChannelID != nil {
+		if resolved := strings.TrimSpace(t.ResolveChannelID()); resolved != "" {
+			channelID = resolved
+		}
+	}
 	if channelID == "" {
 		channelID = "cli"
 	}

@@ -46,7 +46,8 @@ func newCLICmd() *cobra.Command {
 
 			memoryStore := memory.New(filepath.Join(cfg.AgentDir(), "memory"))
 			jobsStore := newSchedulerStore(cfg)
-			schedulerService := newSchedulerService(cfg, cmd.OutOrStdout(), jobsStore)
+			channelWriters := map[string]io.Writer{"cli": cmd.OutOrStdout()}
+			schedulerService := newSchedulerService(cfg, channelWriters, jobsStore)
 			trimmedPrompt := strings.TrimSpace(prompt)
 			var (
 				approver approval.Approver
@@ -62,7 +63,7 @@ func newCLICmd() *cobra.Command {
 				approver = listener
 			}
 
-			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore, approver, jobsStore, schedulerService, nil)
+			registry, err := buildToolRegistry(cfg, cmd.OutOrStdout(), memoryStore, approver, jobsStore, schedulerService, nil, nil)
 			if err != nil {
 				return err
 			}
@@ -125,6 +126,7 @@ func buildToolRegistry(
 	jobsStore *scheduler.Store,
 	schedulerService *scheduler.Service,
 	channelSender tools.ChannelMessageSender,
+	resolveChannelID func() string,
 ) (*tools.Registry, error) {
 	registry := tools.NewRegistry()
 	httpClient := &http.Client{
@@ -145,7 +147,11 @@ func buildToolRegistry(
 		tools.DailyLogTool{Store: memoryStore},
 		tools.SearchLogsTool{Store: memoryStore},
 		tools.JobListTool{Store: jobsStore},
-		tools.JobCreateTool{Store: jobsStore, ChannelID: "cli"},
+		tools.JobCreateTool{
+			Store:            jobsStore,
+			ChannelID:        "cli",
+			ResolveChannelID: resolveChannelID,
+		},
 		tools.JobDeleteTool{Store: jobsStore},
 		tools.JobRunTool{Service: schedulerService},
 		tools.RunCommandTool{

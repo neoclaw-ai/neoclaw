@@ -8,11 +8,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/machinae/betterclaw/internal/agent"
+	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/channels"
 	"github.com/machinae/betterclaw/internal/commands"
 	"github.com/machinae/betterclaw/internal/config"
@@ -57,20 +59,20 @@ func newStartCmd() *cobra.Command {
 				os.Remove(pidFilePath)
 			}()
 
+			channelWriters := map[string]io.Writer{
+				"cli": cmd.OutOrStdout(),
+			}
 			jobsStore := newSchedulerStore(cfg)
-			service := newSchedulerService(cfg, cmd.OutOrStdout(), jobsStore)
+			service := newSchedulerService(cfg, channelWriters, jobsStore)
 
 			runCtx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			if err := service.Start(runCtx); err != nil {
+			telegramErrCh, err := startTelegramFunc(runCtx, cfg, cmd.OutOrStdout(), channelWriters, jobsStore, service)
+			if err != nil {
 				return err
 			}
-
-			telegramErrCh, err := startTelegramFunc(runCtx, cfg, cmd.OutOrStdout(), jobsStore, service)
-			if err != nil {
-				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				service.Stop(shutdownCtx)
+			if err := service.Start(runCtx); err != nil {
+				stop()
 				return err
 			}
 
@@ -116,6 +118,7 @@ func startTelegram(
 	ctx context.Context,
 	cfg *config.Config,
 	out io.Writer,
+	channelWriters map[string]io.Writer,
 	jobsStore *scheduler.Store,
 	schedulerService *scheduler.Service,
 ) (<-chan error, error) {
@@ -130,7 +133,11 @@ func startTelegram(
 	}
 
 	logging.Logger().Info("Starting Telegram listener")
-	listener := channels.NewTelegram(token, filepath.Join(cfg.DataDir, store.AllowedUsersFilePath))
+	allowedUsersPath := filepath.Join(cfg.DataDir, store.AllowedUsersFilePath)
+	listener := channels.NewTelegram(token, allowedUsersPath)
+	if err := registerTelegramChannelWriters(channelWriters, allowedUsersPath, listener); err != nil {
+		return nil, err
+	}
 
 	llmCfg := cfg.DefaultLLM()
 	modelProvider, err := providerFactory(llmCfg)
@@ -139,7 +146,7 @@ func startTelegram(
 	}
 
 	memoryStore := memory.New(filepath.Join(cfg.AgentDir(), store.MemoryDirPath))
-	registry, err := buildToolRegistry(cfg, out, memoryStore, listener, jobsStore, schedulerService, listener)
+	registry, err := buildToolRegistry(cfg, out, memoryStore, listener, jobsStore, schedulerService, listener, listener.CurrentChannelID)
 	if err != nil {
 		return nil, err
 	}
@@ -183,4 +190,35 @@ func startTelegram(
 		}
 	}()
 	return errCh, nil
+}
+
+func registerTelegramChannelWriters(channelWriters map[string]io.Writer, allowedUsersPath string, listener *channels.TelegramListener) error {
+	usersFile, err := approval.LoadUsers(allowedUsersPath)
+	if err != nil {
+		return fmt.Errorf("load allowed users %q: %w", allowedUsersPath, err)
+	}
+
+	for _, user := range usersFile.Users {
+		if !strings.EqualFold(strings.TrimSpace(user.Channel), "telegram") {
+			continue
+		}
+		id := strings.TrimSpace(user.ID)
+		if id == "" {
+			continue
+		}
+
+		chatID, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			logging.Logger().Warn(
+				"skipping telegram channel writer registration with invalid user id",
+				"user_id", id,
+				"err", err,
+			)
+			continue
+		}
+
+		channelID := fmt.Sprintf("telegram-%d", chatID)
+		channelWriters[channelID] = listener.ChannelWriter(chatID)
+	}
+	return nil
 }

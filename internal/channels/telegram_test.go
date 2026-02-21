@@ -355,6 +355,18 @@ func TestTelegramApprovalHandler_DoesNotSendTypingForSlash(t *testing.T) {
 	}
 }
 
+func TestTelegramListenerCurrentChannelID(t *testing.T) {
+	listener := NewTelegram("token", "")
+	if got := listener.CurrentChannelID(); got != "" {
+		t.Fatalf("expected empty channel id without active target, got %q", got)
+	}
+
+	listener.setActiveApprovalTarget("111", "alice", 42)
+	if got := listener.CurrentChannelID(); got != "telegram-42" {
+		t.Fatalf("expected telegram-42, got %q", got)
+	}
+}
+
 func TestMessagePreview_TruncatesToLimit(t *testing.T) {
 	full := strings.Repeat("x", 120)
 	got := messagePreview(full, 100)

@@ -17,11 +17,11 @@ func newSchedulerStore(cfg *config.Config) *scheduler.Store {
 	return scheduler.NewStore(filepath.Join(cfg.AgentDir(), store.JobsFilePath))
 }
 
-func newSchedulerService(cfg *config.Config, out io.Writer, store *scheduler.Store) *scheduler.Service {
-	return scheduler.NewService(store, newSchedulerRunner(cfg, out))
+func newSchedulerService(cfg *config.Config, channelWriters map[string]io.Writer, store *scheduler.Store) *scheduler.Service {
+	return scheduler.NewService(store, newSchedulerRunner(cfg, channelWriters))
 }
 
-func newSchedulerRunner(cfg *config.Config, out io.Writer) *scheduler.Runner {
+func newSchedulerRunner(cfg *config.Config, channelWriters map[string]io.Writer) *scheduler.Runner {
 	httpClient := &http.Client{
 		Transport: approval.RoundTripper{
 			Checker: approval.Checker{
@@ -36,10 +36,10 @@ func newSchedulerRunner(cfg *config.Config, out io.Writer) *scheduler.Runner {
 		Timeout:         cfg.Security.CommandTimeout,
 	}
 	httpTool := tools.HTTPRequestTool{Client: httpClient}
-	sendTool := tools.SendMessageTool{Writer: out}
 
 	return scheduler.NewRunner(scheduler.ActionRunners{
-		SendMessage: func(ctx context.Context, args map[string]any) (string, error) {
+		SendMessage: func(ctx context.Context, writer io.Writer, args map[string]any) (string, error) {
+			sendTool := tools.SendMessageTool{Writer: writer}
 			res, err := sendTool.Execute(ctx, args)
 			if err != nil {
 				return "", err
@@ -69,5 +69,5 @@ func newSchedulerRunner(cfg *config.Config, out io.Writer) *scheduler.Runner {
 			}
 			return res.Output, nil
 		},
-	})
+	}, channelWriters)
 }
