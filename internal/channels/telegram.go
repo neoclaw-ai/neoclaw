@@ -3,12 +3,14 @@ package channels
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -22,6 +24,11 @@ import (
 
 // ErrWrongCode indicates the entered pairing code does not match the expected code.
 var ErrWrongCode = errors.New("wrong pairing code")
+
+const (
+	telegramApprovalApprovePrefix = "approval:ok:"
+	telegramApprovalDenyPrefix    = "approval:no:"
+)
 
 type telegramPairUser struct {
 	id       string
@@ -46,6 +53,26 @@ type telegramInboundMessage struct {
 	chatID   int64
 }
 
+type telegramPairCollector struct {
+	firstInbound chan telegramInboundMessage
+}
+
+type telegramApprovalTarget struct {
+	userID   string
+	username string
+	chatID   int64
+}
+
+type telegramPendingApproval struct {
+	userID   string
+	chatID   int64
+	response chan approval.ApprovalDecision
+}
+
+type telegramSendMessageFunc func(context.Context, *bot.SendMessageParams) (*models.Message, error)
+type telegramAnswerCallbackQueryFunc func(context.Context, *bot.AnswerCallbackQueryParams) (bool, error)
+type telegramEditMessageReplyMarkupFunc func(context.Context, *bot.EditMessageReplyMarkupParams) (*models.Message, error)
+
 // TelegramListener receives Telegram updates and dispatches authorized messages.
 type TelegramListener struct {
 	token            string
@@ -53,6 +80,17 @@ type TelegramListener struct {
 	commands         *commands.Handler
 
 	allowedTelegramUsers map[string]struct{}
+	dispatchMu           sync.RWMutex
+	dispatcher           *runtime.Dispatcher
+
+	opsMu                  sync.RWMutex
+	sendMessage            telegramSendMessageFunc
+	answerCallbackQuery    telegramAnswerCallbackQueryFunc
+	editMessageReplyMarkup telegramEditMessageReplyMarkupFunc
+
+	approvalMu           sync.Mutex
+	activeApprovalTarget *telegramApprovalTarget
+	pendingApprovals     map[string]telegramPendingApproval
 }
 
 // BeginTelegramPairing starts Telegram pairing and waits for the first inbound user message.
@@ -67,22 +105,8 @@ func BeginTelegramPairing(ctx context.Context, token string) (*TelegramPairSessi
 	}
 
 	firstInbound := make(chan telegramInboundMessage, 1)
-	b, err := bot.New(trimmedToken, bot.WithDefaultHandler(func(_ context.Context, _ *bot.Bot, update *models.Update) {
-		if update == nil || update.Message == nil || update.Message.From == nil {
-			return
-		}
-
-		msg := telegramInboundMessage{
-			userID:   fmt.Sprintf("%d", update.Message.From.ID),
-			username: strings.TrimSpace(update.Message.From.Username),
-			name:     strings.TrimSpace(update.Message.From.FirstName),
-			chatID:   update.Message.Chat.ID,
-		}
-		select {
-		case firstInbound <- msg:
-		default:
-		}
-	}))
+	collector := &telegramPairCollector{firstInbound: firstInbound}
+	b, err := bot.New(trimmedToken, bot.WithDefaultHandler(collector.handleUpdate))
 	if err != nil {
 		return nil, fmt.Errorf("connect to telegram bot: %w", err)
 	}
@@ -131,6 +155,23 @@ func BeginTelegramPairing(ctx context.Context, token string) (*TelegramPairSessi
 		},
 		allowedUsersPath: filepath.Join(dataDir, store.AllowedUsersFilePath),
 	}, nil
+}
+
+func (c *telegramPairCollector) handleUpdate(_ context.Context, _ *bot.Bot, update *models.Update) {
+	if update == nil || update.Message == nil || update.Message.From == nil {
+		return
+	}
+
+	msg := telegramInboundMessage{
+		userID:   fmt.Sprintf("%d", update.Message.From.ID),
+		username: strings.TrimSpace(update.Message.From.Username),
+		name:     strings.TrimSpace(update.Message.From.FirstName),
+		chatID:   update.Message.Chat.ID,
+	}
+	select {
+	case c.firstInbound <- msg:
+	default:
+	}
 }
 
 // BotUsername returns the connected bot username discovered via getMe.
@@ -193,6 +234,7 @@ func generateTelegramPairCode() (string, error) {
 }
 
 var _ runtime.Listener = (*TelegramListener)(nil)
+var _ approval.Approver = (*TelegramListener)(nil)
 
 // NewTelegram creates a Telegram listener over one bot token and allowlist path.
 func NewTelegram(token, allowedUsersPath string, commandsHandler *commands.Handler) *TelegramListener {
@@ -200,6 +242,7 @@ func NewTelegram(token, allowedUsersPath string, commandsHandler *commands.Handl
 		token:            token,
 		allowedUsersPath: allowedUsersPath,
 		commands:         commandsHandler,
+		pendingApprovals: make(map[string]telegramPendingApproval),
 	}
 }
 
@@ -218,42 +261,100 @@ func (t *TelegramListener) Listen(ctx context.Context, handler runtime.Handler) 
 		logging.Logger().Warn("No authorized Telegram users. Run claw pair to authorize your account.")
 	}
 
-	updateCh := make(chan *models.Update, defaultDispatchQueue)
-	b, err := bot.New(
-		strings.TrimSpace(t.token),
-		bot.WithDefaultHandler(func(_ context.Context, _ *bot.Bot, update *models.Update) {
-			select {
-			case updateCh <- update:
-			default:
-				logging.Logger().Warn("telegram update queue is full; dropping update")
-			}
-		}),
-	)
+	b, err := t.createTelegramBot()
 	if err != nil {
 		return fmt.Errorf("create telegram bot: %w", err)
 	}
+	t.setTelegramOps(b.SendMessage, b.AnswerCallbackQuery, b.EditMessageReplyMarkup)
+	defer t.clearTelegramOps()
 
 	dispatchCtx, cancelDispatch := context.WithCancel(ctx)
-	dispatcher := runtime.NewDispatcher(handler, defaultDispatchQueue)
+	dispatcher := runtime.NewDispatcher(&telegramApprovalHandler{listener: t, handler: handler}, defaultDispatchQueue)
 	if err := dispatcher.Start(dispatchCtx); err != nil {
 		cancelDispatch()
 		return err
 	}
+	t.setDispatcher(dispatcher)
 	defer func() {
+		t.clearDispatcher()
 		cancelDispatch()
 		dispatcher.Wait()
 	}()
 
 	go b.Start(ctx)
+	<-ctx.Done()
+	dispatcher.Stop()
+	return nil
+}
 
-	for {
-		select {
-		case <-ctx.Done():
-			dispatcher.Stop()
-			return nil
-		case update := <-updateCh:
-			t.handleUpdate(ctx, dispatcher, b, update)
+// RequestApproval prompts the active Telegram user with an inline Approve/Deny keyboard.
+func (t *TelegramListener) RequestApproval(ctx context.Context, req approval.ApprovalRequest) (approval.ApprovalDecision, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if ctx.Err() != nil {
+		return approval.Denied, nil
+	}
+
+	target, ok := t.activeApprovalTargetSnapshot()
+	if !ok {
+		return approval.Denied, errors.New("telegram approval target is unavailable")
+	}
+
+	token, err := generateTelegramApprovalToken()
+	if err != nil {
+		return approval.Denied, fmt.Errorf("generate approval token: %w", err)
+	}
+
+	prompt := strings.TrimSpace(req.Description)
+	if prompt == "" {
+		prompt = fmt.Sprintf("Approve %s?", strings.TrimSpace(req.Tool))
+	}
+
+	message, err := t.sendTelegramMessage(ctx, &bot.SendMessageParams{
+		ChatID: target.chatID,
+		Text:   prompt,
+		ReplyMarkup: &models.InlineKeyboardMarkup{
+			InlineKeyboard: [][]models.InlineKeyboardButton{
+				{
+					{
+						Text:         "✅ Approve",
+						CallbackData: telegramApprovalApprovePrefix + token,
+					},
+					{
+						Text:         "❌ Deny",
+						CallbackData: telegramApprovalDenyPrefix + token,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return approval.Denied, fmt.Errorf("send approval prompt: %w", err)
+	}
+
+	pending := telegramPendingApproval{
+		userID:   target.userID,
+		chatID:   target.chatID,
+		response: make(chan approval.ApprovalDecision, 1),
+	}
+	t.storePendingApproval(token, pending)
+	defer t.deletePendingApproval(token)
+
+	select {
+	case decision := <-pending.response:
+		return decision, nil
+	case <-ctx.Done():
+		if message != nil {
+			if _, err := t.editTelegramReplyMarkup(context.Background(), &bot.EditMessageReplyMarkupParams{
+				ChatID:      target.chatID,
+				MessageID:   message.ID,
+				ReplyMarkup: nil,
+			}); err != nil {
+				logging.Logger().Warn("failed to clear approval keyboard", "chat_id", target.chatID, "message_id", message.ID, "err", err)
+			}
 		}
+		return approval.Denied, nil
 	}
 }
 
@@ -277,24 +378,61 @@ func (t *TelegramListener) loadAllowedUsers() error {
 	return nil
 }
 
-func (t *TelegramListener) handleUpdate(ctx context.Context, dispatcher *runtime.Dispatcher, b *bot.Bot, update *models.Update) {
-	if update == nil || update.Message == nil || update.Message.From == nil {
+func (t *TelegramListener) handleApprovalCallback(
+	ctx context.Context,
+	callback *models.CallbackQuery,
+	callbackPrefix string,
+	decision approval.ApprovalDecision,
+) {
+	if callback == nil {
 		return
 	}
-	t.handleInboundMessage(ctx, dispatcher, update.Message, func(ctx context.Context, text string) error {
-		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: update.Message.Chat.ID,
-			Text:   text,
-		})
-		return err
-	})
+
+	if _, err := t.answerTelegramCallback(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: callback.ID,
+	}); err != nil {
+		logging.Logger().Warn("failed to answer approval callback", "err", err)
+	}
+
+	token := parseApprovalToken(callback.Data, callbackPrefix)
+	if token == "" {
+		return
+	}
+
+	pending, found := t.pendingApproval(token)
+	if !found {
+		return
+	}
+
+	userID := strconv.FormatInt(callback.From.ID, 10)
+	if userID != pending.userID {
+		return
+	}
+
+	chatID, messageID, ok := callbackMessageLocation(callback)
+	if !ok || chatID != pending.chatID {
+		return
+	}
+
+	t.deletePendingApproval(token)
+	if _, err := t.editTelegramReplyMarkup(ctx, &bot.EditMessageReplyMarkupParams{
+		ChatID:      chatID,
+		MessageID:   messageID,
+		ReplyMarkup: nil,
+	}); err != nil {
+		logging.Logger().Warn("failed to clear approval keyboard", "chat_id", chatID, "message_id", messageID, "err", err)
+	}
+
+	select {
+	case pending.response <- decision:
+	default:
+	}
 }
 
 func (t *TelegramListener) handleInboundMessage(
 	ctx context.Context,
 	dispatcher *runtime.Dispatcher,
 	msg *models.Message,
-	send func(context.Context, string) error,
 ) {
 	if msg == nil || msg.From == nil {
 		return
@@ -314,7 +452,12 @@ func (t *TelegramListener) handleInboundMessage(
 		return
 	}
 
-	writer := &telegramWriter{send: send}
+	writer := &telegramWriter{
+		listener: t,
+		chatID:   msg.Chat.ID,
+		userID:   userID,
+		username: username,
+	}
 	trimmedText := strings.TrimSpace(text)
 	if strings.HasPrefix(trimmedText, "/") && t.commands != nil {
 		handled, err := t.commands.Handle(ctx, trimmedText, writer)
@@ -342,14 +485,180 @@ func (t *TelegramListener) isAllowedUser(userID string) bool {
 }
 
 type telegramWriter struct {
-	send func(ctx context.Context, text string) error
+	listener *TelegramListener
+	chatID   int64
+	userID   string
+	username string
 }
 
 func (w *telegramWriter) WriteMessage(ctx context.Context, text string) error {
-	if w == nil || w.send == nil {
+	if w == nil || w.listener == nil {
 		return errors.New("telegram sender is not configured")
 	}
-	return w.send(ctx, text)
+	return w.listener.sendChatMessage(ctx, w.chatID, text)
+}
+
+type telegramApprovalHandler struct {
+	listener *TelegramListener
+	handler  runtime.Handler
+}
+
+func (h *telegramApprovalHandler) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg *runtime.Message) error {
+	if h.listener != nil {
+		if writer, ok := w.(*telegramWriter); ok {
+			h.listener.setActiveApprovalTarget(writer.userID, writer.username, writer.chatID)
+			defer h.listener.clearActiveApprovalTarget()
+		}
+	}
+	return h.handler.HandleMessage(ctx, w, msg)
+}
+
+func (t *TelegramListener) setActiveApprovalTarget(userID, username string, chatID int64) {
+	t.approvalMu.Lock()
+	defer t.approvalMu.Unlock()
+	t.activeApprovalTarget = &telegramApprovalTarget{
+		userID:   strings.TrimSpace(userID),
+		username: strings.TrimSpace(username),
+		chatID:   chatID,
+	}
+}
+
+func (t *TelegramListener) clearActiveApprovalTarget() {
+	t.approvalMu.Lock()
+	defer t.approvalMu.Unlock()
+	t.activeApprovalTarget = nil
+}
+
+func (t *TelegramListener) activeApprovalTargetSnapshot() (telegramApprovalTarget, bool) {
+	t.approvalMu.Lock()
+	defer t.approvalMu.Unlock()
+	if t.activeApprovalTarget == nil {
+		return telegramApprovalTarget{}, false
+	}
+	return *t.activeApprovalTarget, true
+}
+
+func (t *TelegramListener) storePendingApproval(token string, pending telegramPendingApproval) {
+	t.approvalMu.Lock()
+	defer t.approvalMu.Unlock()
+	t.pendingApprovals[token] = pending
+}
+
+func (t *TelegramListener) pendingApproval(token string) (telegramPendingApproval, bool) {
+	t.approvalMu.Lock()
+	defer t.approvalMu.Unlock()
+	pending, ok := t.pendingApprovals[token]
+	return pending, ok
+}
+
+func (t *TelegramListener) deletePendingApproval(token string) {
+	t.approvalMu.Lock()
+	defer t.approvalMu.Unlock()
+	delete(t.pendingApprovals, token)
+}
+
+func (t *TelegramListener) setTelegramOps(
+	send telegramSendMessageFunc,
+	answer telegramAnswerCallbackQueryFunc,
+	edit telegramEditMessageReplyMarkupFunc,
+) {
+	t.opsMu.Lock()
+	defer t.opsMu.Unlock()
+	t.sendMessage = send
+	t.answerCallbackQuery = answer
+	t.editMessageReplyMarkup = edit
+}
+
+func (t *TelegramListener) clearTelegramOps() {
+	t.opsMu.Lock()
+	defer t.opsMu.Unlock()
+	t.sendMessage = nil
+	t.answerCallbackQuery = nil
+	t.editMessageReplyMarkup = nil
+}
+
+func (t *TelegramListener) sendTelegramMessage(ctx context.Context, params *bot.SendMessageParams) (*models.Message, error) {
+	t.opsMu.RLock()
+	send := t.sendMessage
+	t.opsMu.RUnlock()
+	if send == nil {
+		return nil, errors.New("telegram bot is not connected")
+	}
+	return send(ctx, params)
+}
+
+func (t *TelegramListener) sendChatMessage(ctx context.Context, chatID int64, text string) error {
+	_, err := t.sendTelegramMessage(ctx, &bot.SendMessageParams{
+		ChatID: chatID,
+		Text:   text,
+	})
+	return err
+}
+
+func (t *TelegramListener) setDispatcher(dispatcher *runtime.Dispatcher) {
+	t.dispatchMu.Lock()
+	defer t.dispatchMu.Unlock()
+	t.dispatcher = dispatcher
+}
+
+func (t *TelegramListener) clearDispatcher() {
+	t.dispatchMu.Lock()
+	defer t.dispatchMu.Unlock()
+	t.dispatcher = nil
+}
+
+func (t *TelegramListener) activeDispatcher() *runtime.Dispatcher {
+	t.dispatchMu.RLock()
+	defer t.dispatchMu.RUnlock()
+	return t.dispatcher
+}
+
+func (t *TelegramListener) answerTelegramCallback(ctx context.Context, params *bot.AnswerCallbackQueryParams) (bool, error) {
+	t.opsMu.RLock()
+	answer := t.answerCallbackQuery
+	t.opsMu.RUnlock()
+	if answer == nil {
+		return false, errors.New("telegram bot is not connected")
+	}
+	return answer(ctx, params)
+}
+
+func (t *TelegramListener) editTelegramReplyMarkup(ctx context.Context, params *bot.EditMessageReplyMarkupParams) (*models.Message, error) {
+	t.opsMu.RLock()
+	edit := t.editMessageReplyMarkup
+	t.opsMu.RUnlock()
+	if edit == nil {
+		return nil, errors.New("telegram bot is not connected")
+	}
+	return edit(ctx, params)
+}
+
+func generateTelegramApprovalToken() (string, error) {
+	bytes := make([]byte, 8)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func parseApprovalToken(data, prefix string) string {
+	if !strings.HasPrefix(data, prefix) {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(data, prefix))
+}
+
+func callbackMessageLocation(callback *models.CallbackQuery) (int64, int, bool) {
+	if callback == nil {
+		return 0, 0, false
+	}
+	if callback.Message.Message != nil {
+		return callback.Message.Message.Chat.ID, callback.Message.Message.ID, true
+	}
+	if callback.Message.InaccessibleMessage != nil {
+		return callback.Message.InaccessibleMessage.Chat.ID, callback.Message.InaccessibleMessage.MessageID, true
+	}
+	return 0, 0, false
 }
 
 func messagePreview(text string, limit int) string {
@@ -361,4 +670,38 @@ func messagePreview(text string, limit int) string {
 		return text
 	}
 	return string(runes[:limit])
+}
+
+func (t *TelegramListener) createTelegramBot() (*bot.Bot, error) {
+	options := []bot.Option{
+		bot.WithDefaultHandler(t.onDefaultUpdate),
+		bot.WithCallbackQueryDataHandler(telegramApprovalApprovePrefix, bot.MatchTypePrefix, t.onApprovalApproveCallback),
+		bot.WithCallbackQueryDataHandler(telegramApprovalDenyPrefix, bot.MatchTypePrefix, t.onApprovalDenyCallback),
+	}
+	return bot.New(strings.TrimSpace(t.token), options...)
+}
+
+func (t *TelegramListener) onDefaultUpdate(ctx context.Context, _ *bot.Bot, update *models.Update) {
+	if update == nil || update.Message == nil || update.Message.From == nil {
+		return
+	}
+	dispatcher := t.activeDispatcher()
+	if dispatcher == nil {
+		return
+	}
+	t.handleInboundMessage(ctx, dispatcher, update.Message)
+}
+
+func (t *TelegramListener) onApprovalApproveCallback(ctx context.Context, _ *bot.Bot, update *models.Update) {
+	if update == nil || update.CallbackQuery == nil {
+		return
+	}
+	t.handleApprovalCallback(ctx, update.CallbackQuery, telegramApprovalApprovePrefix, approval.Approved)
+}
+
+func (t *TelegramListener) onApprovalDenyCallback(ctx context.Context, _ *bot.Bot, update *models.Update) {
+	if update == nil || update.CallbackQuery == nil {
+		return
+	}
+	t.handleApprovalCallback(ctx, update.CallbackQuery, telegramApprovalDenyPrefix, approval.Denied)
 }

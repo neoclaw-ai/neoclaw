@@ -5,10 +5,13 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/commands"
 	"github.com/machinae/betterclaw/internal/runtime"
 	"github.com/machinae/betterclaw/internal/store"
@@ -61,6 +64,7 @@ func TestTelegramListener_LoadAllowedUsersOnce(t *testing.T) {
 	defer stop()
 
 	outbound := &outboundMessages{}
+	configureTelegramSendCapture(listener, outbound)
 	listener.handleInboundMessage(
 		context.Background(),
 		dispatcher,
@@ -69,7 +73,6 @@ func TestTelegramListener_LoadAllowedUsersOnce(t *testing.T) {
 			Chat: models.Chat{ID: 10},
 			Text: "hello",
 		},
-		outbound.send,
 	)
 
 	select {
@@ -97,6 +100,7 @@ func TestTelegramListener_UnauthorizedUserIsDropped(t *testing.T) {
 	defer stop()
 
 	outbound := &outboundMessages{}
+	configureTelegramSendCapture(listener, outbound)
 	listener.handleInboundMessage(
 		context.Background(),
 		dispatcher,
@@ -105,7 +109,6 @@ func TestTelegramListener_UnauthorizedUserIsDropped(t *testing.T) {
 			Chat: models.Chat{ID: 10},
 			Text: "hello",
 		},
-		outbound.send,
 	)
 
 	select {
@@ -136,6 +139,7 @@ func TestTelegramListener_HelpCommandHandledByCommandsHandler(t *testing.T) {
 	defer stop()
 
 	outbound := &outboundMessages{}
+	configureTelegramSendCapture(listener, outbound)
 	listener.handleInboundMessage(
 		context.Background(),
 		dispatcher,
@@ -144,7 +148,6 @@ func TestTelegramListener_HelpCommandHandledByCommandsHandler(t *testing.T) {
 			Chat: models.Chat{ID: 10},
 			Text: "/help",
 		},
-		outbound.send,
 	)
 
 	select {
@@ -178,6 +181,7 @@ func TestTelegramListener_UnknownSlashFallsThroughToAgent(t *testing.T) {
 	defer stop()
 
 	outbound := &outboundMessages{}
+	configureTelegramSendCapture(listener, outbound)
 	listener.handleInboundMessage(
 		context.Background(),
 		dispatcher,
@@ -186,7 +190,6 @@ func TestTelegramListener_UnknownSlashFallsThroughToAgent(t *testing.T) {
 			Chat: models.Chat{ID: 10},
 			Text: "/doesnotexist",
 		},
-		outbound.send,
 	)
 
 	select {
@@ -220,6 +223,7 @@ func TestTelegramListener_EnqueueIsNonBlocking(t *testing.T) {
 	done := make(chan struct{})
 	start := time.Now()
 	go func() {
+		configureTelegramSendCapture(listener, &outboundMessages{})
 		listener.handleInboundMessage(
 			context.Background(),
 			dispatcher,
@@ -228,7 +232,6 @@ func TestTelegramListener_EnqueueIsNonBlocking(t *testing.T) {
 				Chat: models.Chat{ID: 10},
 				Text: "hello",
 			},
-			func(context.Context, string) error { return nil },
 		)
 		close(done)
 	}()
@@ -249,6 +252,167 @@ func TestMessagePreview_TruncatesToLimit(t *testing.T) {
 	got := messagePreview(full, 100)
 	if len(got) != 100 {
 		t.Fatalf("expected 100-char preview, got %d", len(got))
+	}
+}
+
+func TestTelegramListenerRequestApproval_Approve(t *testing.T) {
+	listener := NewTelegram("token", "", nil)
+	listener.setActiveApprovalTarget("111", "alice", 42)
+
+	api := newMockTelegramAPI()
+	listener.setTelegramOps(api.sendMessage, api.answerCallback, api.editReplyMarkup)
+
+	done := make(chan struct{})
+	var decision approval.ApprovalDecision
+	var err error
+	go func() {
+		decision, err = listener.RequestApproval(context.Background(), approval.ApprovalRequest{
+			Tool:        "run_command",
+			Description: "Run: ls -la",
+		})
+		close(done)
+	}()
+
+	sendParams := api.waitForSend(t)
+	approveData, _ := callbackDataFromReplyMarkup(t, sendParams)
+
+	listener.onApprovalApproveCallback(context.Background(), nil, &models.Update{
+		CallbackQuery: &models.CallbackQuery{
+			ID:   "callback-1",
+			From: models.User{ID: 111, Username: "alice"},
+			Data: approveData,
+			Message: models.MaybeInaccessibleMessage{
+				Message: &models.Message{
+					ID:   500,
+					Chat: models.Chat{ID: 42},
+				},
+			},
+		},
+	})
+
+	select {
+	case <-done:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("request approval did not complete")
+	}
+	if err != nil {
+		t.Fatalf("request approval failed: %v", err)
+	}
+	if decision != approval.Approved {
+		t.Fatalf("expected Approved, got %v", decision)
+	}
+
+	if len(api.answerCalls) != 1 {
+		t.Fatalf("expected one answer callback call, got %d", len(api.answerCalls))
+	}
+	if api.answerCalls[0].CallbackQueryID != "callback-1" {
+		t.Fatalf("unexpected callback id: %q", api.answerCalls[0].CallbackQueryID)
+	}
+	if len(api.editCalls) != 1 {
+		t.Fatalf("expected one edit reply markup call, got %d", len(api.editCalls))
+	}
+	if api.editCalls[0].MessageID != 500 {
+		t.Fatalf("unexpected message id: %d", api.editCalls[0].MessageID)
+	}
+}
+
+func TestTelegramListenerRequestApproval_Deny(t *testing.T) {
+	listener := NewTelegram("token", "", nil)
+	listener.setActiveApprovalTarget("111", "alice", 42)
+
+	api := newMockTelegramAPI()
+	listener.setTelegramOps(api.sendMessage, api.answerCallback, api.editReplyMarkup)
+
+	done := make(chan struct{})
+	var decision approval.ApprovalDecision
+	var err error
+	go func() {
+		decision, err = listener.RequestApproval(context.Background(), approval.ApprovalRequest{
+			Tool:        "write_file",
+			Description: "Write config.toml",
+		})
+		close(done)
+	}()
+
+	sendParams := api.waitForSend(t)
+	_, denyData := callbackDataFromReplyMarkup(t, sendParams)
+
+	listener.onApprovalDenyCallback(context.Background(), nil, &models.Update{
+		CallbackQuery: &models.CallbackQuery{
+			ID:   "callback-2",
+			From: models.User{ID: 111, Username: "alice"},
+			Data: denyData,
+			Message: models.MaybeInaccessibleMessage{
+				Message: &models.Message{
+					ID:   700,
+					Chat: models.Chat{ID: 42},
+				},
+			},
+		},
+	})
+
+	select {
+	case <-done:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("request approval did not complete")
+	}
+	if err != nil {
+		t.Fatalf("request approval failed: %v", err)
+	}
+	if decision != approval.Denied {
+		t.Fatalf("expected Denied, got %v", decision)
+	}
+
+	if len(api.answerCalls) != 1 {
+		t.Fatalf("expected one answer callback call, got %d", len(api.answerCalls))
+	}
+	if api.answerCalls[0].CallbackQueryID != "callback-2" {
+		t.Fatalf("unexpected callback id: %q", api.answerCalls[0].CallbackQueryID)
+	}
+	if len(api.editCalls) != 1 {
+		t.Fatalf("expected one edit reply markup call, got %d", len(api.editCalls))
+	}
+	if api.editCalls[0].MessageID != 700 {
+		t.Fatalf("unexpected message id: %d", api.editCalls[0].MessageID)
+	}
+}
+
+func TestTelegramListenerRequestApproval_ContextCanceledReturnsDenied(t *testing.T) {
+	listener := NewTelegram("token", "", nil)
+	listener.setActiveApprovalTarget("111", "alice", 42)
+
+	api := newMockTelegramAPI()
+	listener.setTelegramOps(api.sendMessage, api.answerCallback, api.editReplyMarkup)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan struct{})
+	var decision approval.ApprovalDecision
+	var err error
+	go func() {
+		decision, err = listener.RequestApproval(ctx, approval.ApprovalRequest{
+			Tool:        "run_command",
+			Description: "Run: pwd",
+		})
+		close(done)
+	}()
+
+	api.waitForSend(t)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("request approval did not return after cancellation")
+	}
+	if err != nil {
+		t.Fatalf("expected nil error on cancellation, got %v", err)
+	}
+	if decision != approval.Denied {
+		t.Fatalf("expected Denied on cancellation, got %v", decision)
+	}
+	if len(api.editCalls) != 1 {
+		t.Fatalf("expected keyboard to be cleared once, got %d", len(api.editCalls))
 	}
 }
 
@@ -277,9 +441,8 @@ type outboundMessages struct {
 	messages []string
 }
 
-func (o *outboundMessages) send(_ context.Context, text string) error {
+func (o *outboundMessages) append(text string) {
 	o.messages = append(o.messages, text)
-	return nil
 }
 
 func startTestDispatcher(t *testing.T, handler runtime.Handler) (*runtime.Dispatcher, func()) {
@@ -303,4 +466,111 @@ func writeAllowedUsersFile(t *testing.T, content string) string {
 		t.Fatalf("write allowed users file: %v", err)
 	}
 	return path
+}
+
+type mockTelegramAPI struct {
+	mu          sync.Mutex
+	sendCalls   []*bot.SendMessageParams
+	answerCalls []*bot.AnswerCallbackQueryParams
+	editCalls   []*bot.EditMessageReplyMarkupParams
+	sendSignal  chan struct{}
+}
+
+func newMockTelegramAPI() *mockTelegramAPI {
+	return &mockTelegramAPI{
+		sendSignal: make(chan struct{}, 10),
+	}
+}
+
+func (m *mockTelegramAPI) sendMessage(_ context.Context, params *bot.SendMessageParams) (*models.Message, error) {
+	m.mu.Lock()
+	m.sendCalls = append(m.sendCalls, params)
+	m.mu.Unlock()
+	select {
+	case m.sendSignal <- struct{}{}:
+	default:
+	}
+	return &models.Message{
+		ID:   1,
+		Chat: models.Chat{ID: chatIDFromAny(params.ChatID)},
+	}, nil
+}
+
+func (m *mockTelegramAPI) answerCallback(_ context.Context, params *bot.AnswerCallbackQueryParams) (bool, error) {
+	m.mu.Lock()
+	m.answerCalls = append(m.answerCalls, params)
+	m.mu.Unlock()
+	return true, nil
+}
+
+func (m *mockTelegramAPI) editReplyMarkup(_ context.Context, params *bot.EditMessageReplyMarkupParams) (*models.Message, error) {
+	m.mu.Lock()
+	m.editCalls = append(m.editCalls, params)
+	m.mu.Unlock()
+	return &models.Message{
+		ID:   params.MessageID,
+		Chat: models.Chat{ID: chatIDFromAny(params.ChatID)},
+	}, nil
+}
+
+func (m *mockTelegramAPI) waitForSend(t *testing.T) *bot.SendMessageParams {
+	t.Helper()
+	select {
+	case <-m.sendSignal:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("timed out waiting for send message call")
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.sendCalls) == 0 {
+		t.Fatal("expected at least one send message call")
+	}
+	return m.sendCalls[len(m.sendCalls)-1]
+}
+
+func callbackDataFromReplyMarkup(t *testing.T, params *bot.SendMessageParams) (string, string) {
+	t.Helper()
+	markup, ok := params.ReplyMarkup.(*models.InlineKeyboardMarkup)
+	if !ok {
+		t.Fatalf("expected inline keyboard markup, got %T", params.ReplyMarkup)
+	}
+	if len(markup.InlineKeyboard) == 0 || len(markup.InlineKeyboard[0]) < 2 {
+		t.Fatalf("expected two inline keyboard buttons, got %#v", markup.InlineKeyboard)
+	}
+	return markup.InlineKeyboard[0][0].CallbackData, markup.InlineKeyboard[0][1].CallbackData
+}
+
+func chatIDFromAny(chatID any) int64 {
+	switch v := chatID.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	default:
+		return 0
+	}
+}
+
+func configureTelegramSendCapture(listener *TelegramListener, outbound *outboundMessages) {
+	listener.setTelegramOps(
+		func(_ context.Context, params *bot.SendMessageParams) (*models.Message, error) {
+			if outbound != nil {
+				outbound.append(params.Text)
+			}
+			return &models.Message{
+				ID:   1,
+				Chat: models.Chat{ID: chatIDFromAny(params.ChatID)},
+			}, nil
+		},
+		func(context.Context, *bot.AnswerCallbackQueryParams) (bool, error) {
+			return true, nil
+		},
+		func(_ context.Context, params *bot.EditMessageReplyMarkupParams) (*models.Message, error) {
+			return &models.Message{
+				ID:   params.MessageID,
+				Chat: models.Chat{ID: chatIDFromAny(params.ChatID)},
+			}, nil
+		},
+	)
 }
