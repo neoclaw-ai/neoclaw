@@ -78,10 +78,7 @@ type TelegramListener struct {
 	allowedUsersPath string
 
 	allowedTelegramUsers map[string]struct{}
-	dispatchMu           sync.RWMutex
-	dispatcher           *runtime.Dispatcher
 
-	opsMu                  sync.RWMutex
 	sendMessage            telegramSendMessageFunc
 	answerCallbackQuery    telegramAnswerCallbackQueryFunc
 	editMessageReplyMarkup telegramEditMessageReplyMarkupFunc
@@ -259,29 +256,37 @@ func (t *TelegramListener) Listen(ctx context.Context, handler runtime.Handler) 
 		logging.Logger().Warn("No authorized Telegram users. Run claw pair to authorize your account.")
 	}
 
-	b, err := t.createTelegramBot()
+	dispatchCtx, cancelDispatch := context.WithCancel(ctx)
+	dispatcher := runtime.NewDispatcher(&telegramApprovalHandler{listener: t, handler: handler}, defaultDispatchQueue)
+	defaultHandler := func(updateCtx context.Context, _ *bot.Bot, update *models.Update) {
+		if update == nil || update.Message == nil || update.Message.From == nil {
+			return
+		}
+		t.handleInboundMessage(updateCtx, dispatcher, update.Message)
+	}
+
+	b, err := t.createTelegramBot(defaultHandler)
 	if err != nil {
+		cancelDispatch()
 		return fmt.Errorf("create telegram bot: %w", err)
 	}
 
 	me, err := b.GetMe(ctx)
 	if err != nil {
+		cancelDispatch()
 		return fmt.Errorf("fetch telegram bot profile: %w", err)
 	}
 	logging.Logger().Info(fmt.Sprintf("Connected to Telegram Bot @%s", strings.TrimSpace(me.Username)))
 
-	t.setTelegramOps(b.SendMessage, b.AnswerCallbackQuery, b.EditMessageReplyMarkup)
-	defer t.clearTelegramOps()
+	t.sendMessage = b.SendMessage
+	t.answerCallbackQuery = b.AnswerCallbackQuery
+	t.editMessageReplyMarkup = b.EditMessageReplyMarkup
 
-	dispatchCtx, cancelDispatch := context.WithCancel(ctx)
-	dispatcher := runtime.NewDispatcher(&telegramApprovalHandler{listener: t, handler: handler}, defaultDispatchQueue)
 	if err := dispatcher.Start(dispatchCtx); err != nil {
 		cancelDispatch()
 		return err
 	}
-	t.setDispatcher(dispatcher)
 	defer func() {
-		t.clearDispatcher()
 		cancelDispatch()
 		dispatcher.Wait()
 	}()
@@ -550,30 +555,8 @@ func (t *TelegramListener) deletePendingApproval(token string) {
 	delete(t.pendingApprovals, token)
 }
 
-func (t *TelegramListener) setTelegramOps(
-	send telegramSendMessageFunc,
-	answer telegramAnswerCallbackQueryFunc,
-	edit telegramEditMessageReplyMarkupFunc,
-) {
-	t.opsMu.Lock()
-	defer t.opsMu.Unlock()
-	t.sendMessage = send
-	t.answerCallbackQuery = answer
-	t.editMessageReplyMarkup = edit
-}
-
-func (t *TelegramListener) clearTelegramOps() {
-	t.opsMu.Lock()
-	defer t.opsMu.Unlock()
-	t.sendMessage = nil
-	t.answerCallbackQuery = nil
-	t.editMessageReplyMarkup = nil
-}
-
 func (t *TelegramListener) sendTelegramMessage(ctx context.Context, params *bot.SendMessageParams) (*models.Message, error) {
-	t.opsMu.RLock()
 	send := t.sendMessage
-	t.opsMu.RUnlock()
 	if send == nil {
 		return nil, errors.New("telegram bot is not connected")
 	}
@@ -597,28 +580,8 @@ func (t *TelegramListener) Send(ctx context.Context, message string) error {
 	return t.sendChatMessage(ctx, target.chatID, message)
 }
 
-func (t *TelegramListener) setDispatcher(dispatcher *runtime.Dispatcher) {
-	t.dispatchMu.Lock()
-	defer t.dispatchMu.Unlock()
-	t.dispatcher = dispatcher
-}
-
-func (t *TelegramListener) clearDispatcher() {
-	t.dispatchMu.Lock()
-	defer t.dispatchMu.Unlock()
-	t.dispatcher = nil
-}
-
-func (t *TelegramListener) activeDispatcher() *runtime.Dispatcher {
-	t.dispatchMu.RLock()
-	defer t.dispatchMu.RUnlock()
-	return t.dispatcher
-}
-
 func (t *TelegramListener) answerTelegramCallback(ctx context.Context, params *bot.AnswerCallbackQueryParams) (bool, error) {
-	t.opsMu.RLock()
 	answer := t.answerCallbackQuery
-	t.opsMu.RUnlock()
 	if answer == nil {
 		return false, errors.New("telegram bot is not connected")
 	}
@@ -626,9 +589,7 @@ func (t *TelegramListener) answerTelegramCallback(ctx context.Context, params *b
 }
 
 func (t *TelegramListener) editTelegramReplyMarkup(ctx context.Context, params *bot.EditMessageReplyMarkupParams) (*models.Message, error) {
-	t.opsMu.RLock()
 	edit := t.editMessageReplyMarkup
-	t.opsMu.RUnlock()
 	if edit == nil {
 		return nil, errors.New("telegram bot is not connected")
 	}
@@ -674,24 +635,13 @@ func messagePreview(text string, limit int) string {
 	return string(runes[:limit])
 }
 
-func (t *TelegramListener) createTelegramBot() (*bot.Bot, error) {
+func (t *TelegramListener) createTelegramBot(defaultHandler bot.HandlerFunc) (*bot.Bot, error) {
 	options := []bot.Option{
-		bot.WithDefaultHandler(t.onDefaultUpdate),
+		bot.WithDefaultHandler(defaultHandler),
 		bot.WithCallbackQueryDataHandler(telegramApprovalApprovePrefix, bot.MatchTypePrefix, t.onApprovalApproveCallback),
 		bot.WithCallbackQueryDataHandler(telegramApprovalDenyPrefix, bot.MatchTypePrefix, t.onApprovalDenyCallback),
 	}
 	return bot.New(strings.TrimSpace(t.token), options...)
-}
-
-func (t *TelegramListener) onDefaultUpdate(ctx context.Context, _ *bot.Bot, update *models.Update) {
-	if update == nil || update.Message == nil || update.Message.From == nil {
-		return
-	}
-	dispatcher := t.activeDispatcher()
-	if dispatcher == nil {
-		return
-	}
-	t.handleInboundMessage(ctx, dispatcher, update.Message)
 }
 
 func (t *TelegramListener) onApprovalApproveCallback(ctx context.Context, _ *bot.Bot, update *models.Update) {

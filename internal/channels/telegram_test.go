@@ -268,7 +268,9 @@ func TestTelegramListenerRequestApproval_Approve(t *testing.T) {
 	listener.setActiveApprovalTarget("111", "alice", 42)
 
 	api := newMockTelegramAPI()
-	listener.setTelegramOps(api.sendMessage, api.answerCallback, api.editReplyMarkup)
+	listener.sendMessage = api.sendMessage
+	listener.answerCallbackQuery = api.answerCallback
+	listener.editMessageReplyMarkup = api.editReplyMarkup
 
 	done := make(chan struct{})
 	var decision approval.ApprovalDecision
@@ -329,7 +331,9 @@ func TestTelegramListenerRequestApproval_Deny(t *testing.T) {
 	listener.setActiveApprovalTarget("111", "alice", 42)
 
 	api := newMockTelegramAPI()
-	listener.setTelegramOps(api.sendMessage, api.answerCallback, api.editReplyMarkup)
+	listener.sendMessage = api.sendMessage
+	listener.answerCallbackQuery = api.answerCallback
+	listener.editMessageReplyMarkup = api.editReplyMarkup
 
 	done := make(chan struct{})
 	var decision approval.ApprovalDecision
@@ -390,7 +394,9 @@ func TestTelegramListenerRequestApproval_ContextCanceledReturnsDenied(t *testing
 	listener.setActiveApprovalTarget("111", "alice", 42)
 
 	api := newMockTelegramAPI()
-	listener.setTelegramOps(api.sendMessage, api.answerCallback, api.editReplyMarkup)
+	listener.sendMessage = api.sendMessage
+	listener.answerCallbackQuery = api.answerCallback
+	listener.editMessageReplyMarkup = api.editReplyMarkup
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -561,24 +567,22 @@ func chatIDFromAny(chatID any) int64 {
 }
 
 func configureTelegramSendCapture(listener *TelegramListener, outbound *outboundMessages) {
-	listener.setTelegramOps(
-		func(_ context.Context, params *bot.SendMessageParams) (*models.Message, error) {
-			if outbound != nil {
-				outbound.append(params.Text)
-			}
-			return &models.Message{
-				ID:   1,
-				Chat: models.Chat{ID: chatIDFromAny(params.ChatID)},
-			}, nil
-		},
-		func(context.Context, *bot.AnswerCallbackQueryParams) (bool, error) {
-			return true, nil
-		},
-		func(_ context.Context, params *bot.EditMessageReplyMarkupParams) (*models.Message, error) {
-			return &models.Message{
-				ID:   params.MessageID,
-				Chat: models.Chat{ID: chatIDFromAny(params.ChatID)},
-			}, nil
-		},
-	)
+	listener.sendMessage = func(_ context.Context, params *bot.SendMessageParams) (*models.Message, error) {
+		if outbound != nil {
+			outbound.append(params.Text)
+		}
+		return &models.Message{
+			ID:   1,
+			Chat: models.Chat{ID: chatIDFromAny(params.ChatID)},
+		}, nil
+	}
+	listener.answerCallbackQuery = func(context.Context, *bot.AnswerCallbackQueryParams) (bool, error) {
+		return true, nil
+	}
+	listener.editMessageReplyMarkup = func(_ context.Context, params *bot.EditMessageReplyMarkupParams) (*models.Message, error) {
+		return &models.Message{
+			ID:   params.MessageID,
+			Chat: models.Chat{ID: chatIDFromAny(params.ChatID)},
+		}, nil
+	}
 }
