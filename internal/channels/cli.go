@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/chzyer/readline"
 	"github.com/machinae/betterclaw/internal/approval"
+	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/runtime"
 	"golang.org/x/term"
 )
@@ -22,9 +22,9 @@ import (
 const (
 	defaultReplPrompt    = "you> "
 	defaultDispatchQueue = 20
-	// Allow queued input to finish when stdin closes before shutting down the dispatcher.
-	dispatchDrainTimeout = 5 * time.Second
 )
+
+var errInputInterrupted = errors.New("input interrupted")
 
 var (
 	_ runtime.Listener  = (*CLIListener)(nil)
@@ -49,10 +49,6 @@ type CLIListener struct {
 
 	rl       *readline.Instance
 	fallback *bufio.Reader
-
-	stateMu      sync.Mutex
-	approvalReq  chan approvalInputRequest
-	listenDoneCh chan struct{}
 }
 
 // NewCLI creates a new CLI listener over stdin/stdout style streams.
@@ -73,96 +69,62 @@ func (c *CLIListener) Listen(ctx context.Context, handler runtime.Handler) error
 	}
 
 	fmt.Fprintln(c.out, "Interactive mode. Type /quit or /exit to stop.")
+	interruptCh := make(chan os.Signal, 1)
+	signal.Notify(interruptCh, os.Interrupt)
+	defer signal.Stop(interruptCh)
 
 	writer := &CLIWriter{out: c.out}
-	dispatchCtx, cancelDispatch := context.WithCancel(ctx)
-
-	dispatcher := runtime.NewDispatcher(handler, defaultDispatchQueue)
-	if err := dispatcher.Start(dispatchCtx); err != nil {
-		cancelDispatch()
-		return err
-	}
-	defer func() {
-		cancelDispatch()
-		dispatcher.Wait()
-	}()
-
-	reqCh, doneCh := c.setupApprovalChannels()
-	defer c.teardownApprovalChannels(reqCh, doneCh)
-
-	inputCh := make(chan inputEvent)
-	go c.readInputLoop(ctx, inputCh)
-
-	var pendingApproval *approvalInputRequest
 	for {
-		select {
-		case <-ctx.Done():
-			dispatcher.Stop()
-			return nil
-		case req := <-reqCh:
-			if pendingApproval != nil {
-				req.response <- approvalInputResponse{err: errors.New("another approval is already pending")}
-				continue
-			}
-			pendingApproval = &req
-			fmt.Fprint(c.out, req.prompt)
-		case event, ok := <-inputCh:
-			if !ok {
-				c.drainDispatcher(dispatcher)
+		line, err := c.readLine(ctx)
+		if err != nil {
+			if errors.Is(err, errInputInterrupted) {
 				return nil
 			}
-			if event.err != nil {
-				if pendingApproval != nil {
-					pendingApproval.response <- approvalInputResponse{err: event.err}
-					pendingApproval = nil
-				}
-				if errors.Is(event.err, io.EOF) {
-					c.drainDispatcher(dispatcher)
-					return nil
-				}
-				if errors.Is(event.err, context.Canceled) {
-					dispatcher.Stop()
-					return nil
-				}
-				return event.err
-			}
-
-			line := strings.TrimSpace(event.line)
-			if pendingApproval != nil {
-				pendingApproval.response <- approvalInputResponse{line: line}
-				pendingApproval = nil
-				continue
-			}
-			if line == "" {
-				continue
-			}
-
-			switch strings.ToLower(line) {
-			case "/stop", "stop":
-				dispatcher.Stop()
-				writer.WriteMessage(ctx, "Stopped.")
-				continue
-			case "/quit", "quit", "/exit", "exit":
-				dispatcher.Stop()
-				writer.WriteMessage(ctx, "Stopped.")
+			if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
 				return nil
 			}
-
-			if err := dispatcher.Enqueue(ctx, &runtime.Message{Text: line}, writer); err != nil {
-				if errors.Is(err, context.Canceled) {
-					return nil
-				}
-				return err
-			}
+			return err
 		}
-	}
-}
 
-func (c *CLIListener) drainDispatcher(dispatcher *runtime.Dispatcher) {
-	drainCtx, cancel := context.WithTimeout(context.Background(), dispatchDrainTimeout)
-	defer cancel()
-	if err := dispatcher.WaitUntilIdle(drainCtx); err != nil {
-		dispatcher.Stop()
+		input := strings.TrimSpace(line)
+		if input == "" {
+			continue
+		}
+
+		switch strings.ToLower(input) {
+		case "/quit", "quit", "/exit", "exit":
+			writer.WriteMessage(ctx, "Stopped.")
+			return nil
+		}
+
+		fmt.Fprintln(c.out, "Thinking... Ctrl+C to cancel")
+
+		reqCtx, cancelReq := context.WithCancel(ctx)
+		drainInterruptSignals(interruptCh)
+		interruptCanceled := watchRequestInterrupt(reqCtx, interruptCh, cancelReq)
+		err = handler.HandleMessage(reqCtx, writer, &runtime.Message{Text: input})
+		cancelReq()
+
+		canceledByInterrupt := false
+		select {
+		case <-interruptCanceled:
+			canceledByInterrupt = true
+		default:
+		}
+		if canceledByInterrupt && errors.Is(err, context.Canceled) {
+			if writeErr := writer.WriteMessage(ctx, "Canceled request"); writeErr != nil {
+				return writeErr
+			}
+			continue
+		}
+
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil
+			}
+			logging.Logger().Error("message handling failed", "err", err)
+			continue
+		}
 	}
 }
 
@@ -176,36 +138,7 @@ func (c *CLIListener) RequestApproval(ctx context.Context, req approval.Approval
 	}
 
 	prompt := fmt.Sprintf("approve tool %s? %s [y/N]: ", req.Tool, req.Description)
-	reqCh, doneCh := c.approvalChannels()
-	if reqCh == nil || doneCh == nil {
-		return c.requestApprovalDirect(prompt)
-	}
-
-	pending := approvalInputRequest{
-		prompt:   prompt,
-		response: make(chan approvalInputResponse, 1),
-	}
-	select {
-	case reqCh <- pending:
-	case <-doneCh:
-		return approval.Denied, errors.New("approval unavailable: listener stopped")
-	case <-ctx.Done():
-		return approval.Denied, ctx.Err()
-	}
-
-	var answer string
-	select {
-	case resp := <-pending.response:
-		if resp.err != nil {
-			return approval.Denied, resp.err
-		}
-		answer = resp.line
-	case <-doneCh:
-		return approval.Denied, errors.New("approval unavailable: listener stopped")
-	case <-ctx.Done():
-		return approval.Denied, ctx.Err()
-	}
-	return parseApprovalAnswer(answer), nil
+	return c.requestApprovalDirect(prompt)
 }
 
 func (c *CLIListener) requestApprovalDirect(prompt string) (approval.ApprovalDecision, error) {
@@ -260,7 +193,10 @@ func (c *CLIListener) readLine(ctx context.Context) (string, error) {
 	if c.rl != nil {
 		line, err := c.rl.Readline()
 		if err != nil {
-			if err == readline.ErrInterrupt || err == io.EOF {
+			if err == readline.ErrInterrupt {
+				return "", errInputInterrupted
+			}
+			if err == io.EOF {
 				return "", io.EOF
 			}
 			return "", err
@@ -279,6 +215,33 @@ func (c *CLIListener) readLine(ctx context.Context) (string, error) {
 	return line, nil
 }
 
+func watchRequestInterrupt(ctx context.Context, interruptCh <-chan os.Signal, cancel context.CancelFunc) <-chan struct{} {
+	canceled := make(chan struct{}, 1)
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		case <-interruptCh:
+			select {
+			case canceled <- struct{}{}:
+			default:
+			}
+			cancel()
+		}
+	}()
+	return canceled
+}
+
+func drainInterruptSignals(interruptCh <-chan os.Signal) {
+	for {
+		select {
+		case <-interruptCh:
+		default:
+			return
+		}
+	}
+}
+
 func (c *CLIListener) readApprovalLineReadline(prompt string) (string, error) {
 	c.rl.SetPrompt(prompt)
 	c.rl.Refresh()
@@ -292,66 +255,6 @@ func (c *CLIListener) readApprovalLineReadline(prompt string) (string, error) {
 		return "", err
 	}
 	return line, nil
-}
-
-func (c *CLIListener) readInputLoop(ctx context.Context, out chan<- inputEvent) {
-	defer close(out)
-	for {
-		line, err := c.readLine(ctx)
-		select {
-		case out <- inputEvent{line: line, err: err}:
-		case <-ctx.Done():
-			return
-		}
-		if err != nil {
-			return
-		}
-	}
-}
-
-func (c *CLIListener) setupApprovalChannels() (chan approvalInputRequest, chan struct{}) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-
-	reqCh := make(chan approvalInputRequest)
-	doneCh := make(chan struct{})
-	c.approvalReq = reqCh
-	c.listenDoneCh = doneCh
-	return reqCh, doneCh
-}
-
-func (c *CLIListener) teardownApprovalChannels(reqCh chan approvalInputRequest, doneCh chan struct{}) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-
-	if c.approvalReq == reqCh {
-		c.approvalReq = nil
-	}
-	if c.listenDoneCh == doneCh {
-		close(doneCh)
-		c.listenDoneCh = nil
-	}
-}
-
-func (c *CLIListener) approvalChannels() (chan approvalInputRequest, chan struct{}) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	return c.approvalReq, c.listenDoneCh
-}
-
-type approvalInputRequest struct {
-	prompt   string
-	response chan approvalInputResponse
-}
-
-type approvalInputResponse struct {
-	line string
-	err  error
-}
-
-type inputEvent struct {
-	line string
-	err  error
 }
 
 func newReadline(in io.Reader, out io.Writer) (*readline.Instance, error) {

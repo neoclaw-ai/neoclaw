@@ -46,24 +46,7 @@ func TestCLIListenerListenExitsOnExitCommands(t *testing.T) {
 	}
 }
 
-func TestCLIListenerListenHandlesStopWithoutDispatch(t *testing.T) {
-	out := &bytes.Buffer{}
-	listener := NewCLI(strings.NewReader("/stop\n/quit\n"), out)
-	handler := &testHandler{response: "unused"}
-
-	err := listener.Listen(context.Background(), handler)
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	if len(handler.messages) != 0 {
-		t.Fatalf("expected no handler calls, got %#v", handler.messages)
-	}
-	if got := out.String(); strings.Count(got, "assistant> Stopped.") < 2 {
-		t.Fatalf("expected stop output for /stop and /quit, got %q", got)
-	}
-}
-
-func TestCLIListenerListenWritesFatalHandlerError(t *testing.T) {
+func TestCLIListenerListenSuppressesFatalHandlerErrorOutput(t *testing.T) {
 	out := &bytes.Buffer{}
 	listener := NewCLI(strings.NewReader("hello\n"), out)
 	handler := &testHandler{err: errors.New("fatal")}
@@ -72,8 +55,11 @@ func TestCLIListenerListenWritesFatalHandlerError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	if got := out.String(); !strings.Contains(got, "assistant> There was an error with your request. Check server logs for details") {
-		t.Fatalf("expected error output, got %q", got)
+	if len(handler.messages) != 1 || handler.messages[0] != "hello" {
+		t.Fatalf("expected one dispatched message, got %#v", handler.messages)
+	}
+	if got := out.String(); strings.Contains(got, "assistant>") {
+		t.Fatalf("did not expect assistant output for handler error, got %q", got)
 	}
 }
 
