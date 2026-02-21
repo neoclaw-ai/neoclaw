@@ -72,7 +72,7 @@ func TestCLIListenerListenWritesFatalHandlerError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	if got := out.String(); !strings.Contains(got, "assistant> error: fatal") {
+	if got := out.String(); !strings.Contains(got, "assistant> There was an error with your request. Check server logs for details") {
 		t.Fatalf("expected error output, got %q", got)
 	}
 }

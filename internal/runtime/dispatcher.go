@@ -3,10 +3,13 @@ package runtime
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
+
+	"github.com/machinae/betterclaw/internal/logging"
 )
+
+const userVisibleHandlerError = "There was an error with your request. Check server logs for details"
 
 // Dispatcher executes queued messages sequentially against a Handler.
 type Dispatcher struct {
@@ -152,7 +155,10 @@ func (d *Dispatcher) run(ctx context.Context) {
 			if err == nil || errors.Is(err, context.Canceled) {
 				continue
 			}
-			item.writer.WriteMessage(ctx, fmt.Sprintf("error: %v", err))
+			logging.Logger().Error("message handling failed", "err", err)
+			if writeErr := item.writer.WriteMessage(ctx, userVisibleHandlerError); writeErr != nil {
+				logging.Logger().Warn("failed to write handler error message", "err", writeErr)
+			}
 		}
 	}
 }

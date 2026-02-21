@@ -165,7 +165,7 @@ func TestDispatcherWritesHandlerErrors(t *testing.T) {
 
 	writer.mu.Lock()
 	defer writer.mu.Unlock()
-	if len(writer.messages) != 1 || writer.messages[0] != "error: boom" {
+	if len(writer.messages) != 1 || writer.messages[0] != userVisibleHandlerError {
 		t.Fatalf("expected one error write, got %#v", writer.messages)
 	}
 }
