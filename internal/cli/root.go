@@ -30,9 +30,9 @@ func NewRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			if verbose {
-				logging.SetLevel(slog.LevelInfo)
+				logging.SetLevel(slog.LevelDebug)
 			} else {
-				logging.SetLevel(slog.LevelWarn)
+				logging.SetLevel(slog.LevelInfo)
 			}
 
 			// The config command only reads and prints merged config and should not
@@ -86,7 +86,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newStartCmd())
 	root.AddCommand(newCLICmd())
 	root.AddCommand(newPairCmd())
-	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (info level)")
+	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (debug level)")
 
 	return root
 }

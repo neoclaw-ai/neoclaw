@@ -17,6 +17,237 @@ import (
 	"github.com/machinae/betterclaw/internal/store"
 )
 
+func TestFormatTelegramMappings(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "bold",
+			input:    "**bold**",
+			expected: "<b>bold</b>",
+		},
+		{
+			name:     "italic",
+			input:    "*italic*",
+			expected: "<i>italic</i>",
+		},
+		{
+			name:     "strikethrough",
+			input:    "~~gone~~",
+			expected: "<s>gone</s>",
+		},
+		{
+			name:     "heading",
+			input:    "# Title",
+			expected: "<b>Title</b>\n",
+		},
+		{
+			name:     "inline code",
+			input:    "`echo hi`",
+			expected: "<code>echo hi</code>",
+		},
+		{
+			name:     "fenced code",
+			input:    "```go\nfmt.Println(\"hi\")\n```",
+			expected: "<pre><code>fmt.Println(&#34;hi&#34;)\n</code></pre>",
+		},
+		{
+			name:     "link",
+			input:    "[site](https://example.com)",
+			expected: `<a href="https://example.com">site</a>`,
+		},
+		{
+			name:     "list item",
+			input:    "- one\n- two",
+			expected: "- one\n- two\n",
+		},
+		{
+			name:     "plain passthrough",
+			input:    "hello world",
+			expected: "hello world",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := formatTelegram(tt.input)
+			if !ok {
+				t.Fatalf("expected format success for input %q", tt.input)
+			}
+			if got != tt.expected {
+				t.Fatalf("unexpected format output\ninput: %q\ngot: %q\nexpected: %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFormatTelegram_OmitsImagesAndRawHTML(t *testing.T) {
+	got, ok := formatTelegram(`<b>raw</b> ![img](https://example.com/a.png)`)
+	if !ok {
+		t.Fatal("expected format success")
+	}
+	if strings.Contains(got, "<b>") || strings.Contains(got, "</b>") {
+		t.Fatalf("expected raw html tags to be omitted, got %q", got)
+	}
+	if strings.Contains(got, "<img") {
+		t.Fatalf("expected image tags to be omitted, got %q", got)
+	}
+}
+
+func TestFormatTelegram_RenderErrorFallback(t *testing.T) {
+	formatted, err := renderTelegram("hello", nil)
+	if err == nil {
+		t.Fatal("expected render error for nil parser")
+	}
+	if formatted != "" {
+		t.Fatalf("expected empty formatted output on render failure, got %q", formatted)
+	}
+
+	got, ok := formatTelegram("hello")
+	if !ok {
+		t.Fatal("expected standard formatter to succeed")
+	}
+	if got != "hello" {
+		t.Fatalf("expected passthrough text, got %q", got)
+	}
+}
+
+func TestTelegramWriterWriteMessage_UsesHTMLParseMode(t *testing.T) {
+	listener := NewTelegram("token", "")
+
+	var sent *bot.SendMessageParams
+	listener.sendMessage = func(_ context.Context, params *bot.SendMessageParams) (*models.Message, error) {
+		sent = params
+		return &models.Message{ID: 1, Chat: models.Chat{ID: chatIDFromAny(params.ChatID)}}, nil
+	}
+
+	writer := &telegramWriter{
+		listener: listener,
+		chatID:   42,
+		userID:   "111",
+		username: "alice",
+	}
+	if err := writer.WriteMessage(context.Background(), "**ok**"); err != nil {
+		t.Fatalf("write message: %v", err)
+	}
+
+	if sent == nil {
+		t.Fatal("expected send message call")
+	}
+	if sent.ParseMode != models.ParseModeHTML {
+		t.Fatalf("expected ParseModeHTML, got %q", sent.ParseMode)
+	}
+	if sent.Text != "<b>ok</b>" {
+		t.Fatalf("unexpected formatted text: %q", sent.Text)
+	}
+}
+
+func TestTelegramWriterWriteMessage_FormatterFailureFallsBackToPlain(t *testing.T) {
+	original := telegramMarkdown
+	telegramMarkdown = nil
+	defer func() {
+		telegramMarkdown = original
+	}()
+
+	listener := NewTelegram("token", "")
+	var sent *bot.SendMessageParams
+	listener.sendMessage = func(_ context.Context, params *bot.SendMessageParams) (*models.Message, error) {
+		sent = params
+		return &models.Message{ID: 1, Chat: models.Chat{ID: chatIDFromAny(params.ChatID)}}, nil
+	}
+
+	writer := &telegramWriter{
+		listener: listener,
+		chatID:   42,
+	}
+	if err := writer.WriteMessage(context.Background(), "**ok**"); err != nil {
+		t.Fatalf("write message: %v", err)
+	}
+
+	if sent == nil {
+		t.Fatal("expected send message call")
+	}
+	if sent.ParseMode != "" {
+		t.Fatalf("expected empty parse mode on formatter failure, got %q", sent.ParseMode)
+	}
+	if sent.Text != "**ok**" {
+		t.Fatalf("expected plain fallback text, got %q", sent.Text)
+	}
+}
+
+func TestTelegramSendChatMessage_DoesNotSetParseMode(t *testing.T) {
+	listener := NewTelegram("token", "")
+
+	var sent *bot.SendMessageParams
+	listener.sendMessage = func(_ context.Context, params *bot.SendMessageParams) (*models.Message, error) {
+		sent = params
+		return &models.Message{ID: 1, Chat: models.Chat{ID: chatIDFromAny(params.ChatID)}}, nil
+	}
+
+	if err := listener.sendChatMessage(context.Background(), 42, "**ok**"); err != nil {
+		t.Fatalf("send chat message: %v", err)
+	}
+	if sent == nil {
+		t.Fatal("expected send message call")
+	}
+	if sent.ParseMode != "" {
+		t.Fatalf("expected empty parse mode for plain chat send, got %q", sent.ParseMode)
+	}
+	if sent.Text != "**ok**" {
+		t.Fatalf("unexpected plain text send content: %q", sent.Text)
+	}
+}
+
+func TestTelegramListenerSend_UsesHTMLParseMode(t *testing.T) {
+	listener := NewTelegram("token", "")
+	listener.setActiveApprovalTarget("111", "alice", 42)
+
+	var sent *bot.SendMessageParams
+	listener.sendMessage = func(_ context.Context, params *bot.SendMessageParams) (*models.Message, error) {
+		sent = params
+		return &models.Message{ID: 1, Chat: models.Chat{ID: chatIDFromAny(params.ChatID)}}, nil
+	}
+
+	if err := listener.Send(context.Background(), "**ok**"); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+	if sent == nil {
+		t.Fatal("expected send call")
+	}
+	if sent.ParseMode != models.ParseModeHTML {
+		t.Fatalf("expected ParseModeHTML, got %q", sent.ParseMode)
+	}
+	if sent.Text != "<b>ok</b>" {
+		t.Fatalf("unexpected formatted text: %q", sent.Text)
+	}
+}
+
+func TestTelegramChannelWriterWrite_UsesHTMLParseMode(t *testing.T) {
+	listener := NewTelegram("token", "")
+
+	var sent *bot.SendMessageParams
+	listener.sendMessage = func(_ context.Context, params *bot.SendMessageParams) (*models.Message, error) {
+		sent = params
+		return &models.Message{ID: 1, Chat: models.Chat{ID: chatIDFromAny(params.ChatID)}}, nil
+	}
+
+	writer := listener.ChannelWriter(42)
+	if _, err := writer.Write([]byte("**ok**")); err != nil {
+		t.Fatalf("channel writer write failed: %v", err)
+	}
+	if sent == nil {
+		t.Fatal("expected send call")
+	}
+	if sent.ParseMode != models.ParseModeHTML {
+		t.Fatalf("expected ParseModeHTML, got %q", sent.ParseMode)
+	}
+	if sent.Text != "<b>ok</b>" {
+		t.Fatalf("unexpected formatted text: %q", sent.Text)
+	}
+}
+
 func TestTelegramPairSessionSubmitCodeWrongReturnsErrWrongCode(t *testing.T) {
 	session := &TelegramPairSession{
 		expectedCode: "123456",

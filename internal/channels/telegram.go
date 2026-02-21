@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"math/big"
 	"path/filepath"
@@ -21,6 +22,11 @@ import (
 	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/runtime"
 	"github.com/machinae/betterclaw/internal/store"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	extast "github.com/yuin/goldmark/extension/ast"
+	"github.com/yuin/goldmark/text"
 )
 
 // ErrWrongCode indicates the entered pairing code does not match the expected code.
@@ -29,6 +35,12 @@ var ErrWrongCode = errors.New("wrong pairing code")
 const (
 	telegramApprovalApprovePrefix = "approval:ok:"
 	telegramApprovalDenyPrefix    = "approval:no:"
+)
+
+var telegramMarkdown = goldmark.New(
+	goldmark.WithExtensions(
+		extension.Strikethrough,
+	),
 )
 
 type telegramPairUser struct {
@@ -498,7 +510,7 @@ func (w *telegramWriter) WriteMessage(ctx context.Context, text string) error {
 	if w == nil || w.listener == nil {
 		return errors.New("telegram sender is not configured")
 	}
-	return w.listener.sendChatMessage(ctx, w.chatID, text)
+	return w.listener.sendFormattedChatMessage(ctx, w.chatID, text)
 }
 
 type telegramChannelWriter struct {
@@ -511,7 +523,7 @@ func (w telegramChannelWriter) Write(p []byte) (int, error) {
 	if text == "" {
 		return len(p), nil
 	}
-	if err := w.listener.sendChatMessage(context.Background(), w.chatID, text); err != nil {
+	if err := w.listener.sendFormattedChatMessage(context.Background(), w.chatID, text); err != nil {
 		return 0, err
 	}
 	return len(p), nil
@@ -603,13 +615,27 @@ func (t *TelegramListener) sendChatMessage(ctx context.Context, chatID int64, te
 	return err
 }
 
+func (t *TelegramListener) sendFormattedChatMessage(ctx context.Context, chatID int64, text string) error {
+	formattedText, ok := formatTelegram(text)
+	params := &bot.SendMessageParams{
+		ChatID: chatID,
+		Text:   formattedText,
+	}
+	if ok {
+		params.ParseMode = models.ParseModeHTML
+	}
+
+	_, err := t.sendTelegramMessage(ctx, params)
+	return err
+}
+
 // Send delivers a channel message to the active Telegram chat for the current request.
 func (t *TelegramListener) Send(ctx context.Context, message string) error {
 	target, ok := t.activeApprovalTargetSnapshot()
 	if !ok {
 		return errors.New("telegram chat target is unavailable")
 	}
-	return t.sendChatMessage(ctx, target.chatID, message)
+	return t.sendFormattedChatMessage(ctx, target.chatID, message)
 }
 
 // CurrentChannelID returns the active scheduler channel key for the in-flight Telegram request.
@@ -724,4 +750,155 @@ func (t *TelegramListener) onApprovalDenyCallback(ctx context.Context, _ *bot.Bo
 		return
 	}
 	t.handleApprovalCallback(ctx, update.CallbackQuery, telegramApprovalDenyPrefix, approval.Denied)
+}
+
+func formatTelegram(input string) (string, bool) {
+	formatted, err := renderTelegram(input, telegramMarkdown)
+	if err != nil {
+		return input, false
+	}
+	return formatted, true
+}
+
+func renderTelegram(input string, md goldmark.Markdown) (formatted string, err error) {
+	if md == nil {
+		return "", errors.New("telegram markdown parser is required")
+	}
+
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			formatted = ""
+			err = fmt.Errorf("telegram markdown render panic: %v", recovered)
+		}
+	}()
+
+	source := []byte(input)
+	root := md.Parser().Parse(text.NewReader(source))
+	var builder strings.Builder
+	if err := renderTelegramNode(&builder, root, source, false); err != nil {
+		return "", err
+	}
+	return builder.String(), nil
+}
+
+func renderTelegramNode(builder *strings.Builder, node ast.Node, source []byte, inListItem bool) error {
+	switch typed := node.(type) {
+	case *ast.Document:
+		return renderTelegramChildren(builder, typed, source, inListItem)
+	case *ast.Heading:
+		builder.WriteString("<b>")
+		if err := renderTelegramChildren(builder, typed, source, inListItem); err != nil {
+			return err
+		}
+		builder.WriteString("</b>")
+		builder.WriteString("\n")
+		return nil
+	case *ast.Paragraph:
+		if err := renderTelegramChildren(builder, typed, source, inListItem); err != nil {
+			return err
+		}
+		if !inListItem && typed.NextSibling() != nil {
+			builder.WriteString("\n")
+		}
+		return nil
+	case *ast.Text:
+		builder.WriteString(html.EscapeString(string(typed.Segment.Value(source))))
+		if typed.HardLineBreak() || typed.SoftLineBreak() {
+			builder.WriteString("\n")
+		}
+		return nil
+	case *ast.Emphasis:
+		tag := "i"
+		if typed.Level == 2 {
+			tag = "b"
+		}
+		builder.WriteString("<")
+		builder.WriteString(tag)
+		builder.WriteString(">")
+		if err := renderTelegramChildren(builder, typed, source, inListItem); err != nil {
+			return err
+		}
+		builder.WriteString("</")
+		builder.WriteString(tag)
+		builder.WriteString(">")
+		return nil
+	case *extast.Strikethrough:
+		builder.WriteString("<s>")
+		if err := renderTelegramChildren(builder, typed, source, inListItem); err != nil {
+			return err
+		}
+		builder.WriteString("</s>")
+		return nil
+	case *ast.CodeSpan:
+		builder.WriteString("<code>")
+		builder.WriteString(html.EscapeString(string(typed.Text(source))))
+		builder.WriteString("</code>")
+		return nil
+	case *ast.FencedCodeBlock:
+		builder.WriteString("<pre><code>")
+		writeEscapedTextSegments(builder, typed.Lines(), source)
+		builder.WriteString("</code></pre>")
+		if typed.NextSibling() != nil {
+			builder.WriteString("\n")
+		}
+		return nil
+	case *ast.CodeBlock:
+		builder.WriteString("<pre><code>")
+		writeEscapedTextSegments(builder, typed.Lines(), source)
+		builder.WriteString("</code></pre>")
+		if typed.NextSibling() != nil {
+			builder.WriteString("\n")
+		}
+		return nil
+	case *ast.Link:
+		builder.WriteString(`<a href="`)
+		builder.WriteString(html.EscapeString(string(typed.Destination)))
+		builder.WriteString(`">`)
+		if err := renderTelegramChildren(builder, typed, source, inListItem); err != nil {
+			return err
+		}
+		builder.WriteString("</a>")
+		return nil
+	case *ast.List:
+		if err := renderTelegramChildren(builder, typed, source, inListItem); err != nil {
+			return err
+		}
+		if typed.NextSibling() != nil {
+			builder.WriteString("\n")
+		}
+		return nil
+	case *ast.ListItem:
+		var itemText strings.Builder
+		if err := renderTelegramChildren(&itemText, typed, source, true); err != nil {
+			return err
+		}
+		builder.WriteString("- ")
+		builder.WriteString(strings.TrimSpace(itemText.String()))
+		builder.WriteString("\n")
+		return nil
+	case *ast.RawHTML:
+		return nil
+	case *ast.HTMLBlock:
+		return nil
+	case *ast.Image:
+		return nil
+	default:
+		return renderTelegramChildren(builder, typed, source, inListItem)
+	}
+}
+
+func renderTelegramChildren(builder *strings.Builder, node ast.Node, source []byte, inListItem bool) error {
+	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+		if err := renderTelegramNode(builder, child, source, inListItem); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeEscapedTextSegments(builder *strings.Builder, segments *text.Segments, source []byte) {
+	for i := 0; i < segments.Len(); i++ {
+		segment := segments.At(i)
+		builder.WriteString(html.EscapeString(string(segment.Value(source))))
+	}
 }

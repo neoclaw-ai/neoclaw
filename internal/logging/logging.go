@@ -9,7 +9,7 @@ import (
 	"golang.org/x/term"
 )
 
-const defaultLogLevel = slog.LevelWarn
+const defaultLogLevel = slog.LevelInfo
 
 var logger = slog.New(newHandler(defaultLogLevel))
 
