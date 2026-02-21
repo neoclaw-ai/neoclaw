@@ -498,5 +498,5 @@ func waitFor(t *testing.T, timeout time.Duration, fn func() bool) {
 }
 func (truncatingTool) Permission() tools.Permission { return tools.AutoApprove }
 func (truncatingTool) Execute(_ context.Context, _ map[string]any) (*tools.ToolResult, error) {
-	return tools.TruncateOutput(strings.Repeat("x", 2500))
+	return &tools.ToolResult{Output: strings.Repeat("x", 2500)}, nil
 }

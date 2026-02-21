@@ -189,10 +189,14 @@ func Run(
 				"duration_ms", time.Since(startedAt).Milliseconds(),
 			)
 
+			content := result.Output
+			if len(content) > 2000 {
+				content = content[:2000]
+			}
 			history = append(history, provider.ChatMessage{
 				Role:       provider.RoleTool,
 				ToolCallID: call.ID,
-				Content:    result.Output,
+				Content:    content,
 			})
 		}
 	}

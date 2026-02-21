@@ -14,6 +14,8 @@ import (
 	"github.com/machinae/betterclaw/internal/store"
 )
 
+const schedulerOutputJobIDArg = "job_id"
+
 // RunCommandTool executes shell commands within the configured workspace.
 type RunCommandTool struct {
 	WorkspaceDir    string
@@ -150,16 +152,29 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 		}
 	}
 
-	result := &ToolResult{Output: output}
-	truncated, err := TruncateOutput(result.Output)
+	fullOutputPath, err := t.WriteOutput(args, output)
 	if err != nil {
 		return nil, err
 	}
-	result.Output = truncated.Output
-	result.Truncated = truncated.Truncated
-	result.FullOutputPath = truncated.FullOutputPath
+	return &ToolResult{
+		Output:         output,
+		FullOutputPath: fullOutputPath,
+	}, nil
+}
 
-	return result, nil
+// WriteOutput writes full command output to workspace/tmp and returns the file path.
+func (t RunCommandTool) WriteOutput(args map[string]any, output string) (string, error) {
+	tmpDir := filepath.Join(t.WorkspaceDir, store.TmpDirPath)
+	prefix := ""
+	if jobID, ok := args[schedulerOutputJobIDArg].(string); ok && strings.TrimSpace(jobID) != "" {
+		prefix = fmt.Sprintf("%s-", jobID)
+	}
+	filename := fmt.Sprintf("%stool-output-%d.txt", prefix, time.Now().UnixNano())
+	fullPath := filepath.Join(tmpDir, filename)
+	if err := store.WriteFile(fullPath, []byte(output)); err != nil {
+		return "", fmt.Errorf("write full output file: %w", err)
+	}
+	return fullPath, nil
 }
 
 func (t RunCommandTool) validateArgs(args map[string]any) (string, string, error) {

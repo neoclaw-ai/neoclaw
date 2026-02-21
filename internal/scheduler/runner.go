@@ -9,6 +9,8 @@ import (
 	"github.com/machinae/betterclaw/internal/logging"
 )
 
+const schedulerOutputJobIDArg = "job_id"
+
 // ActionRunners holds concrete per-action execution functions used by NewRunner.
 type ActionRunners struct {
 	SendMessage func(ctx context.Context, writer io.Writer, args map[string]any) (string, error)
@@ -59,6 +61,7 @@ func (r *Runner) Run(ctx context.Context, job Job) (string, error) {
 		if r.runCommand == nil {
 			return "", errors.New("run_command runner is not configured")
 		}
+		args[schedulerOutputJobIDArg] = job.ID
 		return r.runCommand(ctx, args)
 	case ActionHTTPRequest:
 		if r.httpRequest == nil {

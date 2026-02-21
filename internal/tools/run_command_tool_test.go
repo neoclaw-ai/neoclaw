@@ -152,11 +152,37 @@ func TestRunCommand_TruncationMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute command: %v", err)
 	}
-	if !res.Truncated {
-		t.Fatalf("expected truncated output")
-	}
 	if res.FullOutputPath == "" {
 		t.Fatalf("expected full output path")
+	}
+	if res.Truncated {
+		t.Fatalf("expected non-truncated tool result")
+	}
+	full, err := os.ReadFile(res.FullOutputPath)
+	if err != nil {
+		t.Fatalf("read full output: %v", err)
+	}
+	if string(full) != res.Output {
+		t.Fatalf("expected full output file to match result output")
+	}
+}
+
+func TestRunCommand_WriteOutputUsesSchedulerJobIDInFilename(t *testing.T) {
+	workspace := t.TempDir()
+	tool := RunCommandTool{WorkspaceDir: workspace}
+
+	path, err := tool.WriteOutput(map[string]any{
+		schedulerOutputJobIDArg: "job_123",
+	}, "ok")
+	if err != nil {
+		t.Fatalf("write output: %v", err)
+	}
+	if filepath.Dir(path) != filepath.Join(workspace, "tmp") {
+		t.Fatalf("expected output under workspace/tmp, got %q", path)
+	}
+	base := filepath.Base(path)
+	if !strings.HasPrefix(base, "job_123-tool-output-") || !strings.HasSuffix(base, ".txt") {
+		t.Fatalf("unexpected scheduler output filename %q", base)
 	}
 }
 
