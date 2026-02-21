@@ -118,10 +118,12 @@ func (p *anthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 
 func toAnthropicMessages(messages []ChatMessage) ([]anthropic.MessageParam, error) {
 	out := make([]anthropic.MessageParam, 0, len(messages))
-	for _, msg := range messages {
+	for i := 0; i < len(messages); {
+		msg := messages[i]
 		switch msg.Role {
 		case RoleUser:
 			out = append(out, anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content)))
+			i++
 		case RoleAssistant:
 			blocks := make([]anthropic.ContentBlockParamUnion, 0, len(msg.ToolCalls)+1)
 			if msg.Content != "" {
@@ -140,11 +142,19 @@ func toAnthropicMessages(messages []ChatMessage) ([]anthropic.MessageParam, erro
 				blocks = append(blocks, anthropic.NewTextBlock(""))
 			}
 			out = append(out, anthropic.NewAssistantMessage(blocks...))
+			i++
 		case RoleTool:
-			if msg.ToolCallID == "" {
-				return nil, fmt.Errorf("tool message requires tool_call_id")
+			// Anthropic requires all tool results from one assistant turn in a
+			// single user message. Collect consecutive RoleTool entries.
+			var blocks []anthropic.ContentBlockParamUnion
+			for i < len(messages) && messages[i].Role == RoleTool {
+				if messages[i].ToolCallID == "" {
+					return nil, fmt.Errorf("tool message requires tool_call_id")
+				}
+				blocks = append(blocks, anthropic.NewToolResultBlock(messages[i].ToolCallID, messages[i].Content, false))
+				i++
 			}
-			out = append(out, anthropic.NewUserMessage(anthropic.NewToolResultBlock(msg.ToolCallID, msg.Content, false)))
+			out = append(out, anthropic.NewUserMessage(blocks...))
 		default:
 			return nil, fmt.Errorf("unsupported message role %q", msg.Role)
 		}
