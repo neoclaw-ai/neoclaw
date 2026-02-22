@@ -6,3 +6,7 @@ package sandbox
 func IsSandboxSupported() bool {
 	return false
 }
+
+func restrictProcessImpl(mode, dataDir string) error {
+	return nil
+}

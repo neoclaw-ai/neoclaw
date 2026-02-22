@@ -9,3 +9,7 @@ func IsSandboxSupported() bool {
 	_, err := exec.LookPath("sandbox-exec")
 	return err == nil
 }
+
+func restrictProcessImpl(mode, dataDir string) error {
+	return nil
+}

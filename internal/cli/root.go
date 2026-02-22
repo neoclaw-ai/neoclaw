@@ -11,6 +11,7 @@ import (
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/provider"
+	"github.com/machinae/betterclaw/internal/sandbox"
 	"github.com/spf13/cobra"
 )
 
@@ -65,6 +66,19 @@ func NewRootCmd() *cobra.Command {
 					configPath,
 				)
 				os.Exit(0)
+			}
+
+			switch cfg.Security.Mode {
+			case config.SecurityModeDanger:
+				// Danger mode intentionally skips process-level sandboxing.
+			case config.SecurityModeStrict:
+				if err := sandbox.RestrictProcess(cfg.Security.Mode, cfg.DataDir()); err != nil {
+					return err
+				}
+			default:
+				if err := sandbox.RestrictProcess(cfg.Security.Mode, cfg.DataDir()); err != nil {
+					logging.Logger().Warn("process sandbox unavailable; continuing in standard mode", "err", err)
+				}
 			}
 
 			return nil
