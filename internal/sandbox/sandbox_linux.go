@@ -4,7 +4,11 @@ package sandbox
 
 import (
 	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
 
+	"github.com/landlock-lsm/go-landlock/landlock"
 	"golang.org/x/sys/unix"
 )
 
@@ -26,5 +30,60 @@ func IsSandboxSupported() bool {
 }
 
 func restrictProcessImpl(mode, dataDir string) error {
+	trimmedMode := strings.TrimSpace(mode)
+	if trimmedMode == "strict" && !IsSandboxSupported() {
+		return errors.New("landlock is unavailable on this host")
+	}
+
+	dataDir = strings.TrimSpace(dataDir)
+	if dataDir == "" {
+		return errors.New("data dir is required")
+	}
+	absDataDir, err := filepath.Abs(dataDir)
+	if err != nil {
+		return fmt.Errorf("resolve data dir: %w", err)
+	}
+
+	rules := []landlock.Rule{
+		landlock.RWDirs(absDataDir),
+	}
+	if trimmedMode == "strict" {
+		rules = append(rules, strictLinuxReadRules(absDataDir)...)
+	} else {
+		rules = append(rules, landlock.RODirs("/"))
+	}
+
+	if err := landlock.V6.BestEffort().RestrictPaths(rules...); err != nil {
+		return fmt.Errorf("restrict process with landlock: %w", err)
+	}
 	return nil
+}
+
+func strictLinuxReadRules(dataDir string) []landlock.Rule {
+	readRoots := []string{
+		dataDir,
+		"/bin",
+		"/sbin",
+		"/usr",
+		"/usr/lib",
+		"/usr/lib64",
+		"/usr/libexec",
+		"/lib",
+		"/lib64",
+		"/etc",
+		"/dev",
+		"/proc",
+		"/sys",
+		"/run",
+		"/tmp",
+	}
+	rules := make([]landlock.Rule, 0, len(readRoots))
+	for _, root := range readRoots {
+		root = strings.TrimSpace(root)
+		if root == "" {
+			continue
+		}
+		rules = append(rules, landlock.RODirs(root))
+	}
+	return rules
 }
