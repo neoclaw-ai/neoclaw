@@ -141,6 +141,24 @@ func TestWriteFile_OutsideWorkspaceErrors(t *testing.T) {
 	}
 }
 
+func TestWriteFile_SymlinkEscapeErrors(t *testing.T) {
+	workspace := t.TempDir()
+	outside := t.TempDir()
+	linkPath := filepath.Join(workspace, "link")
+	if err := os.Symlink(outside, linkPath); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+
+	tool := WriteFileTool{WorkspaceDir: workspace}
+	_, err := tool.Execute(context.Background(), map[string]any{
+		"path":    "link/escape.txt",
+		"content": "nope",
+	})
+	if err == nil || !strings.Contains(err.Error(), "outside workspace") {
+		t.Fatalf("expected outside workspace error, got %v", err)
+	}
+}
+
 func TestWriteFileSummarizeArgs(t *testing.T) {
 	tool := WriteFileTool{}
 	s, ok := any(tool).(Summarizer)

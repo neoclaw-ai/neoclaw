@@ -49,21 +49,82 @@ func resolveWorkspacePath(workspaceDir, input string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve workspace path: %w", err)
 	}
+	workspaceReal, err := filepath.EvalSymlinks(workspaceAbs)
+	if err != nil {
+		return "", fmt.Errorf("resolve workspace symlinks: %w", err)
+	}
 
 	candidate := input
 	if !filepath.IsAbs(candidate) {
 		candidate = filepath.Join(workspaceAbs, candidate)
 	}
 	candidate = filepath.Clean(candidate)
+	// Resolve symlinks before boundary checks so a workspace-local symlink
+	// cannot redirect writes outside the workspace root.
+	candidateReal, err := evalPathForWrite(candidate)
+	if err != nil {
+		return "", err
+	}
 
-	rel, err := filepath.Rel(workspaceAbs, candidate)
+	rel, err := filepath.Rel(workspaceReal, candidateReal)
 	if err != nil {
 		return "", fmt.Errorf("resolve relative path: %w", err)
 	}
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 		return "", fmt.Errorf("path %q is outside workspace", input)
 	}
-	return candidate, nil
+	// Return the real path so subsequent mkdir/write operations target the
+	// validated location, not an unresolved symlink chain.
+	return candidateReal, nil
+}
+
+// evalPathForWrite resolves symlinks for write paths, including non-existent leaf paths.
+func evalPathForWrite(path string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return resolved, nil
+	}
+	if !os.IsNotExist(err) {
+		return "", fmt.Errorf("resolve path symlinks: %w", err)
+	}
+
+	// EvalSymlinks requires the path to exist. For writes, the leaf path often
+	// does not exist yet, so resolve the nearest existing ancestor and re-append
+	// the missing suffix.
+	existing, suffix, err := splitExistingPrefix(path)
+	if err != nil {
+		return "", fmt.Errorf("resolve path symlinks: %w", err)
+	}
+	resolvedExisting, err := filepath.EvalSymlinks(existing)
+	if err != nil {
+		return "", fmt.Errorf("resolve path symlinks: %w", err)
+	}
+	parts := append([]string{resolvedExisting}, suffix...)
+	return filepath.Join(parts...), nil
+}
+
+// splitExistingPrefix returns the nearest existing ancestor and the missing suffix path components.
+func splitExistingPrefix(path string) (string, []string, error) {
+	current := filepath.Clean(path)
+	suffix := make([]string, 0, 4)
+	for {
+		_, err := os.Lstat(current)
+		if err == nil {
+			for i, j := 0, len(suffix)-1; i < j; i, j = i+1, j-1 {
+				suffix[i], suffix[j] = suffix[j], suffix[i]
+			}
+			return current, suffix, nil
+		}
+		if !os.IsNotExist(err) {
+			return "", nil, err
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return "", nil, os.ErrNotExist
+		}
+		suffix = append(suffix, filepath.Base(current))
+		current = parent
+	}
 }
 
 func isBinary(data []byte) bool {
