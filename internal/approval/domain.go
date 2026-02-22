@@ -5,32 +5,53 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
-	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/store"
 )
 
-// Checker validates outbound domains against an allowlist and can request user
-// approval for unknown domains.
+type domainMatchDecision int
+
+const (
+	domainNoMatch domainMatchDecision = iota
+	domainAllowed
+	domainDenied
+)
+
+type domainPolicy struct {
+	Allow []string `json:"allow"`
+	Deny  []string `json:"deny"`
+}
+
+// Checker validates outbound domains against a policy and can request user approval for unknown domains.
 type Checker struct {
 	AllowedDomainsPath string
 	Approver           Approver
 }
 
-// Allow checks whether host is permitted. Unknown domains are approved via the
-// configured approver, and approved domains are persisted.
+// Allow checks whether host is permitted. Unknown domains are approved via the configured approver.
 func (c Checker) Allow(ctx context.Context, host string) error {
 	target, err := normalizeDomain(host)
 	if err != nil {
 		return err
 	}
 
-	if isAllowedDomain(c.AllowedDomainsPath, target) {
+	policy, err := loadDomainPolicy(c.AllowedDomainsPath)
+	if err != nil {
+		return err
+	}
+
+	switch evaluateDomainPolicy(target, policy) {
+	case domainAllowed:
 		return nil
+	case domainDenied:
+		return toolDeniedError("network_domain")
+	case domainNoMatch:
+		// Continue to prompt path.
 	}
 
 	if c.Approver == nil {
@@ -39,7 +60,7 @@ func (c Checker) Allow(ctx context.Context, host string) error {
 
 	decision, err := c.Approver.RequestApproval(ctx, ApprovalRequest{
 		Tool:        "network_domain",
-		Description: fmt.Sprintf("allow access to %s?", target),
+		Description: fmt.Sprintf("Allow Domain: %s", target),
 		Args: map[string]any{
 			"domain": target,
 		},
@@ -47,27 +68,23 @@ func (c Checker) Allow(ctx context.Context, host string) error {
 	if err != nil {
 		return err
 	}
-	if decision == Denied {
-		return fmt.Errorf(
-			"user denied domain %q. User denied this action. Try a different approach or ask the user for guidance",
-			target,
-		)
-	}
-	if decision == Approved {
-		if err := addAllowedDomain(c.AllowedDomainsPath, target); err != nil {
-			logging.Logger().Warn(
-				"failed to persist approved domain",
-				"domain", target,
-				"err", err,
-			)
-		}
-	}
 
-	return nil
+	switch decision {
+	case Approved:
+		policy.Allow = appendUnique(policy.Allow, target)
+		return saveDomainPolicy(c.AllowedDomainsPath, policy)
+	case Denied:
+		policy.Deny = appendUnique(policy.Deny, target)
+		if err := saveDomainPolicy(c.AllowedDomainsPath, policy); err != nil {
+			return err
+		}
+		return toolDeniedError("network_domain")
+	default:
+		return toolDeniedError("network_domain")
+	}
 }
 
-// RoundTripper wraps an HTTP transport and enforces domain approval checks
-// before forwarding requests.
+// RoundTripper wraps an HTTP transport and enforces domain approval checks before forwarding requests.
 type RoundTripper struct {
 	Checker Checker
 	Base    http.RoundTripper
@@ -93,98 +110,103 @@ func (rt RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return base.RoundTrip(req)
 }
 
-func isAllowedDomain(allowedDomainsPath, host string) bool {
-	if strings.TrimSpace(allowedDomainsPath) == "" {
-		return false
+// Load allow/deny domain policy from disk.
+func loadDomainPolicy(path string) (domainPolicy, error) {
+	if strings.TrimSpace(path) == "" {
+		return domainPolicy{}, errors.New("allowed domains path is required")
 	}
 
-	content, err := store.ReadFile(allowedDomainsPath)
+	raw, err := store.ReadFile(path)
 	if err != nil {
-		return false
+		if errors.Is(err, os.ErrNotExist) {
+			return domainPolicy{}, nil
+		}
+		return domainPolicy{}, fmt.Errorf("read domain policy %q: %w", path, err)
+	}
+	if strings.TrimSpace(raw) == "" {
+		return domainPolicy{}, nil
 	}
 
-	var allowed []string
-	if err := json.Unmarshal([]byte(content), &allowed); err != nil {
-		return false
+	var policy domainPolicy
+	if err := json.Unmarshal([]byte(raw), &policy); err != nil {
+		return domainPolicy{}, fmt.Errorf("decode domain policy %q: %w", path, err)
+	}
+	return policy, nil
+}
+
+// Save allow/deny domain policy to disk.
+func saveDomainPolicy(path string, policy domainPolicy) error {
+	if strings.TrimSpace(path) == "" {
+		return errors.New("allowed domains path is required")
 	}
 
-	for _, candidate := range allowed {
+	encoded, err := json.MarshalIndent(policy, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode domain policy: %w", err)
+	}
+	encoded = append(encoded, '\n')
+	if err := store.WriteFile(path, encoded); err != nil {
+		return fmt.Errorf("write domain policy %q: %w", path, err)
+	}
+	return nil
+}
+
+// Evaluate deny first, then allow, then no match.
+func evaluateDomainPolicy(host string, policy domainPolicy) domainMatchDecision {
+	for _, candidate := range policy.Deny {
 		normalized, err := normalizeDomain(candidate)
 		if err != nil {
 			continue
 		}
 		if domainMatches(normalized, host) {
-			return true
+			return domainDenied
 		}
 	}
-	return false
-}
 
-func addAllowedDomain(allowedDomainsPath, host string) error {
-	if strings.TrimSpace(allowedDomainsPath) == "" {
-		return fmt.Errorf("allowed domains path is required")
-	}
-
-	target, err := normalizeDomain(host)
-	if err != nil {
-		return err
-	}
-
-	allowed := make([]string, 0)
-	content, err := store.ReadFile(allowedDomainsPath)
-	switch {
-	case err == nil:
-		if len(strings.TrimSpace(content)) > 0 {
-			if err := json.Unmarshal([]byte(content), &allowed); err != nil {
-				return fmt.Errorf("decode allowlist %q: %w", allowedDomainsPath, err)
-			}
-		}
-	case errors.Is(err, os.ErrNotExist):
-		// Missing file is treated as empty allowlist.
-	default:
-		return fmt.Errorf("read allowlist %q: %w", allowedDomainsPath, err)
-	}
-
-	for _, candidate := range allowed {
+	for _, candidate := range policy.Allow {
 		normalized, err := normalizeDomain(candidate)
 		if err != nil {
 			continue
 		}
-		if normalized == target {
-			return nil
+		if domainMatches(normalized, host) {
+			return domainAllowed
 		}
 	}
 
-	allowed = append(allowed, target)
-	encoded, err := json.MarshalIndent(allowed, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode allowlist: %w", err)
-	}
-	encoded = append(encoded, '\n')
-
-	if err := store.WriteFile(allowedDomainsPath, encoded); err != nil {
-		return fmt.Errorf("replace allowlist: %w", err)
-	}
-
-	return nil
+	return domainNoMatch
 }
 
+// Normalize host/domain inputs to lowercase host-only form.
 func normalizeDomain(raw string) (string, error) {
 	value := strings.TrimSpace(raw)
 	if value == "" {
 		return "", errors.New("domain is required")
 	}
 
-	if !strings.Contains(value, "://") {
-		value = "https://" + value
+	host := value
+	if strings.Contains(value, "://") {
+		parsed, err := url.Parse(value)
+		if err != nil {
+			return "", fmt.Errorf("parse domain %q: %w", raw, err)
+		}
+		host = parsed.Host
 	}
 
-	parsed, err := url.Parse(value)
-	if err != nil {
-		return "", fmt.Errorf("parse domain %q: %w", raw, err)
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return "", fmt.Errorf("invalid domain %q", raw)
 	}
 
-	host := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(parsed.Hostname())), ".")
+	parsedHost, _, err := net.SplitHostPort(host)
+	if err == nil {
+		host = parsedHost
+	}
+
+	host = strings.Trim(host, "[]")
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if strings.HasPrefix(host, "*.") {
+		host = strings.TrimPrefix(host, "*.")
+	}
 	if host == "" {
 		return "", fmt.Errorf("invalid domain %q", raw)
 	}
@@ -192,5 +214,8 @@ func normalizeDomain(raw string) (string, error) {
 }
 
 func domainMatches(allowed, host string) bool {
+	if allowed == "*" {
+		return true
+	}
 	return host == allowed || strings.HasSuffix(host, "."+allowed)
 }

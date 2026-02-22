@@ -27,9 +27,8 @@ func newSchedulerRunner(cfg *config.Config, channelWriters map[string]io.Writer)
 	}
 
 	runTool := tools.RunCommandTool{
-		WorkspaceDir:    cfg.WorkspaceDir(),
-		AllowedBinsPath: filepath.Join(cfg.DataDir, store.AllowedBinsFilePath),
-		Timeout:         cfg.Security.CommandTimeout,
+		WorkspaceDir: cfg.WorkspaceDir(),
+		Timeout:      cfg.Security.CommandTimeout,
 	}
 	httpTool := tools.HTTPRequestTool{Client: httpClient}
 

@@ -2,10 +2,8 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -18,9 +16,8 @@ const schedulerOutputJobIDArg = "job_id"
 
 // RunCommandTool executes shell commands within the configured workspace.
 type RunCommandTool struct {
-	WorkspaceDir    string
-	AllowedBinsPath string
-	Timeout         time.Duration
+	WorkspaceDir string
+	Timeout      time.Duration
 }
 
 // Name returns the tool name.
@@ -69,43 +66,6 @@ func (t RunCommandTool) SummarizeArgs(args map[string]any) string {
 	return fmt.Sprintf("run_command: %s", command)
 }
 
-// PersistAllowedBinary stores the command binary in allowed_bins.json for future auto-approval.
-func (t RunCommandTool) PersistAllowedBinary(args map[string]any) error {
-	command, err := stringArg(args, "command")
-	if err != nil {
-		return err
-	}
-	bin, err := firstCommandToken(command)
-	if err != nil {
-		return err
-	}
-	return addAllowedBinary(t.AllowedBinsPath, bin)
-}
-
-// PersistApproval persists an approved decision for this tool.
-func (t RunCommandTool) PersistApproval(args map[string]any) error {
-	return t.PersistAllowedBinary(args)
-}
-
-// RequiresApprovalForArgs resolves approval behavior for this specific command.
-// Allowlisted binaries are auto-approved; all others require an approval prompt.
-func (t RunCommandTool) RequiresApprovalForArgs(args map[string]any) (bool, error) {
-	command, _, err := t.validateArgs(args)
-	if err != nil {
-		return true, err
-	}
-
-	bin, err := firstCommandToken(command)
-	if err != nil {
-		return true, err
-	}
-
-	if isAllowedBinary(t.AllowedBinsPath, bin) {
-		return false, nil
-	}
-	return true, nil
-}
-
 // Execute runs the command and returns combined output, appending exit code on failures.
 func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*ToolResult, error) {
 	command, workdir, err := t.validateArgs(args)
@@ -131,7 +91,6 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 		case errors.Is(runCtx.Err(), context.Canceled):
 			return nil, context.Canceled
 		case errors.Is(runCtx.Err(), context.DeadlineExceeded):
-			// Use 124 for timeout to match common shell timeout conventions.
 			exitCode = 124
 		case errors.As(runErr, &exitErr):
 			exitCode = exitErr.ExitCode()
@@ -177,6 +136,7 @@ func (t RunCommandTool) WriteOutput(args map[string]any, output string) (string,
 	return fullPath, nil
 }
 
+// validateArgs validates command args and resolves working directory.
 func (t RunCommandTool) validateArgs(args map[string]any) (string, string, error) {
 	command, err := stringArg(args, "command")
 	if err != nil {
@@ -203,111 +163,4 @@ func (t RunCommandTool) validateArgs(args map[string]any) (string, string, error
 	}
 
 	return command, workdir, nil
-}
-
-func firstCommandToken(command string) (string, error) {
-	fields := strings.Fields(command)
-	if len(fields) == 0 {
-		return "", fmt.Errorf("argument %q cannot be empty", "command")
-	}
-
-	for _, token := range fields {
-		// Allow leading VAR=value prefixes and return the first actual command token.
-		if isEnvAssignment(token) {
-			continue
-		}
-		return token, nil
-	}
-
-	return "", fmt.Errorf("argument %q cannot be empty", "command")
-}
-
-func isEnvAssignment(token string) bool {
-	idx := strings.Index(token, "=")
-	if idx <= 0 {
-		return false
-	}
-	name := token[:idx]
-	for i, r := range name {
-		if r == '_' || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
-			continue
-		}
-		if i > 0 && r >= '0' && r <= '9' {
-			continue
-		}
-		return false
-	}
-	return true
-}
-
-func isAllowedBinary(allowedBinsPath, bin string) bool {
-	if strings.TrimSpace(allowedBinsPath) == "" {
-		return false
-	}
-
-	// Load on each check so edits to allowed_bins.json take effect immediately
-	// without restarting the process.
-	content, err := store.ReadFile(allowedBinsPath)
-	if err != nil {
-		return false
-	}
-
-	var allowed []string
-	if err := json.Unmarshal([]byte(content), &allowed); err != nil {
-		return false
-	}
-
-	target := filepath.Base(strings.TrimSpace(bin))
-	for _, candidate := range allowed {
-		if filepath.Base(strings.TrimSpace(candidate)) == target {
-			return true
-		}
-	}
-
-	return false
-}
-
-func addAllowedBinary(allowedBinsPath, bin string) error {
-	if strings.TrimSpace(allowedBinsPath) == "" {
-		return fmt.Errorf("allowed bins path is required")
-	}
-
-	allowed := make([]string, 0)
-	content, err := store.ReadFile(allowedBinsPath)
-	switch {
-	case err == nil:
-		if len(strings.TrimSpace(content)) > 0 {
-			if err := json.Unmarshal([]byte(content), &allowed); err != nil {
-				return fmt.Errorf("decode allowlist %q: %w", allowedBinsPath, err)
-			}
-		}
-	case errors.Is(err, os.ErrNotExist):
-		// Missing file is treated as empty allowlist.
-	default:
-		return fmt.Errorf("read allowlist %q: %w", allowedBinsPath, err)
-	}
-
-	target := filepath.Base(strings.TrimSpace(bin))
-	if target == "" || target == "." {
-		return fmt.Errorf("binary is required")
-	}
-
-	for _, candidate := range allowed {
-		if filepath.Base(strings.TrimSpace(candidate)) == target {
-			return nil
-		}
-	}
-
-	allowed = append(allowed, target)
-	encoded, err := json.MarshalIndent(allowed, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode allowlist: %w", err)
-	}
-	encoded = append(encoded, '\n')
-
-	if err := store.WriteFile(allowedBinsPath, encoded); err != nil {
-		return fmt.Errorf("replace allowlist: %w", err)
-	}
-
-	return nil
 }

@@ -153,9 +153,8 @@ func buildToolRegistry(
 		tools.JobDeleteTool{Service: schedulerService},
 		tools.JobRunTool{Service: schedulerService},
 		tools.RunCommandTool{
-			WorkspaceDir:    cfg.WorkspaceDir(),
-			AllowedBinsPath: filepath.Join(cfg.DataDir, store.AllowedBinsFilePath),
-			Timeout:         cfg.Security.CommandTimeout,
+			WorkspaceDir: cfg.WorkspaceDir(),
+			Timeout:      cfg.Security.CommandTimeout,
 		},
 		tools.SendMessageTool{
 			Sender: channelSender,
