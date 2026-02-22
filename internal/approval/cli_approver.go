@@ -35,7 +35,7 @@ func NewCLIApproverFromReader(in *bufio.Reader, out io.Writer) *CLIApprover {
 
 // RequestApproval prompts once and returns Approved or Denied.
 func (a *CLIApprover) RequestApproval(_ context.Context, req ApprovalRequest) (ApprovalDecision, error) {
-	fmt.Fprintf(a.out, "approve tool %s? %s [y/N]: ", req.Tool, req.Description)
+	fmt.Fprint(a.out, FormatApprovalPrompt(req))
 
 	answer, err := a.in.ReadString('\n')
 	if err != nil {

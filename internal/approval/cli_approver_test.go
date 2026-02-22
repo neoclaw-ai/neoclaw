@@ -63,3 +63,28 @@ func TestCLIApprover_Denied(t *testing.T) {
 		t.Fatalf("expected Denied, got %v", decision)
 	}
 }
+
+func TestCLIApprover_DomainPromptHidesInternalToolName(t *testing.T) {
+	in := strings.NewReader("y\n")
+	var out bytes.Buffer
+	approver := NewCLIApprover(in, &out)
+
+	decision, err := approver.RequestApproval(context.Background(), ApprovalRequest{
+		Tool:        "network_domain",
+		Description: "Allow Domain: example.com",
+	})
+	if err != nil {
+		t.Fatalf("request approval: %v", err)
+	}
+	if decision != Approved {
+		t.Fatalf("expected Approved, got %v", decision)
+	}
+
+	prompt := out.String()
+	if !strings.Contains(prompt, "Allow Domain: example.com [y/N]:") {
+		t.Fatalf("expected domain-only prompt, got %q", prompt)
+	}
+	if strings.Contains(prompt, "network_domain") {
+		t.Fatalf("did not expect internal tool name in prompt, got %q", prompt)
+	}
+}
