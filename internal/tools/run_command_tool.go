@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/store"
 )
 
@@ -123,7 +124,7 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 
 // WriteOutput writes full command output to workspace/tmp and returns the file path.
 func (t RunCommandTool) WriteOutput(args map[string]any, output string) (string, error) {
-	tmpDir := filepath.Join(t.WorkspaceDir, store.TmpDirPath)
+	tmpDir := filepath.Join(t.WorkspaceDir, config.TmpDirPath)
 	prefix := ""
 	if jobID, ok := args[schedulerOutputJobIDArg].(string); ok && strings.TrimSpace(jobID) != "" {
 		prefix = fmt.Sprintf("%s-", jobID)

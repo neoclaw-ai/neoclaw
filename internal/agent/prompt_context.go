@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/memory"
 	"github.com/machinae/betterclaw/internal/store"
 )
@@ -35,7 +36,7 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time) (s
 
 	prompt := DefaultSystemPrompt + "\n\n" + autoRememberInstruction
 
-	soulPath := filepath.Join(agentDir, "SOUL.md")
+	soulPath := filepath.Join(agentDir, config.SoulFilePath)
 	soulText, err := readOptionalFile(soulPath)
 	if err != nil {
 		return "", err

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
@@ -259,7 +259,8 @@ func writeCommandPolicyFile(t *testing.T, homeDir string, policy commandPolicy) 
 		t.Fatalf("marshal policy: %v", err)
 	}
 	raw = append(raw, '\n')
-	path := filepath.Join(homeDir, store.DataDirPath, store.AllowedCommandsFilePath)
+	cfg := &config.Config{HomeDir: homeDir, Agent: "default"}
+	path := cfg.AllowedCommandsPath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("mkdir policy dir: %v", err)
 	}
@@ -271,7 +272,8 @@ func writeCommandPolicyFile(t *testing.T, homeDir string, policy commandPolicy) 
 func readCommandPolicyFile(t *testing.T, homeDir string) commandPolicy {
 	t.Helper()
 
-	path := filepath.Join(homeDir, store.DataDirPath, store.AllowedCommandsFilePath)
+	cfg := &config.Config{HomeDir: homeDir, Agent: "default"}
+	path := cfg.AllowedCommandsPath()
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read policy: %v", err)

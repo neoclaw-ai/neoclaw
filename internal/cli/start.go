@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -21,9 +20,9 @@ import (
 	"github.com/machinae/betterclaw/internal/costs"
 	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/memory"
+	"github.com/machinae/betterclaw/internal/sandbox"
 	"github.com/machinae/betterclaw/internal/scheduler"
 	"github.com/machinae/betterclaw/internal/session"
-	"github.com/machinae/betterclaw/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +40,9 @@ func newStartCmd() *cobra.Command {
 			if err := cfg.Validate(); err != nil {
 				return err
 			}
+			if cfg.Security.Mode == config.SecurityModeStrict && !sandbox.IsSandboxSupported() {
+				return errors.New("security.mode strict requires sandbox support on this platform")
+			}
 			warnStartupConditions(cfg)
 
 			llm := cfg.DefaultLLM()
@@ -49,10 +51,10 @@ func newStartCmd() *cobra.Command {
 				"agent", cfg.Agent,
 				"provider", llm.Provider,
 				"model", llm.Model,
-				"data_dir", cfg.DataDir,
+				"data_dir", cfg.DataDir(),
 			)
 
-			pidFilePath := filepath.Join(cfg.DataDir, "claw.pid")
+			pidFilePath := cfg.PIDPath()
 			if err := os.WriteFile(pidFilePath, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0o644); err != nil {
 				return fmt.Errorf("write pid file %q: %w", pidFilePath, err)
 			}
@@ -132,7 +134,7 @@ func startTelegram(
 	}
 
 	logging.Logger().Info("Starting Telegram listener")
-	allowedUsersPath := filepath.Join(cfg.DataDir, store.AllowedUsersFilePath)
+	allowedUsersPath := cfg.AllowedUsersPath()
 	listener := channels.NewTelegram(token, allowedUsersPath)
 	if err := registerTelegramChannelWriters(channelWriters, allowedUsersPath, listener); err != nil {
 		return nil, err
@@ -144,7 +146,7 @@ func startTelegram(
 		return nil, err
 	}
 
-	memoryStore := memory.New(filepath.Join(cfg.AgentDir(), store.MemoryDirPath))
+	memoryStore := memory.New(cfg.MemoryDir())
 	registry, err := buildToolRegistry(cfg, out, memoryStore, listener, schedulerService, listener, listener.CurrentChannelID)
 	if err != nil {
 		return nil, err
@@ -155,8 +157,8 @@ func startTelegram(
 		return nil, err
 	}
 
-	costTracker := costs.New(filepath.Join(cfg.DataDir, store.CostsFilePath))
-	sessionStore := session.New(filepath.Join(cfg.AgentDir(), store.SessionsDirPath, "telegram", store.DefaultSessionPath))
+	costTracker := costs.New(cfg.CostsPath())
+	sessionStore := session.New(cfg.TelegramContextPath())
 	handler := agent.NewWithSession(
 		modelProvider,
 		registry,

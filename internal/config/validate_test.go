@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/machinae/betterclaw/internal/sandbox"
 )
 
 var (
@@ -135,7 +133,7 @@ func TestValidateStartup_DangerFullAccessIsInvalidMode(t *testing.T) {
 	}
 }
 
-func TestValidateStartup_StrictRequiresSandboxSupport(t *testing.T) {
+func TestValidateStartup_StrictModeIsValid(t *testing.T) {
 	cfg := &Config{
 		LLM: map[string]LLMProviderConfig{
 			"default": {Provider: "anthropic", APIKey: "k", Model: "m", RequestTimeout: time.Second},
@@ -147,14 +145,8 @@ func TestValidateStartup_StrictRequiresSandboxSupport(t *testing.T) {
 	}
 
 	err := cfg.Validate()
-	if sandbox.IsSandboxSupported() {
-		if err != nil {
-			t.Fatalf("expected strict mode to pass with sandbox support, got %v", err)
-		}
-		return
-	}
-	if err == nil || !strings.Contains(err.Error(), "requires sandbox support") {
-		t.Fatalf("expected strict sandbox support error, got %v", err)
+	if err != nil {
+		t.Fatalf("expected strict mode to pass config validation, got %v", err)
 	}
 }
 

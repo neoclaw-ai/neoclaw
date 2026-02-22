@@ -109,8 +109,8 @@ func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
 		t.Fatalf("expected home dir %q, got %q", dataDir, cfg.HomeDir)
 	}
 	expectedDataDir := filepath.Join(dataDir, "data")
-	if cfg.DataDir != expectedDataDir {
-		t.Fatalf("expected data dir %q, got %q", expectedDataDir, cfg.DataDir)
+	if cfg.DataDir() != expectedDataDir {
+		t.Fatalf("expected data dir %q, got %q", expectedDataDir, cfg.DataDir())
 	}
 	llm := cfg.DefaultLLM()
 	if llm.Provider != defaultConfig.LLM["default"].Provider {
@@ -211,8 +211,8 @@ func TestLoad_BetterclawHomeOverridesDefault(t *testing.T) {
 		t.Fatalf("load config: %v", err)
 	}
 	expectedDataDir := filepath.Join(customDir, "data")
-	if cfg.DataDir != expectedDataDir {
-		t.Fatalf("expected data dir %q, got %q", expectedDataDir, cfg.DataDir)
+	if cfg.DataDir() != expectedDataDir {
+		t.Fatalf("expected data dir %q, got %q", expectedDataDir, cfg.DataDir())
 	}
 }
 
@@ -223,7 +223,7 @@ func TestHomeDir_DefaultsToUserHome(t *testing.T) {
 		t.Fatalf("get user home: %v", err)
 	}
 
-	dir, err := HomeDir()
+	dir, err := homeDir()
 	if err != nil {
 		t.Fatalf("home dir: %v", err)
 	}
@@ -237,12 +237,50 @@ func TestHomeDir_RespectsEnvVar(t *testing.T) {
 	customDir := "/tmp/my-betterclaw"
 	t.Setenv("BETTERCLAW_HOME", customDir)
 
-	dir, err := HomeDir()
+	dir, err := homeDir()
 	if err != nil {
 		t.Fatalf("home dir: %v", err)
 	}
 	if dir != customDir {
 		t.Fatalf("expected %q, got %q", customDir, dir)
+	}
+}
+
+func TestPathResolutionMethods(t *testing.T) {
+	cfg := &Config{HomeDir: "/tmp/betterclaw", Agent: "default"}
+
+	if cfg.ConfigPath() != "/tmp/betterclaw/config.toml" {
+		t.Fatalf("unexpected config path: %q", cfg.ConfigPath())
+	}
+	if cfg.DataDir() != "/tmp/betterclaw/data" {
+		t.Fatalf("unexpected data dir: %q", cfg.DataDir())
+	}
+	if cfg.PolicyDir() != "/tmp/betterclaw/data/policy" {
+		t.Fatalf("unexpected policy dir: %q", cfg.PolicyDir())
+	}
+	if cfg.AllowedCommandsPath() != "/tmp/betterclaw/data/policy/allowed_commands.json" {
+		t.Fatalf("unexpected allowed commands path: %q", cfg.AllowedCommandsPath())
+	}
+	if cfg.AllowedDomainsPath() != "/tmp/betterclaw/data/policy/allowed_domains.json" {
+		t.Fatalf("unexpected allowed domains path: %q", cfg.AllowedDomainsPath())
+	}
+	if cfg.AllowedUsersPath() != "/tmp/betterclaw/data/policy/allowed_users.json" {
+		t.Fatalf("unexpected allowed users path: %q", cfg.AllowedUsersPath())
+	}
+	if cfg.CostsPath() != "/tmp/betterclaw/data/logs/costs.jsonl" {
+		t.Fatalf("unexpected costs path: %q", cfg.CostsPath())
+	}
+	if cfg.PIDPath() != "/tmp/betterclaw/data/claw.pid" {
+		t.Fatalf("unexpected pid path: %q", cfg.PIDPath())
+	}
+	if cfg.SoulPath() != "/tmp/betterclaw/data/agents/default/SOUL.md" {
+		t.Fatalf("unexpected soul path: %q", cfg.SoulPath())
+	}
+	if cfg.MemoryPath() != "/tmp/betterclaw/data/agents/default/memory/memory.md" {
+		t.Fatalf("unexpected memory path: %q", cfg.MemoryPath())
+	}
+	if cfg.CLIContextPath() != "/tmp/betterclaw/data/agents/default/sessions/cli/default.jsonl" {
+		t.Fatalf("unexpected cli context path: %q", cfg.CLIContextPath())
 	}
 }
 

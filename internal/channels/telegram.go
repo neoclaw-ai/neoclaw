@@ -9,7 +9,6 @@ import (
 	"html"
 	"io"
 	"math/big"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,7 +20,6 @@ import (
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/runtime"
-	"github.com/machinae/betterclaw/internal/store"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
@@ -150,9 +148,9 @@ func BeginTelegramPairing(ctx context.Context, token string) (*TelegramPairSessi
 		return nil, fmt.Errorf("send pairing code: %w", err)
 	}
 
-	homeDir, err := config.HomeDir()
+	cfg, err := config.Load()
 	if err != nil {
-		return nil, fmt.Errorf("resolve data dir for users store: %w", err)
+		return nil, fmt.Errorf("load config for users store: %w", err)
 	}
 
 	return &TelegramPairSession{
@@ -165,7 +163,7 @@ func BeginTelegramPairing(ctx context.Context, token string) (*TelegramPairSessi
 			username: inbound.username,
 			name:     inbound.name,
 		},
-		allowedUsersPath: filepath.Join(homeDir, store.DataDirPath, store.AllowedUsersFilePath),
+		allowedUsersPath: cfg.AllowedUsersPath(),
 	}, nil
 }
 

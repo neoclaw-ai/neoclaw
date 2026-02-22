@@ -12,10 +12,8 @@ import (
 
 func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 	homeDir := filepath.Join(t.TempDir(), ".betterclaw")
-	dataDir := filepath.Join(homeDir, "data")
 	cfg := &config.Config{
 		HomeDir: homeDir,
-		DataDir: dataDir,
 		Agent:   "default",
 	}
 
@@ -24,17 +22,17 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 	}
 
 	requiredPaths := []string{
-		filepath.Join(homeDir, "config.toml"),
-		filepath.Join(dataDir, "policy", "allowed_domains.json"),
-		filepath.Join(dataDir, "policy", "allowed_commands.json"),
-		filepath.Join(dataDir, "policy", "allowed_users.json"),
-		filepath.Join(dataDir, "logs"),
-		filepath.Join(dataDir, "logs", "costs.jsonl"),
-		filepath.Join(dataDir, "agents", "default", "SOUL.md"),
-		filepath.Join(dataDir, "agents", "default", "jobs.json"),
-		filepath.Join(dataDir, "agents", "default", "memory", "memory.md"),
-		filepath.Join(dataDir, "agents", "default", "sessions", "cli", "default.jsonl"),
-		filepath.Join(dataDir, "agents", "default", "workspace"),
+		cfg.ConfigPath(),
+		cfg.AllowedDomainsPath(),
+		cfg.AllowedCommandsPath(),
+		cfg.AllowedUsersPath(),
+		cfg.LogsDir(),
+		cfg.CostsPath(),
+		cfg.SoulPath(),
+		cfg.JobsPath(),
+		cfg.MemoryPath(),
+		cfg.CLIContextPath(),
+		cfg.WorkspaceDir(),
 	}
 
 	for _, path := range requiredPaths {
@@ -43,7 +41,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		}
 	}
 
-	soulPath := filepath.Join(dataDir, "agents", "default", "SOUL.md")
+	soulPath := cfg.SoulPath()
 	soulRaw, err := os.ReadFile(soulPath)
 	if err != nil {
 		t.Fatalf("read SOUL.md: %v", err)
@@ -53,7 +51,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		t.Fatalf("expected SOUL.md template sections, got %q", soul)
 	}
 
-	domainsPath := filepath.Join(dataDir, "policy", "allowed_domains.json")
+	domainsPath := cfg.AllowedDomainsPath()
 	domainsRaw, err := os.ReadFile(domainsPath)
 	if err != nil {
 		t.Fatalf("read allowed domains file: %v", err)
@@ -70,7 +68,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		t.Fatalf("expected bootstrap allowed domains deny list to be empty, got %#v", domainsDoc["deny"])
 	}
 
-	configPath := filepath.Join(homeDir, "config.toml")
+	configPath := cfg.ConfigPath()
 	configRaw, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("read config file: %v", err)
@@ -86,7 +84,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		t.Fatalf("expected bootstrap config to contain explicit security defaults, got %q", configText)
 	}
 
-	commandsPath := filepath.Join(dataDir, "policy", "allowed_commands.json")
+	commandsPath := cfg.AllowedCommandsPath()
 	commandsRaw, err := os.ReadFile(commandsPath)
 	if err != nil {
 		t.Fatalf("read allowed commands file: %v", err)
@@ -106,7 +104,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		t.Fatalf("expected bootstrap allowed commands deny list to be empty, got %#v", commandsDoc["deny"])
 	}
 
-	usersPath := filepath.Join(dataDir, "policy", "allowed_users.json")
+	usersPath := cfg.AllowedUsersPath()
 	usersRaw, err := os.ReadFile(usersPath)
 	if err != nil {
 		t.Fatalf("read allowed users file: %v", err)
@@ -139,10 +137,8 @@ func containsString(values []string, target string) bool {
 
 func TestInitializeIsIdempotent(t *testing.T) {
 	homeDir := filepath.Join(t.TempDir(), ".betterclaw")
-	dataDir := filepath.Join(homeDir, "data")
 	cfg := &config.Config{
 		HomeDir: homeDir,
-		DataDir: dataDir,
 		Agent:   "default",
 	}
 
@@ -150,12 +146,12 @@ func TestInitializeIsIdempotent(t *testing.T) {
 		t.Fatalf("first initialize: %v", err)
 	}
 
-	jobsPath := filepath.Join(dataDir, "agents", "default", "jobs.json")
+	jobsPath := cfg.JobsPath()
 	customContent := []byte("[{\"name\":\"keep-me\"}]\n")
 	if err := os.WriteFile(jobsPath, customContent, 0o644); err != nil {
 		t.Fatalf("seed custom jobs content: %v", err)
 	}
-	configPath := filepath.Join(homeDir, "config.toml")
+	configPath := cfg.ConfigPath()
 	customConfig := []byte("[llm.default]\napi_key = \"keep-me\"\nprovider = \"anthropic\"\nmodel = \"claude-sonnet-4-6\"\n")
 	if err := os.WriteFile(configPath, customConfig, 0o644); err != nil {
 		t.Fatalf("seed custom config content: %v", err)

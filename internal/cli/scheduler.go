@@ -4,24 +4,22 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"path/filepath"
 
 	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/scheduler"
-	"github.com/machinae/betterclaw/internal/store"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
 func newSchedulerService(cfg *config.Config, channelWriters map[string]io.Writer) *scheduler.Service {
-	return scheduler.NewService(filepath.Join(cfg.AgentDir(), store.JobsFilePath), newSchedulerRunner(cfg, channelWriters))
+	return scheduler.NewService(cfg.JobsPath(), newSchedulerRunner(cfg, channelWriters))
 }
 
 func newSchedulerRunner(cfg *config.Config, channelWriters map[string]io.Writer) *scheduler.Runner {
 	httpClient := &http.Client{
 		Transport: approval.RoundTripper{
 			Checker: approval.Checker{
-				AllowedDomainsPath: filepath.Join(cfg.DataDir, store.AllowedDomainsFilePath),
+				AllowedDomainsPath: cfg.AllowedDomainsPath(),
 			},
 		},
 	}

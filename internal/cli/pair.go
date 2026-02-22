@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -34,7 +33,7 @@ func newPairCmd() *cobra.Command {
 				return errors.New("telegram bot token is not configured. Set [channels.telegram] token in config.toml")
 			}
 
-			pidFilePath := filepath.Join(cfg.DataDir, "claw.pid")
+			pidFilePath := cfg.PIDPath()
 			if _, err := os.Stat(pidFilePath); err == nil {
 				return errors.New("server is already running. Stop it first, then run claw pair")
 			} else if !errors.Is(err, os.ErrNotExist) {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path/filepath"
 	"strings"
 
 	"github.com/machinae/betterclaw/internal/agent"
@@ -16,9 +15,9 @@ import (
 	"github.com/machinae/betterclaw/internal/costs"
 	"github.com/machinae/betterclaw/internal/memory"
 	"github.com/machinae/betterclaw/internal/runtime"
+	"github.com/machinae/betterclaw/internal/sandbox"
 	"github.com/machinae/betterclaw/internal/scheduler"
 	"github.com/machinae/betterclaw/internal/session"
-	"github.com/machinae/betterclaw/internal/store"
 	"github.com/machinae/betterclaw/internal/tools"
 	"github.com/spf13/cobra"
 )
@@ -37,6 +36,9 @@ func newCLICmd() *cobra.Command {
 			if err := cfg.Validate(); err != nil {
 				return err
 			}
+			if cfg.Security.Mode == config.SecurityModeStrict && !sandbox.IsSandboxSupported() {
+				return fmt.Errorf("security.mode strict requires sandbox support on this platform")
+			}
 			warnStartupConditions(cfg)
 
 			llmCfg := cfg.DefaultLLM()
@@ -45,7 +47,7 @@ func newCLICmd() *cobra.Command {
 				return err
 			}
 
-			memoryStore := memory.New(filepath.Join(cfg.AgentDir(), "memory"))
+			memoryStore := memory.New(cfg.MemoryDir())
 			channelWriters := map[string]io.Writer{"cli": cmd.OutOrStdout()}
 			schedulerService := newSchedulerService(cfg, channelWriters)
 			trimmedPrompt := strings.TrimSpace(prompt)
@@ -71,7 +73,7 @@ func newCLICmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			costTracker := costs.New(filepath.Join(cfg.DataDir, store.CostsFilePath))
+			costTracker := costs.New(cfg.CostsPath())
 
 			if trimmedPrompt != "" {
 				handler := agent.New(modelProvider, registry, approver, systemPrompt)
@@ -86,7 +88,7 @@ func newCLICmd() *cobra.Command {
 				return handler.HandleMessage(cmd.Context(), writer, &runtime.Message{Text: trimmedPrompt})
 			}
 
-			sessionStore := session.New(filepath.Join(cfg.AgentDir(), store.SessionsDirPath, store.CLISessionsDirPath, store.DefaultSessionPath))
+			sessionStore := session.New(cfg.CLIContextPath())
 			handler := agent.NewWithSession(
 				modelProvider,
 				registry,
@@ -131,7 +133,7 @@ func buildToolRegistry(
 	httpClient := &http.Client{
 		Transport: approval.RoundTripper{
 			Checker: approval.Checker{
-				AllowedDomainsPath: filepath.Join(cfg.DataDir, store.AllowedDomainsFilePath),
+				AllowedDomainsPath: cfg.AllowedDomainsPath(),
 				Approver:           approver,
 			},
 		},

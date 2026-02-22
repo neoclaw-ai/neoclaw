@@ -10,34 +10,7 @@ import (
 	"sync"
 )
 
-const (
-	// Global layout under BETTERCLAW_HOME.
-	ConfigFilePath = "config.toml"
-	DataDirPath    = "data"
-	PolicyDirPath  = "policy"
-	LogsDirPath    = "logs"
-
-	// Agent directory layout under BETTERCLAW_HOME/agents/{agent}/.
-	AgentsDirPath      = "agents"
-	WorkspaceDirPath   = "workspace"
-	TmpDirPath         = "tmp"
-	MemoryDirPath      = "memory"
-	DailyDirPath       = "daily"
-	SessionsDirPath    = "sessions"
-	CLISessionsDirPath = "cli"
-	DefaultSessionPath = "default.jsonl"
-	JobsFilePath       = "jobs.json"
-	SoulFilePath       = "SOUL.md"
-	MemoryFilePath     = "memory.md"
-)
-
 var (
-	// Global runtime data files under BETTERCLAW_HOME/data.
-	AllowedDomainsFilePath  = filepath.Join(PolicyDirPath, "allowed_domains.json")
-	AllowedCommandsFilePath = filepath.Join(PolicyDirPath, "allowed_commands.json")
-	AllowedUsersFilePath    = filepath.Join(PolicyDirPath, "allowed_users.json")
-	CostsFilePath           = filepath.Join(LogsDirPath, "costs.jsonl")
-
 	pathLocksMu sync.Mutex
 	pathLocks   = map[string]*sync.Mutex{}
 )

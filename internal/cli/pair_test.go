@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/machinae/betterclaw/internal/approval"
+	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/store"
 )
 
@@ -34,7 +35,8 @@ func TestPair_MissingTokenFails(t *testing.T) {
 func TestPair_PIDFilePresentFails(t *testing.T) {
 	dataDir := createTestHome(t)
 	writePairConfig(t, dataDir, "telegram-token")
-	pidPath := filepath.Join(dataDir, store.DataDirPath, "claw.pid")
+	cfg := &config.Config{HomeDir: dataDir, Agent: "default"}
+	pidPath := cfg.PIDPath()
 	if err := store.WriteFile(pidPath, []byte("12345\n")); err != nil {
 		t.Fatalf("write pid file: %v", err)
 	}
@@ -76,7 +78,8 @@ func TestPair_TimeoutPrintsMessageAndDoesNotWriteUsers(t *testing.T) {
 		t.Fatalf("expected timeout output, got %q", out.String())
 	}
 
-	usersPath := filepath.Join(dataDir, store.DataDirPath, store.AllowedUsersFilePath)
+	cfg := &config.Config{HomeDir: dataDir, Agent: "default"}
+	usersPath := cfg.AllowedUsersPath()
 	users, loadErr := approval.LoadUsers(usersPath)
 	if loadErr != nil {
 		t.Fatalf("load users: %v", loadErr)
@@ -98,7 +101,7 @@ model = "claude-sonnet-4-6"
 enabled = true
 token = "` + token + `"
 `
-	if err := store.WriteFile(filepath.Join(dataDir, store.ConfigFilePath), []byte(configBody)); err != nil {
+	if err := store.WriteFile(filepath.Join(dataDir, config.ConfigFilePath), []byte(configBody)); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 }

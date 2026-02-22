@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/store"
@@ -45,8 +44,8 @@ var defaultAllowedCommands = []string{
 // Initialize creates the expected BetterClaw data tree if missing.
 func Initialize(cfg *config.Config) error {
 	agentDir := cfg.AgentDir()
-	policyDir := filepath.Join(cfg.DataDir, store.PolicyDirPath)
-	logsDir := filepath.Join(cfg.DataDir, store.LogsDirPath)
+	policyDir := cfg.PolicyDir()
+	logsDir := cfg.LogsDir()
 	defaultConfig, err := config.DefaultUserConfigTOML()
 	if err != nil {
 		return fmt.Errorf("render default config: %w", err)
@@ -54,16 +53,16 @@ func Initialize(cfg *config.Config) error {
 
 	dirs := []string{
 		cfg.HomeDir,
-		cfg.DataDir,
+		cfg.DataDir(),
 		policyDir,
 		logsDir,
-		filepath.Join(cfg.DataDir, store.AgentsDirPath),
+		cfg.AgentsDir(),
 		agentDir,
-		filepath.Join(agentDir, store.WorkspaceDirPath),
-		filepath.Join(agentDir, store.MemoryDirPath),
-		filepath.Join(agentDir, store.MemoryDirPath, store.DailyDirPath),
-		filepath.Join(agentDir, store.SessionsDirPath),
-		filepath.Join(agentDir, store.SessionsDirPath, store.CLISessionsDirPath),
+		cfg.WorkspaceDir(),
+		cfg.MemoryDir(),
+		cfg.DailyLogsDir(),
+		cfg.SessionsDir(),
+		cfg.CLISessionDir(),
 	}
 
 	for _, dir := range dirs {
@@ -77,15 +76,15 @@ func Initialize(cfg *config.Config) error {
 		content string
 	}{
 		{path: cfg.ConfigPath(), content: defaultConfig},
-		{path: filepath.Join(cfg.DataDir, store.AllowedDomainsFilePath), content: defaultAllowedDomainsJSON()},
-		{path: filepath.Join(cfg.DataDir, store.AllowedCommandsFilePath), content: defaultAllowedCommandsJSON()},
-		{path: filepath.Join(cfg.DataDir, store.AllowedUsersFilePath), content: defaultAllowedUsersJSON()},
-		{path: filepath.Join(cfg.DataDir, store.CostsFilePath), content: ""},
+		{path: cfg.AllowedDomainsPath(), content: defaultAllowedDomainsJSON()},
+		{path: cfg.AllowedCommandsPath(), content: defaultAllowedCommandsJSON()},
+		{path: cfg.AllowedUsersPath(), content: defaultAllowedUsersJSON()},
+		{path: cfg.CostsPath(), content: ""},
 
-		{path: filepath.Join(agentDir, store.SoulFilePath), content: defaultSoulMarkdown()},
-		{path: filepath.Join(agentDir, store.JobsFilePath), content: "[]\n"},
-		{path: filepath.Join(agentDir, store.MemoryDirPath, store.MemoryFilePath), content: "# Memory\n"},
-		{path: filepath.Join(agentDir, store.SessionsDirPath, store.CLISessionsDirPath, store.DefaultSessionPath), content: ""},
+		{path: cfg.SoulPath(), content: defaultSoulMarkdown()},
+		{path: cfg.JobsPath(), content: "[]\n"},
+		{path: cfg.MemoryPath(), content: "# Memory\n"},
+		{path: cfg.CLIContextPath(), content: ""},
 	}
 
 	for _, file := range files {

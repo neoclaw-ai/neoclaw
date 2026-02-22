@@ -7,13 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"reflect"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/machinae/betterclaw/internal/sandbox"
-	"github.com/machinae/betterclaw/internal/store"
 	"github.com/spf13/viper"
 )
 
@@ -32,8 +29,6 @@ const (
 type Config struct {
 	// HomeDir is runtime-resolved from BETTERCLAW_HOME and not read from config.
 	HomeDir string `mapstructure:"-"`
-	// DataDir is runtime-resolved as BETTERCLAW_HOME/data and not read from config.
-	DataDir string `mapstructure:"-"`
 	// Agent is runtime-selected (MVP default: "default"), not read from config.
 	Agent    string                       `mapstructure:"-"`
 	Channels map[string]ChannelConfig     `mapstructure:"channels"`
@@ -151,9 +146,9 @@ var defaultUserConfig = Config{
 	},
 }
 
-// HomeDir returns the BetterClaw home directory.
+// homeDir returns the BetterClaw home directory.
 // Uses BETTERCLAW_HOME env var if set, otherwise defaults to ~/.betterclaw.
-func HomeDir() (string, error) {
+func homeDir() (string, error) {
 	if dir := os.Getenv("BETTERCLAW_HOME"); dir != "" {
 		return dir, nil
 	}
@@ -161,22 +156,21 @@ func HomeDir() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve home dir: %w", err)
 	}
-	return filepath.Join(home, ".betterclaw"), nil
+	return defaultHomePath(home), nil
 }
 
 // Load merges hardcoded defaults and config file values in that order.
 // The runtime data directory is BETTERCLAW_HOME/data (default: ~/.betterclaw/data).
 // Config is always at $BETTERCLAW_HOME/config.toml.
 func Load() (*Config, error) {
-	homeDir, err := HomeDir()
+	homeDir, err := homeDir()
 	if err != nil {
 		return nil, err
 	}
-	dataDir := filepath.Join(homeDir, store.DataDirPath)
 
 	v := viper.New()
 	setDefaults(v)
-	v.SetConfigFile(filepath.Join(homeDir, store.ConfigFilePath))
+	v.SetConfigFile(homeConfigPath(homeDir))
 	v.SetConfigType("toml")
 
 	if err := v.ReadInConfig(); err != nil {
@@ -199,7 +193,6 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("decode config: %w", err)
 	}
 	cfg.HomeDir = homeDir
-	cfg.DataDir = dataDir
 	cfg.Agent = defaultAgent
 	cfg.Security.Workspace = cfg.WorkspaceDir()
 
@@ -213,14 +206,14 @@ func Write(w io.Writer) error {
 		return errors.New("writer is required")
 	}
 
-	homeDir, err := HomeDir()
+	homeDir, err := homeDir()
 	if err != nil {
 		return err
 	}
 
 	v := viper.New()
 	setDefaults(v)
-	v.SetConfigFile(filepath.Join(homeDir, store.ConfigFilePath))
+	v.SetConfigFile(homeConfigPath(homeDir))
 	v.SetConfigType("toml")
 
 	if err := v.ReadInConfig(); err != nil {
@@ -290,21 +283,6 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("web.search.provider", defaultConfig.Web.Search.Provider)
 	v.SetDefault("web.search.api_key", defaultConfig.Web.Search.APIKey)
-}
-
-// AgentDir returns the active agent directory under DataDir.
-func (c *Config) AgentDir() string {
-	return filepath.Join(c.DataDir, store.AgentsDirPath, c.Agent)
-}
-
-// ConfigPath returns the config file path under HomeDir.
-func (c *Config) ConfigPath() string {
-	return filepath.Join(c.HomeDir, store.ConfigFilePath)
-}
-
-// WorkspaceDir returns the active agent workspace directory.
-func (c *Config) WorkspaceDir() string {
-	return filepath.Join(c.AgentDir(), store.WorkspaceDirPath)
 }
 
 // DefaultLLM returns the default LLM profile with fallback defaults.
@@ -418,10 +396,6 @@ func (cfg *Config) Validate() error {
 		if err := chCfg.Validate(); err != nil {
 			errs = append(errs, fmt.Errorf("channels.%s: %w", name, err))
 		}
-	}
-
-	if cfg.Security.Mode == SecurityModeStrict && !sandbox.IsSandboxSupported() {
-		errs = append(errs, errors.New("security.mode strict requires sandbox support on this platform"))
 	}
 
 	if len(errs) > 0 {

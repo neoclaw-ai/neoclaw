@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/machinae/betterclaw/internal/config"
@@ -184,7 +183,7 @@ func allowedCommandsPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("load config: %w", err)
 	}
-	return filepath.Join(cfg.DataDir, store.AllowedCommandsFilePath), nil
+	return cfg.AllowedCommandsPath(), nil
 }
 
 // Load command policy from disk.
