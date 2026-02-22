@@ -114,7 +114,7 @@ var defaultConfig = Config{
 	},
 	Web: WebConfig{
 		Search: WebSearchConfig{
-			Provider: "brave",
+			Provider: "",
 			APIKey:   "",
 		},
 	},
