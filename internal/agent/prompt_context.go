@@ -14,7 +14,6 @@ import (
 	"github.com/machinae/betterclaw/internal/store"
 )
 
-const autoRememberInstruction = "When you learn something important about the user (preferences, facts, relationships, ongoing constraints), write it to memory using memory_append without asking permission."
 const maxSoulChars = 4000
 
 // DailyLogLookback controls how far back recent daily log entries are injected into the system prompt.
