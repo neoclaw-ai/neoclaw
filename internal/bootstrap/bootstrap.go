@@ -13,6 +13,7 @@ import (
 var defaultAllowedDomains = []string{
 	"api.anthropic.com",
 	"api.openrouter.ai",
+	"api.search.brave.com",
 }
 
 var defaultAllowedCommands = []string{

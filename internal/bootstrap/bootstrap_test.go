@@ -61,7 +61,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		t.Fatalf("parse allowed domains file as json object: %v", err)
 	}
 	domainsAllow := domainsDoc["allow"]
-	if !containsString(domainsAllow, "api.anthropic.com") || !containsString(domainsAllow, "api.openrouter.ai") {
+	if !containsString(domainsAllow, "api.anthropic.com") || !containsString(domainsAllow, "api.openrouter.ai") || !containsString(domainsAllow, "api.search.brave.com") {
 		t.Fatalf("expected bootstrap allowed domains allow list to contain default domains, got %#v", domainsAllow)
 	}
 	if len(domainsDoc["deny"]) != 0 {
