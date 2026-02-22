@@ -66,7 +66,7 @@ func TestUnknownCommand(t *testing.T) {
 }
 
 func TestJobsCommand(t *testing.T) {
-	service := scheduler.NewService(t.TempDir()+"/jobs.json", scheduler.NewRunner(scheduler.ActionRunners{}, nil))
+	service := scheduler.NewService(filepath.Join(t.TempDir(), "jobs.json"), scheduler.NewRunner(scheduler.ActionRunners{}, nil))
 	_, err := service.Create(context.Background(), scheduler.CreateInput{
 		Description: "daily ping",
 		Cron:        "0 9 * * *",

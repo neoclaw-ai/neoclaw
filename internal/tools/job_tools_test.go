@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,7 +13,7 @@ import (
 func TestJobCreateListDeleteTools(t *testing.T) {
 	t.Parallel()
 
-	svc := scheduler.NewService(t.TempDir()+"/jobs.json", scheduler.NewRunner(scheduler.ActionRunners{}, nil))
+	svc := scheduler.NewService(filepath.Join(t.TempDir(), "jobs.json"), scheduler.NewRunner(scheduler.ActionRunners{}, nil))
 	createTool := JobCreateTool{Service: svc, ChannelID: "cli"}
 	listTool := JobListTool{Service: svc}
 	deleteTool := JobDeleteTool{Service: svc}
@@ -68,7 +69,7 @@ func TestJobCreateListDeleteTools(t *testing.T) {
 func TestJobCreateToolDefaultsChannelID(t *testing.T) {
 	t.Parallel()
 
-	svc := scheduler.NewService(t.TempDir()+"/jobs.json", scheduler.NewRunner(scheduler.ActionRunners{}, nil))
+	svc := scheduler.NewService(filepath.Join(t.TempDir(), "jobs.json"), scheduler.NewRunner(scheduler.ActionRunners{}, nil))
 	createTool := JobCreateTool{Service: svc}
 
 	_, err := createTool.Execute(context.Background(), map[string]any{
@@ -98,7 +99,7 @@ func TestJobCreateToolDefaultsChannelID(t *testing.T) {
 func TestJobCreateToolUsesResolvedChannelID(t *testing.T) {
 	t.Parallel()
 
-	svc := scheduler.NewService(t.TempDir()+"/jobs.json", scheduler.NewRunner(scheduler.ActionRunners{}, nil))
+	svc := scheduler.NewService(filepath.Join(t.TempDir(), "jobs.json"), scheduler.NewRunner(scheduler.ActionRunners{}, nil))
 	createTool := JobCreateTool{
 		Service:          svc,
 		ChannelID:        "cli",
@@ -132,7 +133,7 @@ func TestJobCreateToolUsesResolvedChannelID(t *testing.T) {
 func TestJobRunToolRunsService(t *testing.T) {
 	t.Parallel()
 
-	svc := scheduler.NewService(t.TempDir()+"/jobs.json", scheduler.NewRunner(scheduler.ActionRunners{
+	svc := scheduler.NewService(filepath.Join(t.TempDir(), "jobs.json"), scheduler.NewRunner(scheduler.ActionRunners{
 		SendMessage: func(_ context.Context, _ io.Writer, args map[string]any) (string, error) {
 			if args["message"] != "hello" {
 				t.Fatalf("expected message hello, got %#v", args["message"])

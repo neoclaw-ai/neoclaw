@@ -11,13 +11,11 @@ import (
 )
 
 const (
-	// Global files under BETTERCLAW_HOME.
-	ConfigFilePath          = "config.toml"
-	AllowedDomainsFilePath  = "allowed_domains.json"
-	AllowedCommandsFilePath = "allowed_commands.json"
-	AllowedBinsFilePath     = "allowed_bins.json"
-	AllowedUsersFilePath    = "allowed_users.json"
-	CostsFilePath           = "costs.jsonl"
+	// Global layout under BETTERCLAW_HOME.
+	ConfigFilePath = "config.toml"
+	DataDirPath    = "data"
+	PolicyDirPath  = "policy"
+	LogsDirPath    = "logs"
 
 	// Agent directory layout under BETTERCLAW_HOME/agents/{agent}/.
 	AgentsDirPath      = "agents"
@@ -34,6 +32,12 @@ const (
 )
 
 var (
+	// Global runtime data files under BETTERCLAW_HOME/data.
+	AllowedDomainsFilePath  = filepath.Join(PolicyDirPath, "allowed_domains.json")
+	AllowedCommandsFilePath = filepath.Join(PolicyDirPath, "allowed_commands.json")
+	AllowedUsersFilePath    = filepath.Join(PolicyDirPath, "allowed_users.json")
+	CostsFilePath           = filepath.Join(LogsDirPath, "costs.jsonl")
+
 	pathLocksMu sync.Mutex
 	pathLocks   = map[string]*sync.Mutex{}
 )

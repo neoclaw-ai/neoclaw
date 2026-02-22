@@ -251,7 +251,7 @@ func (f *fakeApprover) RequestApproval(_ context.Context, req ApprovalRequest) (
 	return f.decision, nil
 }
 
-func writeCommandPolicyFile(t *testing.T, dataDir string, policy commandPolicy) {
+func writeCommandPolicyFile(t *testing.T, homeDir string, policy commandPolicy) {
 	t.Helper()
 
 	raw, err := json.MarshalIndent(policy, "", "  ")
@@ -259,7 +259,7 @@ func writeCommandPolicyFile(t *testing.T, dataDir string, policy commandPolicy) 
 		t.Fatalf("marshal policy: %v", err)
 	}
 	raw = append(raw, '\n')
-	path := filepath.Join(dataDir, store.AllowedCommandsFilePath)
+	path := filepath.Join(homeDir, store.DataDirPath, store.AllowedCommandsFilePath)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("mkdir policy dir: %v", err)
 	}
@@ -268,10 +268,10 @@ func writeCommandPolicyFile(t *testing.T, dataDir string, policy commandPolicy) 
 	}
 }
 
-func readCommandPolicyFile(t *testing.T, dataDir string) commandPolicy {
+func readCommandPolicyFile(t *testing.T, homeDir string) commandPolicy {
 	t.Helper()
 
-	path := filepath.Join(dataDir, store.AllowedCommandsFilePath)
+	path := filepath.Join(homeDir, store.DataDirPath, store.AllowedCommandsFilePath)
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read policy: %v", err)

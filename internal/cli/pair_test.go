@@ -34,7 +34,7 @@ func TestPair_MissingTokenFails(t *testing.T) {
 func TestPair_PIDFilePresentFails(t *testing.T) {
 	dataDir := createTestHome(t)
 	writePairConfig(t, dataDir, "telegram-token")
-	pidPath := filepath.Join(dataDir, "claw.pid")
+	pidPath := filepath.Join(dataDir, store.DataDirPath, "claw.pid")
 	if err := store.WriteFile(pidPath, []byte("12345\n")); err != nil {
 		t.Fatalf("write pid file: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestPair_TimeoutPrintsMessageAndDoesNotWriteUsers(t *testing.T) {
 		t.Fatalf("expected timeout output, got %q", out.String())
 	}
 
-	usersPath := filepath.Join(dataDir, store.AllowedUsersFilePath)
+	usersPath := filepath.Join(dataDir, store.DataDirPath, store.AllowedUsersFilePath)
 	users, loadErr := approval.LoadUsers(usersPath)
 	if loadErr != nil {
 		t.Fatalf("load users: %v", loadErr)

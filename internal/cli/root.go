@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/machinae/betterclaw/internal/bootstrap"
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/provider"
-	"github.com/machinae/betterclaw/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +44,7 @@ func NewRootCmd() *cobra.Command {
 				return err
 			}
 
-			configPath := filepath.Join(cfg.DataDir, store.ConfigFilePath)
+			configPath := cfg.ConfigPath()
 			firstRun := false
 			if _, err := os.Stat(configPath); errors.Is(err, os.ErrNotExist) {
 				firstRun = true

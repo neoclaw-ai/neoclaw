@@ -48,7 +48,7 @@ func TestStartLoadsDefaultsAndBootstraps(t *testing.T) {
 		t.Fatalf("execute start: %v", err)
 	}
 
-	soulFile := filepath.Join(dataDir, "agents", "default", "SOUL.md")
+	soulFile := filepath.Join(dataDir, store.DataDirPath, "agents", "default", "SOUL.md")
 	if _, err := os.Stat(soulFile); err != nil {
 		t.Fatalf("expected bootstrap file %q to exist: %v", soulFile, err)
 	}

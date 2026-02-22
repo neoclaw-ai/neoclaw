@@ -81,7 +81,7 @@ func TestTruncateOutput_NoTruncationForSmallOutput(t *testing.T) {
 func TestTruncateOutput_StoresLargeOutputInTempFile(t *testing.T) {
 	dataDir := t.TempDir()
 	t.Setenv("BETTERCLAW_HOME", dataDir)
-	tmpDir := filepath.Join(dataDir, "agents", "default", "workspace", "tmp")
+	tmpDir := filepath.Join(dataDir, "data", "agents", "default", "workspace", "tmp")
 
 	long := make([]byte, 2100)
 	for i := range long {

@@ -3,6 +3,7 @@ package channels
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -818,7 +819,7 @@ func startTestDispatcher(t *testing.T, handler runtime.Handler) (*runtime.Dispat
 
 func writeAllowedUsersFile(t *testing.T, content string) string {
 	t.Helper()
-	path := t.TempDir() + "/allowed_users.json"
+	path := filepath.Join(t.TempDir(), "allowed_users.json")
 	if err := store.WriteFile(path, []byte(content)); err != nil {
 		t.Fatalf("write allowed users file: %v", err)
 	}

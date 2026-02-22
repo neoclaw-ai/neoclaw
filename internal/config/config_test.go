@@ -105,8 +105,12 @@ func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
 	if cfg.Agent != defaultAgent {
 		t.Fatalf("expected default agent %q, got %q", defaultAgent, cfg.Agent)
 	}
-	if cfg.DataDir != dataDir {
-		t.Fatalf("expected data dir %q, got %q", dataDir, cfg.DataDir)
+	if cfg.HomeDir != dataDir {
+		t.Fatalf("expected home dir %q, got %q", dataDir, cfg.HomeDir)
+	}
+	expectedDataDir := filepath.Join(dataDir, "data")
+	if cfg.DataDir != expectedDataDir {
+		t.Fatalf("expected data dir %q, got %q", expectedDataDir, cfg.DataDir)
 	}
 	llm := cfg.DefaultLLM()
 	if llm.Provider != defaultConfig.LLM["default"].Provider {
@@ -133,7 +137,7 @@ func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
 	if cfg.Costs.RecentMessages != defaultConfig.Costs.RecentMessages {
 		t.Fatalf("expected default recent messages %d, got %d", defaultConfig.Costs.RecentMessages, cfg.Costs.RecentMessages)
 	}
-	expectedWorkspace := filepath.Join(dataDir, "agents", defaultAgent, "workspace")
+	expectedWorkspace := filepath.Join(expectedDataDir, "agents", defaultAgent, "workspace")
 	if cfg.Security.Workspace != expectedWorkspace {
 		t.Fatalf("expected derived workspace %q, got %q", expectedWorkspace, cfg.Security.Workspace)
 	}
@@ -206,8 +210,9 @@ func TestLoad_BetterclawHomeOverridesDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	if cfg.DataDir != customDir {
-		t.Fatalf("expected data dir %q, got %q", customDir, cfg.DataDir)
+	expectedDataDir := filepath.Join(customDir, "data")
+	if cfg.DataDir != expectedDataDir {
+		t.Fatalf("expected data dir %q, got %q", expectedDataDir, cfg.DataDir)
 	}
 }
 

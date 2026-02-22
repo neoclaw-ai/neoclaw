@@ -30,7 +30,9 @@ const (
 
 // Config is the runtime configuration loaded from defaults, config.toml, and env vars.
 type Config struct {
-	// DataDir is runtime-resolved from BETTERCLAW_HOME and not read from config.
+	// HomeDir is runtime-resolved from BETTERCLAW_HOME and not read from config.
+	HomeDir string `mapstructure:"-"`
+	// DataDir is runtime-resolved as BETTERCLAW_HOME/data and not read from config.
 	DataDir string `mapstructure:"-"`
 	// Agent is runtime-selected (MVP default: "default"), not read from config.
 	Agent    string                       `mapstructure:"-"`
@@ -163,17 +165,18 @@ func HomeDir() (string, error) {
 }
 
 // Load merges hardcoded defaults and config file values in that order.
-// The data directory is determined by BETTERCLAW_HOME (default: ~/.betterclaw).
+// The runtime data directory is BETTERCLAW_HOME/data (default: ~/.betterclaw/data).
 // Config is always at $BETTERCLAW_HOME/config.toml.
 func Load() (*Config, error) {
-	dataDir, err := HomeDir()
+	homeDir, err := HomeDir()
 	if err != nil {
 		return nil, err
 	}
+	dataDir := filepath.Join(homeDir, store.DataDirPath)
 
 	v := viper.New()
-	setDefaults(v, dataDir)
-	v.SetConfigFile(filepath.Join(dataDir, store.ConfigFilePath))
+	setDefaults(v)
+	v.SetConfigFile(filepath.Join(homeDir, store.ConfigFilePath))
 	v.SetConfigType("toml")
 
 	if err := v.ReadInConfig(); err != nil {
@@ -195,6 +198,7 @@ func Load() (*Config, error) {
 	}); err != nil {
 		return nil, fmt.Errorf("decode config: %w", err)
 	}
+	cfg.HomeDir = homeDir
 	cfg.DataDir = dataDir
 	cfg.Agent = defaultAgent
 	cfg.Security.Workspace = cfg.WorkspaceDir()
@@ -209,14 +213,14 @@ func Write(w io.Writer) error {
 		return errors.New("writer is required")
 	}
 
-	dataDir, err := HomeDir()
+	homeDir, err := HomeDir()
 	if err != nil {
 		return err
 	}
 
 	v := viper.New()
-	setDefaults(v, dataDir)
-	v.SetConfigFile(filepath.Join(dataDir, store.ConfigFilePath))
+	setDefaults(v)
+	v.SetConfigFile(filepath.Join(homeDir, store.ConfigFilePath))
 	v.SetConfigType("toml")
 
 	if err := v.ReadInConfig(); err != nil {
@@ -264,7 +268,7 @@ func DefaultUserConfigTOML() (string, error) {
 	return out.String(), nil
 }
 
-func setDefaults(v *viper.Viper, dataDir string) {
+func setDefaults(v *viper.Viper) {
 	v.SetDefault("channels.telegram.enabled", defaultConfig.Channels["telegram"].Enabled)
 	v.SetDefault("channels.telegram.token", defaultConfig.Channels["telegram"].Token)
 
@@ -291,6 +295,11 @@ func setDefaults(v *viper.Viper, dataDir string) {
 // AgentDir returns the active agent directory under DataDir.
 func (c *Config) AgentDir() string {
 	return filepath.Join(c.DataDir, store.AgentsDirPath, c.Agent)
+}
+
+// ConfigPath returns the config file path under HomeDir.
+func (c *Config) ConfigPath() string {
+	return filepath.Join(c.HomeDir, store.ConfigFilePath)
 }
 
 // WorkspaceDir returns the active agent workspace directory.

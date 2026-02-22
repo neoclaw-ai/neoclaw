@@ -45,13 +45,18 @@ var defaultAllowedCommands = []string{
 // Initialize creates the expected BetterClaw data tree if missing.
 func Initialize(cfg *config.Config) error {
 	agentDir := cfg.AgentDir()
+	policyDir := filepath.Join(cfg.DataDir, store.PolicyDirPath)
+	logsDir := filepath.Join(cfg.DataDir, store.LogsDirPath)
 	defaultConfig, err := config.DefaultUserConfigTOML()
 	if err != nil {
 		return fmt.Errorf("render default config: %w", err)
 	}
 
 	dirs := []string{
+		cfg.HomeDir,
 		cfg.DataDir,
+		policyDir,
+		logsDir,
 		filepath.Join(cfg.DataDir, store.AgentsDirPath),
 		agentDir,
 		filepath.Join(agentDir, store.WorkspaceDirPath),
@@ -71,7 +76,7 @@ func Initialize(cfg *config.Config) error {
 		path    string
 		content string
 	}{
-		{path: filepath.Join(cfg.DataDir, store.ConfigFilePath), content: defaultConfig},
+		{path: cfg.ConfigPath(), content: defaultConfig},
 		{path: filepath.Join(cfg.DataDir, store.AllowedDomainsFilePath), content: defaultAllowedDomainsJSON()},
 		{path: filepath.Join(cfg.DataDir, store.AllowedCommandsFilePath), content: defaultAllowedCommandsJSON()},
 		{path: filepath.Join(cfg.DataDir, store.AllowedUsersFilePath), content: defaultAllowedUsersJSON()},

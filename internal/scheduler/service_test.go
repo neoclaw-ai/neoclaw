@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"io"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -10,7 +11,7 @@ import (
 func TestRunNowValidJobReturnsOutput(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{
+	svc := NewService(filepath.Join(t.TempDir(), "jobs.json"), NewRunner(ActionRunners{
 		RunCommand: func(_ context.Context, args map[string]any) (string, error) {
 			if args["command"] != "echo hello" {
 				t.Fatalf("expected command echo hello, got %#v", args["command"])
@@ -42,7 +43,7 @@ func TestRunNowValidJobReturnsOutput(t *testing.T) {
 func TestRunNowMissingJobReturnsError(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{
+	svc := NewService(filepath.Join(t.TempDir(), "jobs.json"), NewRunner(ActionRunners{
 		RunCommand: func(_ context.Context, _ map[string]any) (string, error) {
 			return "", nil
 		},
@@ -58,7 +59,7 @@ func TestStartRunNowStopRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	called := 0
-	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{
+	svc := NewService(filepath.Join(t.TempDir(), "jobs.json"), NewRunner(ActionRunners{
 		SendMessage: func(_ context.Context, _ io.Writer, args map[string]any) (string, error) {
 			called++
 			if args["message"] != "hello" {
@@ -107,7 +108,7 @@ func TestStartRunNowStopRoundTrip(t *testing.T) {
 func TestStartTwiceReturnsError(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{}, nil))
+	svc := NewService(filepath.Join(t.TempDir(), "jobs.json"), NewRunner(ActionRunners{}, nil))
 
 	if err := svc.Start(context.Background()); err != nil {
 		t.Fatalf("first start: %v", err)
@@ -121,7 +122,7 @@ func TestStartTwiceReturnsError(t *testing.T) {
 func TestStopExpiredContextOnUnstartedServiceReturnsNil(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{}, nil))
+	svc := NewService(filepath.Join(t.TempDir(), "jobs.json"), NewRunner(ActionRunners{}, nil))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -134,7 +135,7 @@ func TestStopExpiredContextOnUnstartedServiceReturnsNil(t *testing.T) {
 func TestRegisterAndUnregisterManageEntryMapping(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService(t.TempDir()+"/jobs.json", NewRunner(ActionRunners{
+	svc := NewService(filepath.Join(t.TempDir(), "jobs.json"), NewRunner(ActionRunners{
 		SendMessage: func(_ context.Context, _ io.Writer, _ map[string]any) (string, error) {
 			return "sent", nil
 		},

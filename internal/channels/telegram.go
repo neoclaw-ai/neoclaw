@@ -150,7 +150,7 @@ func BeginTelegramPairing(ctx context.Context, token string) (*TelegramPairSessi
 		return nil, fmt.Errorf("send pairing code: %w", err)
 	}
 
-	dataDir, err := config.HomeDir()
+	homeDir, err := config.HomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("resolve data dir for users store: %w", err)
 	}
@@ -165,7 +165,7 @@ func BeginTelegramPairing(ctx context.Context, token string) (*TelegramPairSessi
 			username: inbound.username,
 			name:     inbound.name,
 		},
-		allowedUsersPath: filepath.Join(dataDir, store.AllowedUsersFilePath),
+		allowedUsersPath: filepath.Join(homeDir, store.DataDirPath, store.AllowedUsersFilePath),
 	}, nil
 }
 
