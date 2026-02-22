@@ -34,9 +34,10 @@ func newCLICmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := config.ValidateStartup(cfg); err != nil {
+			if err := cfg.Validate(); err != nil {
 				return err
 			}
+			warnStartupConditions(cfg)
 
 			llmCfg := cfg.DefaultLLM()
 			modelProvider, err := providerFactory(llmCfg)

@@ -14,7 +14,7 @@ token = ""
 
 [security]
 command_timeout = "5m"
-mode = "standard" # one of: "standard", "danger-full-access", "strict"
+mode = "standard" # one of: "standard", "danger", "strict"
 
 [costs]
 daily_limit = 0.0

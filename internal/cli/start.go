@@ -38,9 +38,10 @@ func newStartCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := config.ValidateStartup(cfg); err != nil {
+			if err := cfg.Validate(); err != nil {
 				return err
 			}
+			warnStartupConditions(cfg)
 
 			llm := cfg.DefaultLLM()
 			logging.Logger().Info(

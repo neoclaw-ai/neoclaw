@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/machinae/betterclaw/internal/sandbox"
 	"github.com/machinae/betterclaw/internal/store"
 	"github.com/spf13/viper"
 )
@@ -21,8 +22,8 @@ const defaultAgent = "default"
 const (
 	// SecurityModeStandard is the default sandbox/security behavior.
 	SecurityModeStandard = "standard"
-	// SecurityModeDangerFullAccess disables sandbox protections.
-	SecurityModeDangerFullAccess = "danger-full-access"
+	// SecurityModeDanger disables sandbox protections and approval checks.
+	SecurityModeDanger = "danger"
 	// SecurityModeStrict enables stricter sandbox policy where supported.
 	SecurityModeStrict = "strict"
 )
@@ -315,11 +316,109 @@ func (c *Config) TelegramChannel() ChannelConfig {
 
 func validateSecurityMode(mode string) error {
 	switch mode {
-	case SecurityModeStandard, SecurityModeDangerFullAccess, SecurityModeStrict:
+	case SecurityModeStandard, SecurityModeDanger, SecurityModeStrict:
 		return nil
 	default:
-		return fmt.Errorf("invalid security.mode %q (allowed: %q, %q, %q)", mode, SecurityModeStandard, SecurityModeDangerFullAccess, SecurityModeStrict)
+		return fmt.Errorf("invalid security.mode %q (allowed: %q, %q, %q)", mode, SecurityModeStandard, SecurityModeDanger, SecurityModeStrict)
 	}
+}
+
+// Validatable is implemented by config sections that can self-validate.
+type Validatable interface {
+	Validate() error
+}
+
+// Validate checks required LLM provider fields and provider-specific rules.
+func (c LLMProviderConfig) Validate() error {
+	if c.Provider == "" {
+		return errors.New("provider is required")
+	}
+	if c.Model == "" {
+		return errors.New("model is required")
+	}
+	if c.RequestTimeout <= 0 {
+		return errors.New("request_timeout must be > 0")
+	}
+
+	switch c.Provider {
+	case "anthropic", "openrouter":
+		if c.APIKey == "" {
+			return errors.New("api_key is required")
+		}
+	case "ollama":
+		// Local provider, no API key required.
+	default:
+		return fmt.Errorf("unsupported provider %q", c.Provider)
+	}
+	return nil
+}
+
+// Validate checks required channel fields when the channel is enabled.
+func (c ChannelConfig) Validate() error {
+	if !c.Enabled {
+		return nil
+	}
+	if c.Token == "" {
+		return errors.New("token is required when enabled=true")
+	}
+	return nil
+}
+
+// Validate checks security mode values.
+func (c SecurityConfig) Validate() error {
+	return validateSecurityMode(c.Mode)
+}
+
+// Validate validates cost limits.
+func (c CostsConfig) Validate() error {
+	return nil
+}
+
+// Validate validates web settings.
+func (c WebConfig) Validate() error {
+	return nil
+}
+
+// Validate validates startup configuration and returns the first fatal error.
+func (cfg *Config) Validate() error {
+	var errs []error
+
+	if len(cfg.LLM) == 0 {
+		errs = append(errs, errors.New("at least one llm.* profile is required"))
+	}
+	if len(cfg.Channels) == 0 {
+		errs = append(errs, errors.New("at least one channels.* entry is required"))
+	}
+
+	if err := cfg.Security.Validate(); err != nil {
+		errs = append(errs, fmt.Errorf("security: %w", err))
+	}
+	if err := cfg.Costs.Validate(); err != nil {
+		errs = append(errs, fmt.Errorf("costs: %w", err))
+	}
+	if err := cfg.Web.Validate(); err != nil {
+		errs = append(errs, fmt.Errorf("web: %w", err))
+	}
+
+	for name, llmCfg := range cfg.LLM {
+		if err := llmCfg.Validate(); err != nil {
+			errs = append(errs, fmt.Errorf("llm.%s: %w", name, err))
+		}
+	}
+	for name, chCfg := range cfg.Channels {
+		if err := chCfg.Validate(); err != nil {
+			errs = append(errs, fmt.Errorf("channels.%s: %w", name, err))
+		}
+	}
+
+	if cfg.Security.Mode == SecurityModeStrict && !sandbox.IsSandboxSupported() {
+		errs = append(errs, errors.New("security.mode strict requires sandbox support on this platform"))
+	}
+
+	if len(errs) > 0 {
+		return errs[0]
+	}
+	return nil
 }
 
 func expandEnvStringHook() mapstructure.DecodeHookFuncType {

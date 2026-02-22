@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/machinae/betterclaw/internal/sandbox"
 )
 
 var (
@@ -21,7 +23,7 @@ func TestValidateStartup_HardFailNoLLM(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
 
-	err := ValidateStartup(cfg)
+	err := cfg.Validate()
 	if err == nil {
 		t.Fatalf("expected error for missing llm profiles")
 	}
@@ -34,7 +36,7 @@ func TestValidateStartup_HardFailNoChannels(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
 
-	err := ValidateStartup(cfg)
+	err := cfg.Validate()
 	if err == nil {
 		t.Fatalf("expected error for missing channels")
 	}
@@ -47,7 +49,7 @@ func TestValidateStartup_AnthropicRequiresAPIKey(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
 
-	err := ValidateStartup(cfg)
+	err := cfg.Validate()
 	if err == nil || !strings.Contains(err.Error(), "api_key is required") {
 		t.Fatalf("expected anthropic api_key validation error, got %v", err)
 	}
@@ -60,7 +62,7 @@ func TestValidateStartup_OllamaDoesNotRequireAPIKey(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
 
-	err := ValidateStartup(cfg)
+	err := cfg.Validate()
 	if err != nil {
 		t.Fatalf("expected ollama config to pass without api key, got %v", err)
 	}
@@ -73,13 +75,13 @@ func TestValidateStartup_RequestTimeoutMustBePositive(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard},
 	}
 
-	err := ValidateStartup(cfg)
+	err := cfg.Validate()
 	if err == nil || !strings.Contains(err.Error(), "request_timeout must be > 0") {
 		t.Fatalf("expected request_timeout validation error, got %v", err)
 	}
 }
 
-func TestValidateStartup_WebBraveMissingAPIKeyWarnsOnly(t *testing.T) {
+func TestValidateStartup_WebBraveMissingAPIKeyDoesNotHardFail(t *testing.T) {
 	cfg := &Config{
 		LLM: map[string]LLMProviderConfig{
 			"default": {Provider: "anthropic", APIKey: "k", Model: "m", RequestTimeout: time.Second},
@@ -93,8 +95,82 @@ func TestValidateStartup_WebBraveMissingAPIKeyWarnsOnly(t *testing.T) {
 		},
 	}
 
-	err := ValidateStartup(cfg)
+	err := cfg.Validate()
 	if err != nil {
 		t.Fatalf("expected no hard error for missing brave web.search api key, got %v", err)
+	}
+}
+
+func TestValidateStartup_InvalidModeFails(t *testing.T) {
+	cfg := &Config{
+		LLM: map[string]LLMProviderConfig{
+			"default": {Provider: "anthropic", APIKey: "k", Model: "m", RequestTimeout: time.Second},
+		},
+		Channels: map[string]ChannelConfig{
+			"telegram": {Enabled: true, Token: "t"},
+		},
+		Security: SecurityConfig{Mode: "banana"},
+	}
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "invalid security.mode") {
+		t.Fatalf("expected invalid mode error, got %v", err)
+	}
+}
+
+func TestValidateStartup_DangerFullAccessIsInvalidMode(t *testing.T) {
+	cfg := &Config{
+		LLM: map[string]LLMProviderConfig{
+			"default": {Provider: "anthropic", APIKey: "k", Model: "m", RequestTimeout: time.Second},
+		},
+		Channels: map[string]ChannelConfig{
+			"telegram": {Enabled: true, Token: "t"},
+		},
+		Security: SecurityConfig{Mode: "danger-full-access"},
+	}
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "invalid security.mode") {
+		t.Fatalf("expected invalid mode error, got %v", err)
+	}
+}
+
+func TestValidateStartup_StrictRequiresSandboxSupport(t *testing.T) {
+	cfg := &Config{
+		LLM: map[string]LLMProviderConfig{
+			"default": {Provider: "anthropic", APIKey: "k", Model: "m", RequestTimeout: time.Second},
+		},
+		Channels: map[string]ChannelConfig{
+			"telegram": {Enabled: true, Token: "t"},
+		},
+		Security: SecurityConfig{Mode: SecurityModeStrict},
+	}
+
+	err := cfg.Validate()
+	if sandbox.IsSandboxSupported() {
+		if err != nil {
+			t.Fatalf("expected strict mode to pass with sandbox support, got %v", err)
+		}
+		return
+	}
+	if err == nil || !strings.Contains(err.Error(), "requires sandbox support") {
+		t.Fatalf("expected strict sandbox support error, got %v", err)
+	}
+}
+
+func TestValidateStartup_DangerModeIsValid(t *testing.T) {
+	cfg := &Config{
+		LLM: map[string]LLMProviderConfig{
+			"default": {Provider: "anthropic", APIKey: "k", Model: "m", RequestTimeout: time.Second},
+		},
+		Channels: map[string]ChannelConfig{
+			"telegram": {Enabled: true, Token: "t"},
+		},
+		Security: SecurityConfig{Mode: SecurityModeDanger},
+	}
+
+	err := cfg.Validate()
+	if err != nil {
+		t.Fatalf("expected danger mode to pass validation, got %v", err)
 	}
 }
