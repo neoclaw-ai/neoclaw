@@ -12,11 +12,12 @@ import (
 
 const (
 	// Global files under BETTERCLAW_HOME.
-	ConfigFilePath         = "config.toml"
-	AllowedDomainsFilePath = "allowed_domains.json"
-	AllowedBinsFilePath    = "allowed_bins.json"
-	AllowedUsersFilePath   = "allowed_users.json"
-	CostsFilePath          = "costs.jsonl"
+	ConfigFilePath          = "config.toml"
+	AllowedDomainsFilePath  = "allowed_domains.json"
+	AllowedCommandsFilePath = "allowed_commands.json"
+	AllowedBinsFilePath     = "allowed_bins.json"
+	AllowedUsersFilePath    = "allowed_users.json"
+	CostsFilePath           = "costs.jsonl"
 
 	// Agent directory layout under BETTERCLAW_HOME/agents/{agent}/.
 	AgentsDirPath      = "agents"
