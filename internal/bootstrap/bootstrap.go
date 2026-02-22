@@ -16,29 +16,30 @@ var defaultAllowedDomains = []string{
 	"api.openrouter.ai",
 }
 
-var defaultAllowedBins = []string{
-	"cat",
-	"cd",
-	"cut",
-	"echo",
-	"expr",
-	"find",
-	"grep",
-	"head",
-	"id",
-	"ls",
-	"paste",
-	"pwd",
-	"rev",
-	"seq",
-	"stat",
-	"tail",
-	"tr",
-	"uname",
-	"uniq",
-	"wc",
-	"which",
-	"whoami",
+var defaultAllowedCommands = []string{
+	"cat *",
+	"cd *",
+	"curl *",
+	"cut *",
+	"echo *",
+	"expr *",
+	"find *",
+	"grep *",
+	"head *",
+	"id *",
+	"ls *",
+	"paste *",
+	"pwd *",
+	"rev *",
+	"seq *",
+	"stat *",
+	"tail *",
+	"tr *",
+	"uname *",
+	"uniq *",
+	"wc *",
+	"which *",
+	"whoami *",
 }
 
 // Initialize creates the expected BetterClaw data tree if missing.
@@ -72,7 +73,7 @@ func Initialize(cfg *config.Config) error {
 	}{
 		{path: filepath.Join(cfg.DataDir, store.ConfigFilePath), content: defaultConfig},
 		{path: filepath.Join(cfg.DataDir, store.AllowedDomainsFilePath), content: defaultAllowedDomainsJSON()},
-		{path: filepath.Join(cfg.DataDir, store.AllowedBinsFilePath), content: defaultAllowedBinsJSON()},
+		{path: filepath.Join(cfg.DataDir, store.AllowedCommandsFilePath), content: defaultAllowedCommandsJSON()},
 		{path: filepath.Join(cfg.DataDir, store.AllowedUsersFilePath), content: defaultAllowedUsersJSON()},
 		{path: filepath.Join(cfg.DataDir, store.CostsFilePath), content: ""},
 
@@ -105,19 +106,25 @@ func writeFileIfMissing(path, content string) error {
 }
 
 func defaultAllowedDomainsJSON() string {
-	b, err := json.MarshalIndent(defaultAllowedDomains, "", "  ")
+	payload := map[string][]string{
+		"allow": defaultAllowedDomains,
+		"deny":  []string{},
+	}
+	b, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
-		// Static list; this should never fail.
-		return "[]\n"
+		return "{\n  \"allow\": [],\n  \"deny\": []\n}\n"
 	}
 	return string(b) + "\n"
 }
 
-func defaultAllowedBinsJSON() string {
-	b, err := json.MarshalIndent(defaultAllowedBins, "", "  ")
+func defaultAllowedCommandsJSON() string {
+	payload := map[string][]string{
+		"allow": defaultAllowedCommands,
+		"deny":  []string{},
+	}
+	b, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
-		// Static list; this should never fail.
-		return "[]\n"
+		return "{\n  \"allow\": [],\n  \"deny\": []\n}\n"
 	}
 	return string(b) + "\n"
 }

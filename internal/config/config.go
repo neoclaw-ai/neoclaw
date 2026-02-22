@@ -142,6 +142,10 @@ var defaultUserConfig = Config{
 		DailyLimit:   0,
 		MonthlyLimit: 0,
 	},
+	Security: SecurityConfig{
+		CommandTimeout: 5 * time.Minute,
+		Mode:           SecurityModeStandard,
+	},
 }
 
 // HomeDir returns the BetterClaw home directory.
@@ -249,6 +253,8 @@ func DefaultUserConfigTOML() (string, error) {
 	}
 	v.Set("costs.daily_limit", defaultUserConfig.Costs.DailyLimit)
 	v.Set("costs.monthly_limit", defaultUserConfig.Costs.MonthlyLimit)
+	v.Set("security.mode", defaultUserConfig.Security.Mode)
+	v.Set("security.command_timeout", defaultUserConfig.Security.CommandTimeout.String())
 
 	var out bytes.Buffer
 	if err := v.WriteConfigTo(&out); err != nil {

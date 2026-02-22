@@ -24,7 +24,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 	requiredPaths := []string{
 		filepath.Join(dataDir, "config.toml"),
 		filepath.Join(dataDir, "allowed_domains.json"),
-		filepath.Join(dataDir, "allowed_bins.json"),
+		filepath.Join(dataDir, "allowed_commands.json"),
 		filepath.Join(dataDir, "allowed_users.json"),
 		filepath.Join(dataDir, "costs.jsonl"),
 		filepath.Join(dataDir, "agents", "default", "SOUL.md"),
@@ -55,9 +55,16 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read allowed domains file: %v", err)
 	}
-	domains := string(domainsRaw)
-	if !strings.Contains(domains, "api.anthropic.com") || !strings.Contains(domains, "api.openrouter.ai") {
-		t.Fatalf("expected bootstrap allowed domains file to contain default domains, got %q", domains)
+	var domainsDoc map[string][]string
+	if err := json.Unmarshal(domainsRaw, &domainsDoc); err != nil {
+		t.Fatalf("parse allowed domains file as json object: %v", err)
+	}
+	domainsAllow := domainsDoc["allow"]
+	if !containsString(domainsAllow, "api.anthropic.com") || !containsString(domainsAllow, "api.openrouter.ai") {
+		t.Fatalf("expected bootstrap allowed domains allow list to contain default domains, got %#v", domainsAllow)
+	}
+	if len(domainsDoc["deny"]) != 0 {
+		t.Fatalf("expected bootstrap allowed domains deny list to be empty, got %#v", domainsDoc["deny"])
 	}
 
 	configPath := filepath.Join(dataDir, "config.toml")
@@ -72,18 +79,28 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 	if !strings.Contains(configText, "[costs]") || !strings.Contains(configText, "daily_limit = 0") || !strings.Contains(configText, "monthly_limit = 0") {
 		t.Fatalf("expected bootstrap config to expose disabled spend limits, got %q", configText)
 	}
+	if !strings.Contains(configText, "[security]") || !strings.Contains(configText, "mode = 'standard'") || !strings.Contains(configText, "command_timeout = '5m0s'") {
+		t.Fatalf("expected bootstrap config to contain explicit security defaults, got %q", configText)
+	}
 
-	binsPath := filepath.Join(dataDir, "allowed_bins.json")
-	binsRaw, err := os.ReadFile(binsPath)
+	commandsPath := filepath.Join(dataDir, "allowed_commands.json")
+	commandsRaw, err := os.ReadFile(commandsPath)
 	if err != nil {
-		t.Fatalf("read allowed bins file: %v", err)
+		t.Fatalf("read allowed commands file: %v", err)
 	}
-	var bins []string
-	if err := json.Unmarshal(binsRaw, &bins); err != nil {
-		t.Fatalf("parse allowed bins file as json array: %v", err)
+	var commandsDoc map[string][]string
+	if err := json.Unmarshal(commandsRaw, &commandsDoc); err != nil {
+		t.Fatalf("parse allowed commands file as json object: %v", err)
 	}
-	if len(bins) == 0 {
-		t.Fatalf("expected bootstrap allowed bins file to have at least one entry")
+	commandsAllow := commandsDoc["allow"]
+	if len(commandsAllow) != 23 {
+		t.Fatalf("expected 23 default allowed commands, got %d", len(commandsAllow))
+	}
+	if !containsString(commandsAllow, "curl *") {
+		t.Fatalf("expected default allowed commands to include curl *, got %#v", commandsAllow)
+	}
+	if len(commandsDoc["deny"]) != 0 {
+		t.Fatalf("expected bootstrap allowed commands deny list to be empty, got %#v", commandsDoc["deny"])
 	}
 
 	usersPath := filepath.Join(dataDir, "allowed_users.json")
@@ -106,6 +123,15 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 	if len(usersSlice) != 0 {
 		t.Fatalf("expected bootstrap allowed users file to start empty, got %d entries", len(usersSlice))
 	}
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func TestInitializeIsIdempotent(t *testing.T) {
