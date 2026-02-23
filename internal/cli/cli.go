@@ -72,7 +72,7 @@ func newCLICmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			systemPrompt, err := agent.BuildSystemPrompt(cfg.AgentDir(), memoryStore, cfg.Context.DailyLogLookback, cfg.Context.MaxSoulLength)
+			systemPrompt, err := agent.BuildSystemPrompt(cfg.AgentDir(), memoryStore, cfg.Context)
 			if err != nil {
 				return err
 			}

@@ -75,7 +75,6 @@ type ContextConfig struct {
 	MaxToolCalls     int           `mapstructure:"max_tool_calls"`
 	ToolOutputLength int           `mapstructure:"tool_output_length"`
 	DailyLogLookback time.Duration `mapstructure:"daily_log_lookback"`
-	MaxSoulLength    int           `mapstructure:"max_soul_length"`
 }
 
 // WebConfig configures built-in web tool behavior.
@@ -119,7 +118,6 @@ var defaultConfig = Config{
 		MaxToolCalls:     10,
 		ToolOutputLength: 2000,
 		DailyLogLookback: 24 * time.Hour,
-		MaxSoulLength:    4000,
 	},
 	Web: WebConfig{
 		Search: WebSearchConfig{
@@ -293,7 +291,6 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("context.max_tool_calls", defaultConfig.Context.MaxToolCalls)
 	v.SetDefault("context.tool_output_length", defaultConfig.Context.ToolOutputLength)
 	v.SetDefault("context.daily_log_lookback", defaultConfig.Context.DailyLogLookback)
-	v.SetDefault("context.max_soul_length", defaultConfig.Context.MaxSoulLength)
 
 	v.SetDefault("web.search.provider", defaultConfig.Web.Search.Provider)
 	v.SetDefault("web.search.api_key", defaultConfig.Web.Search.APIKey)

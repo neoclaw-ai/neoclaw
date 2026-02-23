@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/memory"
 )
 
@@ -32,7 +33,7 @@ func TestBuildSystemPromptIncludesSoulMemoryAndRecentDailyLogs(t *testing.T) {
 		t.Fatalf("append recent daily log: %v", err)
 	}
 
-	got, err := buildSystemPromptAt(agentDir, store, now, 24*time.Hour, 4000)
+	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookback: 24 * time.Hour})
 	if err != nil {
 		t.Fatalf("build system prompt: %v", err)
 	}
@@ -47,29 +48,6 @@ func TestBuildSystemPromptIncludesSoulMemoryAndRecentDailyLogs(t *testing.T) {
 	}
 	if !strings.Contains(got, "[Recent daily log]") || !strings.Contains(got, "Worked on API migration") {
 		t.Fatalf("expected recent daily log context, got %q", got)
-	}
-}
-
-func TestBuildSystemPromptTruncatesSoulContent(t *testing.T) {
-	agentDir := t.TempDir()
-	memoryDir := filepath.Join(agentDir, "memory")
-	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
-		t.Fatalf("mkdir memory dir: %v", err)
-	}
-	longSoul := strings.Repeat("a", 4025)
-	if err := os.WriteFile(filepath.Join(agentDir, "SOUL.md"), []byte(longSoul), 0o644); err != nil {
-		t.Fatalf("write soul: %v", err)
-	}
-
-	got, err := buildSystemPromptAt(agentDir, memory.New(memoryDir), time.Date(2026, 2, 17, 12, 0, 0, 0, time.Local), 24*time.Hour, 4000)
-	if err != nil {
-		t.Fatalf("build system prompt: %v", err)
-	}
-	if !strings.Contains(got, strings.Repeat("a", 4000)) {
-		t.Fatalf("expected truncated SOUL content in prompt")
-	}
-	if strings.Contains(got, strings.Repeat("a", 4001)) {
-		t.Fatalf("expected SOUL content to be capped at 4000 chars")
 	}
 }
 
@@ -88,7 +66,7 @@ func TestBuildSystemPromptDailyLogLookbackWindow(t *testing.T) {
 		t.Fatalf("append outside lookback: %v", err)
 	}
 
-	got, err := buildSystemPromptAt(agentDir, store, now, 24*time.Hour, 4000)
+	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookback: 24 * time.Hour})
 	if err != nil {
 		t.Fatalf("build system prompt: %v", err)
 	}

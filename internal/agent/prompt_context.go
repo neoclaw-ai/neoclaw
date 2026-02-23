@@ -14,27 +14,24 @@ import (
 	"github.com/machinae/betterclaw/internal/store"
 )
 
-const defaultMaxSoulLength = 4000
 const defaultDailyLogLookback = 24 * time.Hour
 
 // BuildSystemPrompt assembles the runtime system prompt from base instructions,
 // SOUL.md, long-term memory, and recent daily log entries.
-func BuildSystemPrompt(agentDir string, store *memory.Store, dailyLogLookback time.Duration, maxSoulLength int) (string, error) {
-	return buildSystemPromptAt(agentDir, store, time.Now(), dailyLogLookback, maxSoulLength)
+func BuildSystemPrompt(agentDir string, store *memory.Store, contextCfg config.ContextConfig) (string, error) {
+	return buildSystemPromptAt(agentDir, store, time.Now(), contextCfg)
 }
 
-func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, dailyLogLookback time.Duration, maxSoulLength int) (string, error) {
+func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, contextCfg config.ContextConfig) (string, error) {
 	if strings.TrimSpace(agentDir) == "" {
 		return "", errors.New("agent directory is required")
 	}
 	if store == nil {
 		return "", errors.New("memory store is required")
 	}
+	dailyLogLookback := contextCfg.DailyLogLookback
 	if dailyLogLookback <= 0 {
 		dailyLogLookback = defaultDailyLogLookback
-	}
-	if maxSoulLength <= 0 {
-		maxSoulLength = defaultMaxSoulLength
 	}
 
 	prompt := DefaultSystemPrompt + "\n\n" + autoRememberInstruction
@@ -61,14 +58,10 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, da
 	b.WriteString(prompt)
 	b.WriteString("\n\nContext:\n")
 	if soulText != "" {
-		truncatedSoul, truncated := truncateStringByChars(soulText, maxSoulLength)
 		b.WriteString("\n[SOUL.md]\n")
-		b.WriteString(truncatedSoul)
-		if !strings.HasSuffix(truncatedSoul, "\n") {
+		b.WriteString(soulText)
+		if !strings.HasSuffix(soulText, "\n") {
 			b.WriteByte('\n')
-		}
-		if truncated {
-			b.WriteString(fmt.Sprintf("[SOUL.md truncated to %d chars]\n", maxSoulLength))
 		}
 	}
 	if memoryText != "" {
@@ -92,17 +85,8 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, da
 	return b.String(), nil
 }
 
-func readOptionalFile(path string) (string, error) {
-	content, err := store.ReadFile(path)
-	if err == nil {
-		return content, nil
-	}
-	if errors.Is(err, os.ErrNotExist) {
-		return "", nil
-	}
-	return "", fmt.Errorf("read %q: %w", path, err)
-}
-
+// truncateStringByChars truncates s to at most maxChars Unicode code points,
+// returning the truncated string and whether truncation occurred.
 func truncateStringByChars(s string, maxChars int) (string, bool) {
 	if maxChars <= 0 {
 		return "", len(s) > 0
@@ -121,4 +105,15 @@ func truncateStringByChars(s string, maxChars int) (string, bool) {
 		charCount++
 	}
 	return b.String(), true
+}
+
+func readOptionalFile(path string) (string, error) {
+	content, err := store.ReadFile(path)
+	if err == nil {
+		return content, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	return "", fmt.Errorf("read %q: %w", path, err)
 }
