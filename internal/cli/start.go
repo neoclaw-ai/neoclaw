@@ -51,6 +51,7 @@ func newStartCmd() *cobra.Command {
 				"agent", cfg.Agent,
 				"provider", llm.Provider,
 				"model", llm.Model,
+				"security_mode", cfg.Security.Mode,
 				"data_dir", cfg.DataDir(),
 			)
 
