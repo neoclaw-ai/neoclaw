@@ -38,7 +38,7 @@ func TestDarwinProfileStrict(t *testing.T) {
 		"(deny default)",
 		"(allow process*)",
 		"(allow sysctl-read)",
-		"(allow network-outbound*)",
+		"(allow network-outbound)",
 		`(allow file-read* (subpath "/tmp/betterclaw/data"))`,
 		`(allow file-read* (subpath "/usr"))`,
 		`(allow file-read* (subpath "/bin"))`,

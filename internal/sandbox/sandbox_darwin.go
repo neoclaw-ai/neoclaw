@@ -44,10 +44,15 @@ func restrictProcessImpl(mode, dataDir string) error {
 		return fmt.Errorf("resolve data dir symlinks: %w", err)
 	}
 
-	profile := darwinProfile(mode, absDataDir)
-	if strings.TrimSpace(profile) == "" {
-		return fmt.Errorf("unsupported security mode %q", mode)
+	// Resolve home dir for strict mode HOME deny. Best-effort: if unresolvable,
+	// strict mode degrades to standard mode behavior for reads.
+	homeDir, _ := os.UserHomeDir()
+	if homeDir != "" {
+		if resolved, err := filepath.EvalSymlinks(homeDir); err == nil {
+			homeDir = resolved
+		}
 	}
+
 	execPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("resolve executable path: %w", err)
@@ -55,6 +60,11 @@ func restrictProcessImpl(mode, dataDir string) error {
 	execPath, err = filepath.EvalSymlinks(execPath)
 	if err != nil {
 		return fmt.Errorf("resolve executable symlinks: %w", err)
+	}
+
+	profile := darwinProfile(mode, absDataDir, homeDir)
+	if strings.TrimSpace(profile) == "" {
+		return fmt.Errorf("unsupported security mode %q", mode)
 	}
 
 	args := append([]string{
@@ -71,34 +81,25 @@ func restrictProcessImpl(mode, dataDir string) error {
 }
 
 // darwinProfile builds the SBPL profile for process-level filesystem restrictions.
-func darwinProfile(mode, dataDir string) string {
-	writeRule := fmt.Sprintf("(allow file-write* (subpath %q))", dataDir)
+//
+// Both modes start from (allow default) to avoid breaking dyld and system services.
+// Strict mode additionally denies reads from the user home directory, except for
+// dataDir which is explicitly allowed before the home deny fires.
+// If homeDir is empty, the home read deny is skipped and strict behaves like standard.
+func darwinProfile(mode, dataDir, homeDir string) string {
 	switch strings.TrimSpace(mode) {
 	case config.SecurityModeStrict:
-		readRoots := []string{
-			dataDir,
-			"/usr",
-			"/bin",
-			"/sbin",
-			"/private/etc",
-			"/private/tmp",
-			"/private/var",
-			"/dev/null",
-		}
 		var profile strings.Builder
 		profile.WriteString("(version 1)\n")
-		profile.WriteString("(deny default)\n")
-		profile.WriteString("(allow process*)\n")
-		profile.WriteString("(allow sysctl-read)\n")
-		profile.WriteString("(allow network-outbound*)\n")
-		for _, root := range readRoots {
-			root = strings.TrimSpace(root)
-			if root == "" {
-				continue
-			}
-			profile.WriteString(fmt.Sprintf("(allow file-read* (subpath %q))\n", root))
+		profile.WriteString("(allow default)\n")
+		// Punch a hole for dataDir reads before denying the rest of HOME.
+		// Order matters: SBPL uses first-match for explicit rules.
+		if homeDir != "" {
+			profile.WriteString(fmt.Sprintf("(allow file-read* (subpath %q))\n", dataDir))
+			profile.WriteString(fmt.Sprintf("(deny file-read* (subpath %q))\n", homeDir))
 		}
-		profile.WriteString(writeRule)
+		profile.WriteString(fmt.Sprintf("(allow file-write* (subpath %q))\n", dataDir))
+		profile.WriteString("(deny file-write*)")
 		return profile.String()
 	case config.SecurityModeStandard:
 		return strings.Join([]string{
