@@ -44,6 +44,10 @@ func restrictProcessImpl(mode, dataDir string) error {
 	if err != nil {
 		return fmt.Errorf("resolve data dir: %w", err)
 	}
+	absDataDir, err = filepath.EvalSymlinks(absDataDir)
+	if err != nil {
+		return fmt.Errorf("resolve data dir symlinks: %w", err)
+	}
 
 	rules := []landlock.Rule{
 		landlock.RWDirs(absDataDir),

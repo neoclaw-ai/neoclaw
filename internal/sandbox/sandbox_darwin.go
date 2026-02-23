@@ -39,11 +39,22 @@ func restrictProcessImpl(mode, dataDir string) error {
 	if err != nil {
 		return fmt.Errorf("resolve data dir: %w", err)
 	}
+	absDataDir, err = filepath.EvalSymlinks(absDataDir)
+	if err != nil {
+		return fmt.Errorf("resolve data dir symlinks: %w", err)
+	}
 
 	profile := darwinProfile(mode, absDataDir)
+	if strings.TrimSpace(profile) == "" {
+		return fmt.Errorf("unsupported security mode %q", mode)
+	}
 	execPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("resolve executable path: %w", err)
+	}
+	execPath, err = filepath.EvalSymlinks(execPath)
+	if err != nil {
+		return fmt.Errorf("resolve executable symlinks: %w", err)
 	}
 
 	args := append([]string{
@@ -89,12 +100,14 @@ func darwinProfile(mode, dataDir string) string {
 		}
 		profile.WriteString(writeRule)
 		return profile.String()
-	default:
+	case config.SecurityModeStandard:
 		return strings.Join([]string{
 			"(version 1)",
 			"(allow default)",
-			"(deny file-write*)",
 			fmt.Sprintf("(allow file-write* (subpath %q))", dataDir),
+			"(deny file-write*)",
 		}, "\n")
+	default:
+		return ""
 	}
 }

@@ -59,3 +59,10 @@ func TestDarwinProfileStrict(t *testing.T) {
 		t.Fatalf("strict profile should not allow global file reads:\n%s", profile)
 	}
 }
+
+func TestDarwinProfileUnknownModeReturnsEmpty(t *testing.T) {
+	profile := darwinProfile("unknown", "/tmp/betterclaw/data")
+	if profile != "" {
+		t.Fatalf("expected empty profile for unknown mode, got:\n%s", profile)
+	}
+}
