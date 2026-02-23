@@ -65,7 +65,10 @@ func newStartCmd() *cobra.Command {
 			channelWriters := map[string]io.Writer{
 				"cli": cmd.OutOrStdout(),
 			}
-			service := newSchedulerService(cfg, channelWriters)
+			service, err := newSchedulerService(cfg, channelWriters)
+			if err != nil {
+				return err
+			}
 
 			runCtx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()

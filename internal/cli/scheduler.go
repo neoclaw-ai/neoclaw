@@ -2,20 +2,37 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/machinae/betterclaw/internal/approval"
 	"github.com/machinae/betterclaw/internal/config"
+	"github.com/machinae/betterclaw/internal/sandbox"
 	"github.com/machinae/betterclaw/internal/scheduler"
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
-func newSchedulerService(cfg *config.Config, channelWriters map[string]io.Writer) *scheduler.Service {
-	return scheduler.NewService(cfg.JobsPath(), newSchedulerRunner(cfg, channelWriters))
+func newSchedulerService(cfg *config.Config, channelWriters map[string]io.Writer) (*scheduler.Service, error) {
+	runner, err := newSchedulerRunner(cfg, channelWriters)
+	if err != nil {
+		return nil, err
+	}
+	return scheduler.NewService(cfg.JobsPath(), runner), nil
 }
 
-func newSchedulerRunner(cfg *config.Config, channelWriters map[string]io.Writer) *scheduler.Runner {
+func newSchedulerRunner(cfg *config.Config, channelWriters map[string]io.Writer) (*scheduler.Runner, error) {
+	proxyAddress := ""
+	if cfg.Security.Mode != config.SecurityModeDanger {
+		domainProxy, err := sandbox.StartDomainProxy(approval.Checker{
+			AllowedDomainsPath: cfg.AllowedDomainsPath(),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("start scheduler domain proxy: %w", err)
+		}
+		proxyAddress = domainProxy.Addr()
+	}
+
 	httpClient := &http.Client{
 		Transport: approval.RoundTripper{
 			Checker: approval.Checker{
@@ -27,6 +44,8 @@ func newSchedulerRunner(cfg *config.Config, channelWriters map[string]io.Writer)
 	runTool := tools.RunCommandTool{
 		WorkspaceDir: cfg.WorkspaceDir(),
 		Timeout:      cfg.Security.CommandTimeout,
+		SecurityMode: cfg.Security.Mode,
+		ProxyAddress: proxyAddress,
 	}
 	httpTool := tools.HTTPRequestTool{Client: httpClient}
 
@@ -62,5 +81,5 @@ func newSchedulerRunner(cfg *config.Config, channelWriters map[string]io.Writer)
 			}
 			return res.Output, nil
 		},
-	}, channelWriters)
+	}, channelWriters), nil
 }

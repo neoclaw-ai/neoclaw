@@ -49,7 +49,10 @@ func newCLICmd() *cobra.Command {
 
 			memoryStore := memory.New(cfg.MemoryDir())
 			channelWriters := map[string]io.Writer{"cli": cmd.OutOrStdout()}
-			schedulerService := newSchedulerService(cfg, channelWriters)
+			schedulerService, err := newSchedulerService(cfg, channelWriters)
+			if err != nil {
+				return err
+			}
 			trimmedPrompt := strings.TrimSpace(prompt)
 			var (
 				approver approval.Approver
@@ -130,6 +133,19 @@ func buildToolRegistry(
 	resolveChannelID func() string,
 ) (*tools.Registry, error) {
 	registry := tools.NewRegistry()
+
+	proxyAddress := ""
+	if cfg.Security.Mode != config.SecurityModeDanger {
+		domainProxy, err := sandbox.StartDomainProxy(approval.Checker{
+			AllowedDomainsPath: cfg.AllowedDomainsPath(),
+			Approver:           approver,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("start domain proxy: %w", err)
+		}
+		proxyAddress = domainProxy.Addr()
+	}
+
 	httpClient := &http.Client{
 		Transport: approval.RoundTripper{
 			Checker: approval.Checker{
@@ -158,6 +174,8 @@ func buildToolRegistry(
 		tools.RunCommandTool{
 			WorkspaceDir: cfg.WorkspaceDir(),
 			Timeout:      cfg.Security.CommandTimeout,
+			SecurityMode: cfg.Security.Mode,
+			ProxyAddress: proxyAddress,
 		},
 		tools.SendMessageTool{
 			Sender: channelSender,

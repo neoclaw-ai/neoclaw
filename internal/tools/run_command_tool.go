@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -19,6 +20,8 @@ const schedulerOutputJobIDArg = "job_id"
 type RunCommandTool struct {
 	WorkspaceDir string
 	Timeout      time.Duration
+	SecurityMode string
+	ProxyAddress string
 }
 
 // Name returns the tool name.
@@ -83,6 +86,7 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 
 	cmd := exec.CommandContext(runCtx, "bash", "-lc", command)
 	cmd.Dir = workdir
+	cmd.Env = t.commandEnv()
 	configureCommandForCancellation(cmd)
 	combinedOut, runErr := cmd.CombinedOutput()
 	exitCode := 0
@@ -120,6 +124,27 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 		Output:         output,
 		FullOutputPath: fullOutputPath,
 	}, nil
+}
+
+// commandEnv returns subprocess environment with proxy settings for non-danger modes.
+func (t RunCommandTool) commandEnv() []string {
+	env := os.Environ()
+	if strings.EqualFold(strings.TrimSpace(t.SecurityMode), config.SecurityModeDanger) {
+		return env
+	}
+	proxyAddress := strings.TrimSpace(t.ProxyAddress)
+	if proxyAddress == "" {
+		return env
+	}
+	env = append(env,
+		"HTTP_PROXY="+proxyAddress,
+		"HTTPS_PROXY="+proxyAddress,
+		"http_proxy="+proxyAddress,
+		"https_proxy="+proxyAddress,
+		"NO_PROXY=",
+		"no_proxy=",
+	)
+	return env
 }
 
 // WriteOutput writes full command output to workspace/tmp and returns the file path.
