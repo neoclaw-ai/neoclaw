@@ -84,7 +84,7 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(runCtx, "bash", "-lc", command)
+	cmd := exec.CommandContext(runCtx, "sh", "-c", command)
 	cmd.Dir = workdir
 	cmd.Env = t.commandEnv()
 	configureCommandForCancellation(cmd)
