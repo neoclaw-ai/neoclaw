@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,6 +69,89 @@ func TestExecuteTool_RequiresApprovalMissingApprover(t *testing.T) {
 	_, err := ExecuteTool(context.Background(), nil, tool, nil, "Write file")
 	if err == nil || !strings.Contains(err.Error(), "requires approval") {
 		t.Fatalf("expected missing approver error, got %v", err)
+	}
+}
+
+func TestExecuteTool_DangerModeSkipsAllApprovals(t *testing.T) {
+	useIsolatedPolicyCache(t)
+
+	homeDir := t.TempDir()
+	t.Setenv("BETTERCLAW_HOME", homeDir)
+	writeDangerConfig(t, homeDir)
+
+	appr := &fakeApprover{decision: Denied}
+	tool := fakeTool{name: "write_file", permission: tools.RequiresApproval, output: "done"}
+	res, err := ExecuteTool(context.Background(), appr, tool, map[string]any{"path": "notes.md"}, "Write file")
+	if err != nil {
+		t.Fatalf("execute tool: %v", err)
+	}
+	if res.Output != "done" {
+		t.Fatalf("expected output done, got %q", res.Output)
+	}
+	if appr.calls != 0 {
+		t.Fatalf("expected no approval prompts in danger mode, got %d", appr.calls)
+	}
+}
+
+func TestExecuteTool_ApprovalBehaviorBySecurityMode(t *testing.T) {
+	useIsolatedPolicyCache(t)
+
+	testCases := []struct {
+		name        string
+		mode        string
+		expectErr   bool
+		expectCalls int
+	}{
+		{
+			name:        "standard mode prompts and denied decision blocks",
+			mode:        config.SecurityModeStandard,
+			expectErr:   true,
+			expectCalls: 1,
+		},
+		{
+			name:        "strict mode prompts and denied decision blocks",
+			mode:        config.SecurityModeStrict,
+			expectErr:   true,
+			expectCalls: 1,
+		},
+		{
+			name:        "danger mode bypasses approval and executes",
+			mode:        config.SecurityModeDanger,
+			expectErr:   false,
+			expectCalls: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			useIsolatedPolicyCache(t)
+
+			homeDir := t.TempDir()
+			t.Setenv("BETTERCLAW_HOME", homeDir)
+			writeSecurityModeConfig(t, homeDir, tc.mode)
+
+			appr := &fakeApprover{decision: Denied}
+			tool := fakeTool{name: "write_file", permission: tools.RequiresApproval, output: "done"}
+			res, err := ExecuteTool(context.Background(), appr, tool, map[string]any{"path": "notes.md"}, "Write file")
+			if tc.expectErr {
+				if err == nil {
+					t.Fatalf("expected error in mode %q", tc.mode)
+				}
+				if !strings.Contains(err.Error(), "User denied this action") {
+					t.Fatalf("expected denied error, got %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("expected success in mode %q, got err %v", tc.mode, err)
+				}
+				if res == nil || res.Output != "done" {
+					t.Fatalf("expected tool execution output in mode %q", tc.mode)
+				}
+			}
+			if appr.calls != tc.expectCalls {
+				t.Fatalf("expected %d approval calls, got %d", tc.expectCalls, appr.calls)
+			}
+		})
 	}
 }
 
@@ -535,9 +619,14 @@ func readUsersPolicyFile(t *testing.T, homeDir string) UsersFile {
 
 func writeDangerConfig(t *testing.T, homeDir string) {
 	t.Helper()
+	writeSecurityModeConfig(t, homeDir, config.SecurityModeDanger)
+}
+
+func writeSecurityModeConfig(t *testing.T, homeDir, mode string) {
+	t.Helper()
 
 	path := filepath.Join(homeDir, config.ConfigFilePath)
-	content := "[security]\nmode = \"danger\"\n"
+	content := fmt.Sprintf("[security]\nmode = %q\n", mode)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}

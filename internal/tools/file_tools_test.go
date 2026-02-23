@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/machinae/betterclaw/internal/config"
 )
 
 func TestReadFile_ReadExistingFile(t *testing.T) {
@@ -156,6 +158,82 @@ func TestWriteFile_SymlinkEscapeErrors(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "outside workspace") {
 		t.Fatalf("expected outside workspace error, got %v", err)
+	}
+}
+
+func TestWriteFile_DangerModeAllowsOutsideWorkspace(t *testing.T) {
+	workspace := t.TempDir()
+	tool := WriteFileTool{
+		WorkspaceDir: workspace,
+		SecurityMode: config.SecurityModeDanger,
+	}
+
+	outside := filepath.Join(filepath.Dir(workspace), "outside-danger.txt")
+	res, err := tool.Execute(context.Background(), map[string]any{
+		"path":    outside,
+		"content": "danger-ok",
+	})
+	if err != nil {
+		t.Fatalf("write file in danger mode: %v", err)
+	}
+	if res.Output != "ok" {
+		t.Fatalf("expected ok output, got %q", res.Output)
+	}
+
+	content, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatalf("read written file: %v", err)
+	}
+	if string(content) != "danger-ok" {
+		t.Fatalf("expected danger-ok, got %q", string(content))
+	}
+}
+
+func TestWriteFile_OutsideWorkspaceBehaviorBySecurityMode(t *testing.T) {
+	workspace := t.TempDir()
+	testCases := []struct {
+		name      string
+		mode      string
+		expectErr bool
+	}{
+		{
+			name:      "standard mode blocks outside workspace",
+			mode:      config.SecurityModeStandard,
+			expectErr: true,
+		},
+		{
+			name:      "strict mode blocks outside workspace",
+			mode:      config.SecurityModeStrict,
+			expectErr: true,
+		},
+		{
+			name:      "danger mode allows outside workspace",
+			mode:      config.SecurityModeDanger,
+			expectErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			outside := filepath.Join(filepath.Dir(workspace), tc.mode+"-outside.txt")
+			tool := WriteFileTool{
+				WorkspaceDir: workspace,
+				SecurityMode: tc.mode,
+			}
+			_, err := tool.Execute(context.Background(), map[string]any{
+				"path":    outside,
+				"content": tc.mode,
+			})
+			if tc.expectErr {
+				if err == nil || !strings.Contains(err.Error(), "outside workspace") {
+					t.Fatalf("expected outside workspace error in mode %q, got %v", tc.mode, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("expected success in mode %q, got %v", tc.mode, err)
+			}
+		})
 	}
 }
 

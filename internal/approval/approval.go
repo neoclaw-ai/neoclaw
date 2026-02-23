@@ -58,6 +58,11 @@ var (
 
 // ExecuteTool enforces permission checks and executes the tool when allowed.
 func ExecuteTool(ctx context.Context, approver Approver, tool tools.Tool, args map[string]any, description string) (*tools.ToolResult, error) {
+	// In danger mode we bypass all approval and policy checks for tool execution.
+	if isDangerMode() {
+		return tool.Execute(ctx, args)
+	}
+
 	permission := tool.Permission()
 
 	if permission == tools.RequiresApproval && tool.Name() == "run_command" {
@@ -249,12 +254,17 @@ func currentPolicyPaths() (policyPaths, error) {
 
 // Determine whether run_command policy flush should run.
 func shouldFlushPolicies() bool {
+	return !isDangerMode()
+}
+
+// isDangerMode reports whether security.mode is configured as danger.
+func isDangerMode() bool {
 	cfg, err := config.Load()
 	if err != nil {
-		logging.Logger().Warn("failed to load config for policy flush mode check", "err", err)
-		return true
+		logging.Logger().Warn("failed to load config for security mode check", "err", err)
+		return false
 	}
-	return !strings.EqualFold(strings.TrimSpace(cfg.Security.Mode), config.SecurityModeDanger)
+	return strings.EqualFold(strings.TrimSpace(cfg.Security.Mode), config.SecurityModeDanger)
 }
 
 // Ensure both command and domain policy are loaded into in-memory cache.

@@ -34,6 +34,10 @@ type Checker struct {
 
 // Allow checks whether host is permitted. Unknown domains are approved via the configured approver.
 func (c Checker) Allow(ctx context.Context, host string) error {
+	if isDangerMode() {
+		return nil
+	}
+
 	target, err := normalizeDomain(host)
 	if err != nil {
 		return err

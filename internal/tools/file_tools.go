@@ -12,6 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/store"
 )
 
@@ -274,6 +275,7 @@ func (t ListDirTool) Execute(_ context.Context, args map[string]any) (*ToolResul
 // WriteFileTool writes text files under the workspace root.
 type WriteFileTool struct {
 	WorkspaceDir string
+	SecurityMode string
 }
 
 // Name returns the tool name.
@@ -339,7 +341,12 @@ func (t WriteFileTool) Execute(_ context.Context, args map[string]any) (*ToolRes
 		return nil, err
 	}
 
-	path, err := resolveWorkspacePath(t.WorkspaceDir, pathArg)
+	var path string
+	if strings.EqualFold(strings.TrimSpace(t.SecurityMode), config.SecurityModeDanger) {
+		path, err = resolveInputPath(t.WorkspaceDir, pathArg)
+	} else {
+		path, err = resolveWorkspacePath(t.WorkspaceDir, pathArg)
+	}
 	if err != nil {
 		return nil, err
 	}

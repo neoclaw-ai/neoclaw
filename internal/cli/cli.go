@@ -157,7 +157,10 @@ func buildToolRegistry(
 	coreTools := []tools.Tool{
 		tools.ReadFileTool{WorkspaceDir: cfg.WorkspaceDir()},
 		tools.ListDirTool{WorkspaceDir: cfg.WorkspaceDir()},
-		tools.WriteFileTool{WorkspaceDir: cfg.WorkspaceDir()},
+		tools.WriteFileTool{
+			WorkspaceDir: cfg.WorkspaceDir(),
+			SecurityMode: cfg.Security.Mode,
+		},
 		tools.MemoryReadTool{Store: memoryStore},
 		tools.MemoryAppendTool{Store: memoryStore},
 		tools.MemoryRemoveTool{Store: memoryStore},

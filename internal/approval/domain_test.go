@@ -3,12 +3,15 @@ package approval
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/machinae/betterclaw/internal/config"
 )
 
 type mockDomainApprover struct {
@@ -67,6 +70,96 @@ func TestCheckerAllow_DenyTakesPrecedenceOverAllow(t *testing.T) {
 	}
 	if approver.calls != 0 {
 		t.Fatalf("expected no prompt when deny rule matches, got %d", approver.calls)
+	}
+}
+
+func TestCheckerAllow_DangerModeSkipsDomainPolicyAndApproval(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("BETTERCLAW_HOME", homeDir)
+	writeDangerConfigDomainTest(t, homeDir)
+
+	cfg := &config.Config{HomeDir: homeDir, Agent: "default"}
+	if err := os.MkdirAll(filepath.Dir(cfg.AllowedDomainsPath()), 0o755); err != nil {
+		t.Fatalf("mkdir policy dir: %v", err)
+	}
+	writeDomainPolicy(t, cfg.AllowedDomainsPath(), domainPolicy{
+		Allow: []string{},
+		Deny:  []string{"*"},
+	})
+
+	approver := &mockDomainApprover{decision: Denied}
+	checker := Checker{
+		AllowedDomainsPath: cfg.AllowedDomainsPath(),
+		Approver:           approver,
+	}
+	if err := checker.Allow(context.Background(), "api.github.com"); err != nil {
+		t.Fatalf("expected danger mode to bypass domain approval checks, got %v", err)
+	}
+	if approver.calls != 0 {
+		t.Fatalf("expected no prompt in danger mode, got %d", approver.calls)
+	}
+}
+
+func TestCheckerAllow_ApprovalBehaviorBySecurityMode(t *testing.T) {
+	testCases := []struct {
+		name        string
+		mode        string
+		expectErr   bool
+		expectCalls int
+	}{
+		{
+			name:        "standard mode prompts and denied decision blocks",
+			mode:        config.SecurityModeStandard,
+			expectErr:   true,
+			expectCalls: 1,
+		},
+		{
+			name:        "strict mode prompts and denied decision blocks",
+			mode:        config.SecurityModeStrict,
+			expectErr:   true,
+			expectCalls: 1,
+		},
+		{
+			name:        "danger mode bypasses approval and allows",
+			mode:        config.SecurityModeDanger,
+			expectErr:   false,
+			expectCalls: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			homeDir := t.TempDir()
+			t.Setenv("BETTERCLAW_HOME", homeDir)
+			writeSecurityModeConfigDomainTest(t, homeDir, tc.mode)
+
+			cfg := &config.Config{HomeDir: homeDir, Agent: "default"}
+			if err := os.MkdirAll(filepath.Dir(cfg.AllowedDomainsPath()), 0o755); err != nil {
+				t.Fatalf("mkdir policy dir: %v", err)
+			}
+			writeDomainPolicy(t, cfg.AllowedDomainsPath(), domainPolicy{Allow: nil, Deny: nil})
+
+			approver := &mockDomainApprover{decision: Denied}
+			checker := Checker{
+				AllowedDomainsPath: cfg.AllowedDomainsPath(),
+				Approver:           approver,
+			}
+			err := checker.Allow(context.Background(), "unknown.example.com")
+			if tc.expectErr {
+				if err == nil {
+					t.Fatalf("expected denied error in mode %q", tc.mode)
+				}
+				if !strings.Contains(err.Error(), "User denied this action") {
+					t.Fatalf("expected denied error, got %v", err)
+				}
+			} else if err != nil {
+				t.Fatalf("expected success in mode %q, got %v", tc.mode, err)
+			}
+
+			if approver.calls != tc.expectCalls {
+				t.Fatalf("expected %d approval calls, got %d", tc.expectCalls, approver.calls)
+			}
+		})
 	}
 }
 
@@ -284,6 +377,20 @@ func TestNormalizeDomain_StripsWildcardDotPrefix(t *testing.T) {
 	}
 	if host != "github.com" {
 		t.Fatalf("expected github.com, got %q", host)
+	}
+}
+
+func writeDangerConfigDomainTest(t *testing.T, homeDir string) {
+	t.Helper()
+	writeSecurityModeConfigDomainTest(t, homeDir, config.SecurityModeDanger)
+}
+
+func writeSecurityModeConfigDomainTest(t *testing.T, homeDir, mode string) {
+	t.Helper()
+	path := filepath.Join(homeDir, config.ConfigFilePath)
+	content := fmt.Sprintf("[security]\nmode = %q\n", mode)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
 	}
 }
 
