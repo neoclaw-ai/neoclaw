@@ -1,28 +1,83 @@
-# BetterClaw sample config
-# Place at: $BETTERCLAW_HOME/config.toml
+# BetterClaw sample config — copy to $BETTERCLAW_HOME/config.toml and fill in your values.
+# Default location: ~/.betterclaw/config.toml
 
+# ── LLM provider ──────────────────────────────────────────────────────────────
 [llm.default]
+
+# Your API key. Supports $ENV_VAR expansion.
 api_key = "$ANTHROPIC_API_KEY"
+
+# Provider to use. Supported values: "anthropic", "openrouter", "ollama"
+# Use "openrouter" to access DeepSeek, Mistral, Llama, and 100+ other models
+# through a single API key at https://openrouter.ai
 provider = "anthropic"
+
+# Model name. Examples:
+#   anthropic:  claude-sonnet-4-6, claude-haiku-4-5-20251001
+#   openrouter: deepseek/deepseek-chat, mistralai/mistral-small
 model = "claude-sonnet-4-6"
+
+# Maximum tokens the model may generate in a single response.
 max_tokens = 8192
+
+# How long to wait for an API response before giving up.
 request_timeout = "30s"
 
+# ── Telegram channel ──────────────────────────────────────────────────────────
 [channels.telegram]
+
+# Set to false to disable the Telegram interface entirely.
 enabled = true
+
+# Bot token from @BotFather. Run `claw pair` to authorize your Telegram account.
 token = ""
 
+# ── Security ──────────────────────────────────────────────────────────────────
 [security]
-command_timeout = "5m"
-mode = "standard" # one of: "standard", "danger", "strict"
 
+# How long a shell command is allowed to run before it is killed.
+command_timeout = "5m"
+
+# Sandbox and approval mode:
+#   standard — approval prompts enabled; reads entire filesystem, writes only to workspace
+#   strict   — approval prompts enabled; reads only from workspace and system binary paths;
+#              startup fails if the sandbox is unavailable on this platform
+#   danger   — no approval prompts, no sandbox (useful for trusted local use)
+mode = "standard"
+
+# ── Cost controls ─────────────────────────────────────────────────────────────
 [costs]
+
+# Soft daily spend limit in USD. 0 = disabled. Checked before each LLM call.
 daily_limit = 0.0
+
+# Soft monthly spend limit in USD. 0 = disabled.
 monthly_limit = 0.0
+
+# Circuit breaker: pause if more than this many LLM calls occur within the window.
+# Protects against runaway background jobs. 0 = disabled.
 circuit_breaker_max_calls = 10
+
+# Time window for the circuit breaker call counter.
 circuit_breaker_window = "60s"
+
+# Token budget for the conversation context window. When the session history
+# exceeds this limit, older messages are summarised to free up space. Lower
+# values reduce per-request cost; higher values give the model more history.
 max_context_tokens = 4000
+
+# Number of recent messages always kept verbatim (never summarised), regardless
+# of max_context_tokens. Ensures the model always sees the latest exchanges.
 recent_messages = 10
 
+# ── Web search ────────────────────────────────────────────────────────────────
 [web.search]
+
+# Search provider for the web_search tool.
+# "brave" uses the Brave Search API (free tier: 2,000 requests/month).
+# Leave empty to disable the web_search tool.
 provider = "brave"
+
+# API key for the search provider. Get a Brave Search API key at:
+# https://brave.com/search/api/
+api_key = ""
