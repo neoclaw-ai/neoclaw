@@ -66,7 +66,7 @@ func restrictProcessImpl(mode, dataDir string) error {
 
 func strictLinuxReadRules(dataDir string) []landlock.Rule {
 	readRoots := []string{
-		dataDir,
+		filepath.Dir(dataDir),
 		"/bin",
 		"/sbin",
 		"/usr",

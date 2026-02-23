@@ -95,7 +95,7 @@ func darwinProfile(mode, dataDir, homeDir string) string {
 		// Punch a hole for dataDir reads before denying the rest of HOME.
 		// Order matters: SBPL uses first-match for explicit rules.
 		if homeDir != "" {
-			profile.WriteString(fmt.Sprintf("(allow file-read* (subpath %q))\n", dataDir))
+			profile.WriteString(fmt.Sprintf("(allow file-read* (subpath %q))\n", filepath.Dir(dataDir)))
 			profile.WriteString(fmt.Sprintf("(deny file-read* (subpath %q))\n", homeDir))
 		}
 		profile.WriteString(fmt.Sprintf("(allow file-write* (subpath %q))\n", dataDir))
