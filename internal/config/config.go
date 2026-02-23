@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -201,6 +202,8 @@ func Load() (*Config, error) {
 	}); err != nil {
 		return nil, fmt.Errorf("decode config: %w", err)
 	}
+
+	applyZeroValueDefaults(&cfg)
 	cfg.HomeDir = homeDir
 	cfg.Agent = defaultAgent
 	cfg.Security.Workspace = cfg.WorkspaceDir()
@@ -296,6 +299,43 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("web.search.api_key", defaultConfig.Web.Search.APIKey)
 }
 
+// applyZeroValueDefaults replaces explicit zero numeric config values with runtime defaults.
+func applyZeroValueDefaults(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+
+	if cfg.Security.CommandTimeout == 0 {
+		cfg.Security.CommandTimeout = defaultConfig.Security.CommandTimeout
+	}
+
+	if cfg.Context.MaxTokens == 0 {
+		cfg.Context.MaxTokens = defaultConfig.Context.MaxTokens
+	}
+	if cfg.Context.RecentMessages == 0 {
+		cfg.Context.RecentMessages = defaultConfig.Context.RecentMessages
+	}
+	if cfg.Context.MaxToolCalls == 0 {
+		cfg.Context.MaxToolCalls = defaultConfig.Context.MaxToolCalls
+	}
+	if cfg.Context.ToolOutputLength == 0 {
+		cfg.Context.ToolOutputLength = defaultConfig.Context.ToolOutputLength
+	}
+	if cfg.Context.DailyLogLookback == 0 {
+		cfg.Context.DailyLogLookback = defaultConfig.Context.DailyLogLookback
+	}
+
+	for name, llm := range cfg.LLM {
+		if llm.MaxTokens == 0 {
+			llm.MaxTokens = defaultConfig.LLM["default"].MaxTokens
+		}
+		if llm.RequestTimeout == 0 {
+			llm.RequestTimeout = defaultConfig.LLM["default"].RequestTimeout
+		}
+		cfg.LLM[name] = llm
+	}
+}
+
 // DefaultLLM returns the default LLM profile with fallback defaults.
 func (c *Config) DefaultLLM() LLMProviderConfig {
 	if llm, ok := c.LLM["default"]; ok {
@@ -334,8 +374,11 @@ func (c LLMProviderConfig) Validate() error {
 	if c.Model == "" {
 		return errors.New("model is required")
 	}
-	if c.RequestTimeout <= 0 {
-		return errors.New("request_timeout must be > 0")
+	if c.MaxTokens < 0 {
+		return errors.New("max_tokens must be >= 0")
+	}
+	if c.RequestTimeout < 0 {
+		return errors.New("request_timeout must be >= 0")
 	}
 
 	switch c.Provider {
@@ -364,26 +407,60 @@ func (c ChannelConfig) Validate() error {
 
 // Validate checks security mode values.
 func (c SecurityConfig) Validate() error {
-	return validateSecurityMode(c.Mode)
+	if err := validateSecurityMode(c.Mode); err != nil {
+		return err
+	}
+	if c.CommandTimeout < 0 {
+		return errors.New("command_timeout must be >= 0")
+	}
+	return nil
 }
 
 // Validate validates cost limits.
 func (c CostsConfig) Validate() error {
+	if c.DailyLimit < 0 {
+		return errors.New("daily_limit must be >= 0")
+	}
+	if c.MonthlyLimit < 0 {
+		return errors.New("monthly_limit must be >= 0")
+	}
+	if c.DailyLimit > 0 && c.MonthlyLimit > 0 && c.DailyLimit > c.MonthlyLimit {
+		return errors.New("daily_limit cannot be greater than monthly_limit")
+	}
 	return nil
 }
 
 // Validate validates context settings.
 func (c ContextConfig) Validate() error {
+	if c.MaxTokens < 0 {
+		return errors.New("max_tokens must be >= 0")
+	}
+	if c.RecentMessages < 0 {
+		return errors.New("recent_messages must be >= 0")
+	}
+	if c.MaxToolCalls < 0 {
+		return errors.New("max_tool_calls must be >= 0")
+	}
+	if c.ToolOutputLength < 0 {
+		return errors.New("tool_output_length must be >= 0")
+	}
+	if c.DailyLogLookback < 0 {
+		return errors.New("daily_log_lookback must be >= 0")
+	}
 	return nil
 }
 
 // Validate validates web settings.
 func (c WebConfig) Validate() error {
-	return nil
+	switch strings.ToLower(strings.TrimSpace(c.Search.Provider)) {
+	case "", "brave":
+		return nil
+	default:
+		return fmt.Errorf("unsupported web.search.provider %q", c.Search.Provider)
+	}
 }
 
-// Validate validates startup configuration and returns the first fatal error.
-func (cfg *Config) Validate() error {
+func (cfg *Config) firstValidationError() error {
 	var errs []error
 
 	if len(cfg.LLM) == 0 {
@@ -419,6 +496,16 @@ func (cfg *Config) Validate() error {
 
 	if len(errs) > 0 {
 		return errs[0]
+	}
+	return nil
+}
+
+// Validate validates startup configuration and returns the first fatal error.
+func (cfg *Config) Validate() error {
+	cfgCopy := *cfg
+	applyZeroValueDefaults(&cfgCopy)
+	if err := cfgCopy.firstValidationError(); err != nil {
+		return err
 	}
 	return nil
 }

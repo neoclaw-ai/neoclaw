@@ -199,6 +199,67 @@ mode = "banana"
 	}
 }
 
+func TestLoad_ZeroNumericValuesFallbackToDefaults(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	t.Setenv("BETTERCLAW_HOME", dataDir)
+
+	configBody := `
+[llm.default]
+api_key = "test-key"
+provider = "anthropic"
+model = "claude-sonnet-4-6"
+max_tokens = 0
+request_timeout = "0s"
+
+[security]
+command_timeout = "0s"
+
+[context]
+max_tokens = 0
+recent_messages = 0
+max_tool_calls = 0
+tool_output_length = 0
+daily_log_lookback = "0s"
+`
+	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	llm := cfg.DefaultLLM()
+	if llm.MaxTokens != defaultConfig.LLM["default"].MaxTokens {
+		t.Fatalf("expected default llm max tokens %d, got %d", defaultConfig.LLM["default"].MaxTokens, llm.MaxTokens)
+	}
+	if llm.RequestTimeout != defaultConfig.LLM["default"].RequestTimeout {
+		t.Fatalf("expected default request timeout %v, got %v", defaultConfig.LLM["default"].RequestTimeout, llm.RequestTimeout)
+	}
+	if cfg.Security.CommandTimeout != defaultConfig.Security.CommandTimeout {
+		t.Fatalf("expected default command timeout %v, got %v", defaultConfig.Security.CommandTimeout, cfg.Security.CommandTimeout)
+	}
+	if cfg.Context.MaxTokens != defaultConfig.Context.MaxTokens {
+		t.Fatalf("expected default context max tokens %d, got %d", defaultConfig.Context.MaxTokens, cfg.Context.MaxTokens)
+	}
+	if cfg.Context.RecentMessages != defaultConfig.Context.RecentMessages {
+		t.Fatalf("expected default context recent_messages %d, got %d", defaultConfig.Context.RecentMessages, cfg.Context.RecentMessages)
+	}
+	if cfg.Context.MaxToolCalls != defaultConfig.Context.MaxToolCalls {
+		t.Fatalf("expected default context max_tool_calls %d, got %d", defaultConfig.Context.MaxToolCalls, cfg.Context.MaxToolCalls)
+	}
+	if cfg.Context.ToolOutputLength != defaultConfig.Context.ToolOutputLength {
+		t.Fatalf("expected default context tool_output_length %d, got %d", defaultConfig.Context.ToolOutputLength, cfg.Context.ToolOutputLength)
+	}
+	if cfg.Context.DailyLogLookback != defaultConfig.Context.DailyLogLookback {
+		t.Fatalf("expected default context daily_log_lookback %v, got %v", defaultConfig.Context.DailyLogLookback, cfg.Context.DailyLogLookback)
+	}
+}
+
 func TestLoad_BetterclawHomeOverridesDefault(t *testing.T) {
 	customDir := filepath.Join(t.TempDir(), "custom-home")
 	if err := os.MkdirAll(customDir, 0o755); err != nil {
