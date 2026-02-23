@@ -99,6 +99,7 @@ func darwinProfile(mode, dataDir, homeDir string) string {
 			profile.WriteString(fmt.Sprintf("(deny file-read* (subpath %q))\n", homeDir))
 		}
 		profile.WriteString(fmt.Sprintf("(allow file-write* (subpath %q))\n", dataDir))
+		profile.WriteString("(allow file-write* (subpath \"/dev\"))\n")
 		profile.WriteString("(deny file-write*)")
 		return profile.String()
 	case config.SecurityModeStandard:
@@ -106,6 +107,7 @@ func darwinProfile(mode, dataDir, homeDir string) string {
 			"(version 1)",
 			"(allow default)",
 			fmt.Sprintf("(allow file-write* (subpath %q))", dataDir),
+			"(allow file-write* (subpath \"/dev\"))",
 			"(deny file-write*)",
 		}, "\n")
 	default:

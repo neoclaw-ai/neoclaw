@@ -51,6 +51,7 @@ func restrictProcessImpl(mode, dataDir string) error {
 
 	rules := []landlock.Rule{
 		landlock.RWDirs(absDataDir),
+		landlock.RWDirs("/dev"),
 	}
 	if trimmedMode == config.SecurityModeStrict {
 		rules = append(rules, strictLinuxReadRules(absDataDir)...)
