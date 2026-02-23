@@ -348,8 +348,8 @@ func TestTelegramListener_UnauthorizedUserIsDropped(t *testing.T) {
 		t.Fatalf("expected no handler call for unauthorized user, got %#v", msg)
 	case <-time.After(80 * time.Millisecond):
 	}
-	if len(outbound.messages) != 0 {
-		t.Fatalf("expected no outbound messages, got %#v", outbound.messages)
+	if msgs := outbound.snapshot(); len(msgs) != 0 {
+		t.Fatalf("expected no outbound messages, got %#v", msgs)
 	}
 }
 
@@ -391,11 +391,12 @@ func TestTelegramListener_HelpCommandHandledByCommandsHandler(t *testing.T) {
 		t.Fatal("expected /help to be handled before agent dispatch")
 	case <-time.After(80 * time.Millisecond):
 	}
-	if len(outbound.messages) != 1 {
-		t.Fatalf("expected one command response, got %#v", outbound.messages)
+	msgs := outbound.snapshot()
+	if len(msgs) != 1 {
+		t.Fatalf("expected one command response, got %#v", msgs)
 	}
-	if !strings.Contains(outbound.messages[0], "Commands: /help") {
-		t.Fatalf("unexpected /help response: %q", outbound.messages[0])
+	if !strings.Contains(msgs[0], "Commands: /help") {
+		t.Fatalf("unexpected /help response: %q", msgs[0])
 	}
 }
 
@@ -796,11 +797,21 @@ func (h *telegramBlockingHandler) HandleMessage(context.Context, runtime.Respons
 }
 
 type outboundMessages struct {
+	mu       sync.Mutex
 	messages []string
 }
 
 func (o *outboundMessages) append(text string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	o.messages = append(o.messages, text)
+}
+
+// snapshot returns a copy of the messages slice under the lock.
+func (o *outboundMessages) snapshot() []string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return append([]string(nil), o.messages...)
 }
 
 func startTestDispatcher(t *testing.T, handler runtime.Handler) (*runtime.Dispatcher, func()) {
