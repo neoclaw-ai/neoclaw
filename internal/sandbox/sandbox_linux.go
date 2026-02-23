@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/landlock-lsm/go-landlock/landlock"
+	"github.com/machinae/betterclaw/internal/config"
 	"golang.org/x/sys/unix"
 )
 
@@ -31,7 +32,7 @@ func IsSandboxSupported() bool {
 
 func restrictProcessImpl(mode, dataDir string) error {
 	trimmedMode := strings.TrimSpace(mode)
-	if trimmedMode == "strict" && !IsSandboxSupported() {
+	if trimmedMode == config.SecurityModeStrict && !IsSandboxSupported() {
 		return errors.New("landlock is unavailable on this host")
 	}
 
@@ -47,7 +48,7 @@ func restrictProcessImpl(mode, dataDir string) error {
 	rules := []landlock.Rule{
 		landlock.RWDirs(absDataDir),
 	}
-	if trimmedMode == "strict" {
+	if trimmedMode == config.SecurityModeStrict {
 		rules = append(rules, strictLinuxReadRules(absDataDir)...)
 	} else {
 		rules = append(rules, landlock.RODirs("/"))
