@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/machinae/betterclaw/internal/config"
+	"github.com/machinae/betterclaw/internal/logging"
 	"github.com/machinae/betterclaw/internal/store"
 )
 
@@ -89,6 +90,10 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 	cmd.Env = t.commandEnv()
 	configureCommandForCancellation(cmd)
 	combinedOut, runErr := cmd.CombinedOutput()
+	// Critical security control: kill the process group after Wait so background children cannot outlive the shell and race policy flush.
+	if err := killCommandProcessGroup(cmd); err != nil {
+		logging.Logger().Warn("failed to kill command process group after command exit", "err", err)
+	}
 	exitCode := 0
 	if runErr != nil {
 		var exitErr *exec.ExitError

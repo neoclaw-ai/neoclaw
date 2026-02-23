@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/machinae/betterclaw/internal/config"
 	"github.com/machinae/betterclaw/internal/logging"
@@ -42,6 +43,19 @@ type commandPolicy struct {
 	Deny  []string `json:"deny"`
 }
 
+type policyPaths struct {
+	commands string
+	domains  string
+	users    string
+}
+
+var (
+	policyCacheMu      sync.Mutex
+	commandPolicyCache = map[string]commandPolicy{}
+	domainPolicyCache  = map[string]domainPolicy{}
+	usersPolicyCache   = map[string]UsersFile{}
+)
+
 // ExecuteTool enforces permission checks and executes the tool when allowed.
 func ExecuteTool(ctx context.Context, approver Approver, tool tools.Tool, args map[string]any, description string) (*tools.ToolResult, error) {
 	permission := tool.Permission()
@@ -71,7 +85,18 @@ func ExecuteTool(ctx context.Context, approver Approver, tool tools.Tool, args m
 		}
 	}
 
-	return tool.Execute(ctx, args)
+	result, execErr := tool.Execute(ctx, args)
+	if tool.Name() != "run_command" || !shouldFlushPolicies() {
+		return result, execErr
+	}
+
+	if flushErr := FlushPolicies(); flushErr != nil {
+		if execErr != nil {
+			return result, errors.Join(execErr, flushErr)
+		}
+		return result, flushErr
+	}
+	return result, execErr
 }
 
 // Resolve run_command permission by matching against persisted allow/deny patterns.
@@ -87,17 +112,17 @@ func resolveRunCommandPermission(
 		return tools.RequiresApproval, err
 	}
 
-	path, err := allowedCommandsPath()
+	paths, err := currentPolicyPaths()
 	if err != nil {
 		return tools.RequiresApproval, err
 	}
 
-	policy, err := loadCommandPolicy(path)
-	switch {
-	case err == nil:
-	case errors.Is(err, os.ErrNotExist):
-		policy = commandPolicy{}
-	default:
+	if err := ensurePolicyCacheLoaded(paths); err != nil {
+		return tools.RequiresApproval, err
+	}
+
+	policy, err := loadCachedCommandPolicy(paths.commands)
+	if err != nil {
 		return tools.RequiresApproval, err
 	}
 
@@ -107,7 +132,7 @@ func resolveRunCommandPermission(
 	case commandDenied:
 		return tools.RequiresApproval, toolDeniedError(tool.Name())
 	case commandNoMatch:
-		return promptForRunCommandPolicy(ctx, approver, tool.Name(), args, description, path, policy, command)
+		return promptForRunCommandPolicy(ctx, approver, tool.Name(), args, description, paths.commands, policy, command)
 	default:
 		return tools.RequiresApproval, nil
 	}
@@ -151,7 +176,7 @@ func promptForRunCommandPolicy(
 	case Approved:
 		if pattern != "" {
 			policy.Allow = appendUnique(policy.Allow, pattern)
-			if err := saveCommandPolicy(path, policy); err != nil {
+			if err := saveCachedCommandPolicy(path, policy); err != nil {
 				logging.Logger().Warn(
 					"failed to persist command allow pattern",
 					"pattern", pattern,
@@ -163,7 +188,7 @@ func promptForRunCommandPolicy(
 	case Denied:
 		if pattern != "" {
 			policy.Deny = appendUnique(policy.Deny, pattern)
-			if err := saveCommandPolicy(path, policy); err != nil {
+			if err := saveCachedCommandPolicy(path, policy); err != nil {
 				logging.Logger().Warn(
 					"failed to persist command deny pattern",
 					"pattern", pattern,
@@ -177,13 +202,206 @@ func promptForRunCommandPolicy(
 	}
 }
 
-// Resolve the allowed_commands.json path from config.
-func allowedCommandsPath() (string, error) {
+// FlushPolicies rewrites in-memory policy state back to disk.
+func FlushPolicies() error {
+	paths, err := currentPolicyPaths()
+	if err != nil {
+		return err
+	}
+	if err := ensurePolicyCacheLoaded(paths); err != nil {
+		return err
+	}
+
+	commandPolicy, err := loadCachedCommandPolicy(paths.commands)
+	if err != nil {
+		return err
+	}
+	domainPolicy, err := loadCachedDomainPolicy(paths.domains)
+	if err != nil {
+		return err
+	}
+	usersPolicy, err := loadCachedUsersFile(paths.users)
+	if err != nil {
+		return err
+	}
+
+	flushErr := saveCommandPolicy(paths.commands, commandPolicy)
+	flushErr = errors.Join(flushErr, saveDomainPolicy(paths.domains, domainPolicy))
+	flushErr = errors.Join(flushErr, saveUsers(paths.users, usersPolicy))
+	if flushErr != nil {
+		return fmt.Errorf("flush policies: %w", flushErr)
+	}
+	return nil
+}
+
+// Resolve policy file paths from config.
+func currentPolicyPaths() (policyPaths, error) {
 	cfg, err := config.Load()
 	if err != nil {
-		return "", fmt.Errorf("load config: %w", err)
+		return policyPaths{}, fmt.Errorf("load config: %w", err)
 	}
-	return cfg.AllowedCommandsPath(), nil
+	return policyPaths{
+		commands: cfg.AllowedCommandsPath(),
+		domains:  cfg.AllowedDomainsPath(),
+		users:    cfg.AllowedUsersPath(),
+	}, nil
+}
+
+// Determine whether run_command policy flush should run.
+func shouldFlushPolicies() bool {
+	cfg, err := config.Load()
+	if err != nil {
+		logging.Logger().Warn("failed to load config for policy flush mode check", "err", err)
+		return true
+	}
+	return !strings.EqualFold(strings.TrimSpace(cfg.Security.Mode), config.SecurityModeDanger)
+}
+
+// Ensure both command and domain policy are loaded into in-memory cache.
+func ensurePolicyCacheLoaded(paths policyPaths) error {
+	if _, err := loadCachedCommandPolicy(paths.commands); err != nil {
+		return err
+	}
+	if _, err := loadCachedDomainPolicy(paths.domains); err != nil {
+		return err
+	}
+	if _, err := loadCachedUsersFile(paths.users); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Load command policy from in-memory cache, lazy-loading from disk once.
+func loadCachedCommandPolicy(path string) (commandPolicy, error) {
+	policyCacheMu.Lock()
+	defer policyCacheMu.Unlock()
+
+	if policy, ok := commandPolicyCache[path]; ok {
+		return cloneCommandPolicy(policy), nil
+	}
+
+	policy, err := loadCommandPolicy(path)
+	switch {
+	case err == nil:
+	case errors.Is(err, os.ErrNotExist):
+		policy = commandPolicy{}
+	default:
+		return commandPolicy{}, err
+	}
+	commandPolicyCache[path] = cloneCommandPolicy(policy)
+	return cloneCommandPolicy(policy), nil
+}
+
+// Persist command policy and update in-memory cache.
+func saveCachedCommandPolicy(path string, policy commandPolicy) error {
+	copied := cloneCommandPolicy(policy)
+
+	policyCacheMu.Lock()
+	commandPolicyCache[path] = copied
+	policyCacheMu.Unlock()
+
+	if err := saveCommandPolicy(path, copied); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Load domain policy from in-memory cache, lazy-loading from disk once.
+func loadCachedDomainPolicy(path string) (domainPolicy, error) {
+	policyCacheMu.Lock()
+	defer policyCacheMu.Unlock()
+
+	if policy, ok := domainPolicyCache[path]; ok {
+		return cloneDomainPolicy(policy), nil
+	}
+
+	policy, err := loadDomainPolicy(path)
+	switch {
+	case err == nil:
+	case errors.Is(err, os.ErrNotExist):
+		policy = domainPolicy{}
+	default:
+		return domainPolicy{}, err
+	}
+	domainPolicyCache[path] = cloneDomainPolicy(policy)
+	return cloneDomainPolicy(policy), nil
+}
+
+// Persist domain policy and update in-memory cache.
+func saveCachedDomainPolicy(path string, policy domainPolicy) error {
+	copied := cloneDomainPolicy(policy)
+
+	policyCacheMu.Lock()
+	domainPolicyCache[path] = copied
+	policyCacheMu.Unlock()
+
+	if err := saveDomainPolicy(path, copied); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Load allowed users from in-memory cache, lazy-loading from disk once.
+func loadCachedUsersFile(path string) (UsersFile, error) {
+	policyCacheMu.Lock()
+	defer policyCacheMu.Unlock()
+
+	if usersFile, ok := usersPolicyCache[path]; ok {
+		return cloneUsersFile(usersFile), nil
+	}
+
+	usersFile, err := LoadUsers(path)
+	if err != nil {
+		return UsersFile{}, err
+	}
+	usersPolicyCache[path] = cloneUsersFile(usersFile)
+	return cloneUsersFile(usersFile), nil
+}
+
+// Persist allowed users and update in-memory cache.
+func saveCachedUsersFile(path string, usersFile UsersFile) error {
+	copied := cloneUsersFile(usersFile)
+
+	policyCacheMu.Lock()
+	usersPolicyCache[path] = copied
+	policyCacheMu.Unlock()
+
+	if err := saveUsers(path, copied); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Copy command policy slices before returning/storing.
+func cloneCommandPolicy(policy commandPolicy) commandPolicy {
+	return commandPolicy{
+		Allow: append([]string(nil), policy.Allow...),
+		Deny:  append([]string(nil), policy.Deny...),
+	}
+}
+
+// Copy domain policy slices before returning/storing.
+func cloneDomainPolicy(policy domainPolicy) domainPolicy {
+	return domainPolicy{
+		Allow: append([]string(nil), policy.Allow...),
+		Deny:  append([]string(nil), policy.Deny...),
+	}
+}
+
+// Copy users list before returning/storing.
+func cloneUsersFile(usersFile UsersFile) UsersFile {
+	return UsersFile{
+		Users: append([]User(nil), usersFile.Users...),
+	}
+}
+
+// Reset in-memory policy cache state.
+func resetPolicyCache() {
+	policyCacheMu.Lock()
+	defer policyCacheMu.Unlock()
+	commandPolicyCache = map[string]commandPolicy{}
+	domainPolicyCache = map[string]domainPolicy{}
+	usersPolicyCache = map[string]UsersFile{}
 }
 
 // Load command policy from disk.

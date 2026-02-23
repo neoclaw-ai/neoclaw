@@ -105,7 +105,7 @@ func AddUser(path string, user User) error {
 	username := strings.TrimSpace(user.Username)
 	name := strings.TrimSpace(user.Name)
 
-	usersFile, err := LoadUsers(path)
+	usersFile, err := loadCachedUsersFile(path)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func AddUser(path string, user User) error {
 			strings.ToLower(strings.TrimSpace(usersFile.Users[i].Channel)) == targetChannel {
 			usersFile.Users[i].Username = username
 			usersFile.Users[i].Name = name
-			return saveUsers(path, usersFile)
+			return saveCachedUsersFile(path, usersFile)
 		}
 	}
 
@@ -131,5 +131,5 @@ func AddUser(path string, user User) error {
 		Name:     name,
 		AddedAt:  addedAt,
 	})
-	return saveUsers(path, usersFile)
+	return saveCachedUsersFile(path, usersFile)
 }

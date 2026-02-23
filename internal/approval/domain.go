@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/machinae/betterclaw/internal/store"
@@ -40,7 +39,7 @@ func (c Checker) Allow(ctx context.Context, host string) error {
 		return err
 	}
 
-	policy, err := loadDomainPolicy(c.AllowedDomainsPath)
+	policy, err := loadCachedDomainPolicy(c.AllowedDomainsPath)
 	if err != nil {
 		return err
 	}
@@ -72,10 +71,10 @@ func (c Checker) Allow(ctx context.Context, host string) error {
 	switch decision {
 	case Approved:
 		policy.Allow = appendUnique(policy.Allow, target)
-		return saveDomainPolicy(c.AllowedDomainsPath, policy)
+		return saveCachedDomainPolicy(c.AllowedDomainsPath, policy)
 	case Denied:
 		policy.Deny = appendUnique(policy.Deny, target)
-		if err := saveDomainPolicy(c.AllowedDomainsPath, policy); err != nil {
+		if err := saveCachedDomainPolicy(c.AllowedDomainsPath, policy); err != nil {
 			return err
 		}
 		return toolDeniedError("network_domain")
@@ -118,9 +117,6 @@ func loadDomainPolicy(path string) (domainPolicy, error) {
 
 	raw, err := store.ReadFile(path)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return domainPolicy{}, nil
-		}
 		return domainPolicy{}, fmt.Errorf("read domain policy %q: %w", path, err)
 	}
 	if strings.TrimSpace(raw) == "" {
