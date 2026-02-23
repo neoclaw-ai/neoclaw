@@ -54,21 +54,30 @@ daily_limit = 0.0
 # Soft monthly spend limit in USD. 0 = disabled.
 monthly_limit = 0.0
 
-# Circuit breaker: pause if more than this many LLM calls occur within the window.
-# Protects against runaway background jobs. 0 = disabled.
-circuit_breaker_max_calls = 10
-
-# Time window for the circuit breaker call counter.
-circuit_breaker_window = "60s"
+# ── Context window ────────────────────────────────────────────────────────────
+[context]
 
 # Token budget for the conversation context window. When the session history
 # exceeds this limit, older messages are summarised to free up space. Lower
 # values reduce per-request cost; higher values give the model more history.
-max_context_tokens = 4000
+max_tokens = 4000
 
 # Number of recent messages always kept verbatim (never summarised), regardless
-# of max_context_tokens. Ensures the model always sees the latest exchanges.
+# of max_tokens. Ensures the model always sees the latest exchanges.
 recent_messages = 10
+
+# Maximum number of tool-call iterations per message before the agent stops.
+max_tool_calls = 10
+
+# Maximum characters of tool output included inline in the conversation history.
+# Larger outputs are written to a temp file and only the first N chars are shown.
+tool_output_length = 2000
+
+# How far back recent daily log entries are injected into the system prompt.
+daily_log_lookback = "24h"
+
+# Maximum characters of SOUL.md included in the system prompt.
+max_soul_length = 4000
 
 # ── Web search ────────────────────────────────────────────────────────────────
 [web.search]

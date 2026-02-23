@@ -35,6 +35,7 @@ type Config struct {
 	LLM      map[string]LLMProviderConfig `mapstructure:"llm"`
 	Security SecurityConfig               `mapstructure:"security"`
 	Costs    CostsConfig                  `mapstructure:"costs"`
+	Context  ContextConfig                `mapstructure:"context"`
 	Web      WebConfig                    `mapstructure:"web"`
 }
 
@@ -61,14 +62,20 @@ type SecurityConfig struct {
 	Mode           string        `mapstructure:"mode"`
 }
 
-// CostsConfig defines soft spending and circuit-breaker limits.
+// CostsConfig defines soft USD spending limits.
 type CostsConfig struct {
-	DailyLimit             float64       `mapstructure:"daily_limit"`
-	MonthlyLimit           float64       `mapstructure:"monthly_limit"`
-	CircuitBreakerMaxCalls int           `mapstructure:"circuit_breaker_max_calls"`
-	CircuitBreakerWindow   time.Duration `mapstructure:"circuit_breaker_window"`
-	MaxContextTokens       int           `mapstructure:"max_context_tokens"`
-	RecentMessages         int           `mapstructure:"recent_messages"`
+	DailyLimit   float64 `mapstructure:"daily_limit"`
+	MonthlyLimit float64 `mapstructure:"monthly_limit"`
+}
+
+// ContextConfig controls agent context window, prompt composition, and circuit-breaker behavior.
+type ContextConfig struct {
+	MaxTokens        int           `mapstructure:"max_tokens"`
+	RecentMessages   int           `mapstructure:"recent_messages"`
+	MaxToolCalls     int           `mapstructure:"max_tool_calls"`
+	ToolOutputLength int           `mapstructure:"tool_output_length"`
+	DailyLogLookback time.Duration `mapstructure:"daily_log_lookback"`
+	MaxSoulLength    int           `mapstructure:"max_soul_length"`
 }
 
 // WebConfig configures built-in web tool behavior.
@@ -103,12 +110,16 @@ var defaultConfig = Config{
 		Mode:           SecurityModeStandard,
 	},
 	Costs: CostsConfig{
-		DailyLimit:             0,
-		MonthlyLimit:           0,
-		CircuitBreakerMaxCalls: 10,
-		CircuitBreakerWindow:   60 * time.Second,
-		MaxContextTokens:       4000,
-		RecentMessages:         10,
+		DailyLimit:   0,
+		MonthlyLimit: 0,
+	},
+	Context: ContextConfig{
+		MaxTokens:        4000,
+		RecentMessages:   10,
+		MaxToolCalls:     10,
+		ToolOutputLength: 2000,
+		DailyLogLookback: 24 * time.Hour,
+		MaxSoulLength:    4000,
 	},
 	Web: WebConfig{
 		Search: WebSearchConfig{
@@ -226,7 +237,7 @@ func Write(w io.Writer) error {
 	// Keep duration fields human-readable in generated TOML.
 	v.Set("llm.default.request_timeout", v.GetDuration("llm.default.request_timeout").String())
 	v.Set("security.command_timeout", v.GetDuration("security.command_timeout").String())
-	v.Set("costs.circuit_breaker_window", v.GetDuration("costs.circuit_breaker_window").String())
+	v.Set("context.daily_log_lookback", v.GetDuration("context.daily_log_lookback").String())
 
 	if err := v.WriteConfigTo(w); err != nil {
 		return fmt.Errorf("write config: %w", err)
@@ -276,10 +287,13 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("costs.daily_limit", defaultConfig.Costs.DailyLimit)
 	v.SetDefault("costs.monthly_limit", defaultConfig.Costs.MonthlyLimit)
-	v.SetDefault("costs.circuit_breaker_max_calls", defaultConfig.Costs.CircuitBreakerMaxCalls)
-	v.SetDefault("costs.circuit_breaker_window", defaultConfig.Costs.CircuitBreakerWindow)
-	v.SetDefault("costs.max_context_tokens", defaultConfig.Costs.MaxContextTokens)
-	v.SetDefault("costs.recent_messages", defaultConfig.Costs.RecentMessages)
+
+	v.SetDefault("context.max_tokens", defaultConfig.Context.MaxTokens)
+	v.SetDefault("context.recent_messages", defaultConfig.Context.RecentMessages)
+	v.SetDefault("context.max_tool_calls", defaultConfig.Context.MaxToolCalls)
+	v.SetDefault("context.tool_output_length", defaultConfig.Context.ToolOutputLength)
+	v.SetDefault("context.daily_log_lookback", defaultConfig.Context.DailyLogLookback)
+	v.SetDefault("context.max_soul_length", defaultConfig.Context.MaxSoulLength)
 
 	v.SetDefault("web.search.provider", defaultConfig.Web.Search.Provider)
 	v.SetDefault("web.search.api_key", defaultConfig.Web.Search.APIKey)
@@ -361,6 +375,11 @@ func (c CostsConfig) Validate() error {
 	return nil
 }
 
+// Validate validates context settings.
+func (c ContextConfig) Validate() error {
+	return nil
+}
+
 // Validate validates web settings.
 func (c WebConfig) Validate() error {
 	return nil
@@ -382,6 +401,9 @@ func (cfg *Config) Validate() error {
 	}
 	if err := cfg.Costs.Validate(); err != nil {
 		errs = append(errs, fmt.Errorf("costs: %w", err))
+	}
+	if err := cfg.Context.Validate(); err != nil {
+		errs = append(errs, fmt.Errorf("context: %w", err))
 	}
 	if err := cfg.Web.Validate(); err != nil {
 		errs = append(errs, fmt.Errorf("web: %w", err))

@@ -131,11 +131,11 @@ func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
 	if cfg.Security.Mode != SecurityModeStandard {
 		t.Fatalf("expected default security mode %q, got %q", SecurityModeStandard, cfg.Security.Mode)
 	}
-	if cfg.Costs.MaxContextTokens != defaultConfig.Costs.MaxContextTokens {
-		t.Fatalf("expected default context max tokens %d, got %d", defaultConfig.Costs.MaxContextTokens, cfg.Costs.MaxContextTokens)
+	if cfg.Context.MaxTokens != defaultConfig.Context.MaxTokens {
+		t.Fatalf("expected default context max tokens %d, got %d", defaultConfig.Context.MaxTokens, cfg.Context.MaxTokens)
 	}
-	if cfg.Costs.RecentMessages != defaultConfig.Costs.RecentMessages {
-		t.Fatalf("expected default recent messages %d, got %d", defaultConfig.Costs.RecentMessages, cfg.Costs.RecentMessages)
+	if cfg.Context.RecentMessages != defaultConfig.Context.RecentMessages {
+		t.Fatalf("expected default recent messages %d, got %d", defaultConfig.Context.RecentMessages, cfg.Context.RecentMessages)
 	}
 	expectedWorkspace := filepath.Join(expectedDataDir, "agents", defaultAgent, "workspace")
 	if cfg.Security.Workspace != expectedWorkspace {

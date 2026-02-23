@@ -35,6 +35,7 @@ func TestRun_DispatchesToolAndReturnsFinalResponse(t *testing.T) {
 		"system",
 		[]provider.ChatMessage{{Role: provider.RoleUser, Content: "read it"}},
 		10,
+		0,
 		nil,
 	)
 	if err != nil {
@@ -89,6 +90,7 @@ func TestRun_MaxIterationsGuard(t *testing.T) {
 		"system",
 		[]provider.ChatMessage{{Role: provider.RoleUser, Content: "loop"}},
 		1,
+		0,
 		nil,
 	)
 	if err == nil || !strings.Contains(err.Error(), "max iterations exceeded") {
@@ -120,6 +122,7 @@ func TestRun_UnknownToolAppendsErrorAndContinues(t *testing.T) {
 		"system",
 		[]provider.ChatMessage{{Role: provider.RoleUser, Content: "do it"}},
 		2,
+		0,
 		nil,
 	)
 	if err != nil {

@@ -14,23 +14,27 @@ import (
 	"github.com/machinae/betterclaw/internal/store"
 )
 
-const maxSoulChars = 4000
-
-// DailyLogLookback controls how far back recent daily log entries are injected into the system prompt.
-const DailyLogLookback = 24 * time.Hour
+const defaultMaxSoulLength = 4000
+const defaultDailyLogLookback = 24 * time.Hour
 
 // BuildSystemPrompt assembles the runtime system prompt from base instructions,
 // SOUL.md, long-term memory, and recent daily log entries.
-func BuildSystemPrompt(agentDir string, store *memory.Store) (string, error) {
-	return buildSystemPromptAt(agentDir, store, time.Now())
+func BuildSystemPrompt(agentDir string, store *memory.Store, dailyLogLookback time.Duration, maxSoulLength int) (string, error) {
+	return buildSystemPromptAt(agentDir, store, time.Now(), dailyLogLookback, maxSoulLength)
 }
 
-func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time) (string, error) {
+func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, dailyLogLookback time.Duration, maxSoulLength int) (string, error) {
 	if strings.TrimSpace(agentDir) == "" {
 		return "", errors.New("agent directory is required")
 	}
 	if store == nil {
 		return "", errors.New("memory store is required")
+	}
+	if dailyLogLookback <= 0 {
+		dailyLogLookback = defaultDailyLogLookback
+	}
+	if maxSoulLength <= 0 {
+		maxSoulLength = defaultMaxSoulLength
 	}
 
 	prompt := DefaultSystemPrompt + "\n\n" + autoRememberInstruction
@@ -44,7 +48,7 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time) (s
 	if err != nil {
 		return "", err
 	}
-	recentLogs, err := store.GetDailyLogs(now.Add(-DailyLogLookback), now)
+	recentLogs, err := store.GetDailyLogs(now.Add(-dailyLogLookback), now)
 	if err != nil {
 		return "", err
 	}
@@ -57,14 +61,14 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time) (s
 	b.WriteString(prompt)
 	b.WriteString("\n\nContext:\n")
 	if soulText != "" {
-		truncatedSoul, truncated := truncateStringByChars(soulText, maxSoulChars)
+		truncatedSoul, truncated := truncateStringByChars(soulText, maxSoulLength)
 		b.WriteString("\n[SOUL.md]\n")
 		b.WriteString(truncatedSoul)
 		if !strings.HasSuffix(truncatedSoul, "\n") {
 			b.WriteByte('\n')
 		}
 		if truncated {
-			b.WriteString(fmt.Sprintf("[SOUL.md truncated to %d chars]\n", maxSoulChars))
+			b.WriteString(fmt.Sprintf("[SOUL.md truncated to %d chars]\n", maxSoulLength))
 		}
 	}
 	if memoryText != "" {

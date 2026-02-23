@@ -111,7 +111,7 @@ func TestAgentWithSessionLoadsHistoryAndAppendsTurn(t *testing.T) {
 		t.Fatalf("seed session: %v", err)
 	}
 
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, time.Second)
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, 0, 0, time.Second)
 	writer := &captureWriter{}
 
 	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "next"}); err != nil {
@@ -153,7 +153,7 @@ func TestAgentResetResetsSession(t *testing.T) {
 		t.Fatalf("seed session: %v", err)
 	}
 
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, time.Second)
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, 0, 0, time.Second)
 	if err := ag.Reset(context.Background()); err != nil {
 		t.Fatalf("reset: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestAgentResetWritesSummaryToDailyLog(t *testing.T) {
 
 	memoryDir := filepath.Join(t.TempDir(), "memory")
 	memoryStore := memory.New(memoryDir)
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, memoryStore, 4000, 10, time.Second)
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, memoryStore, 4000, 10, 0, 0, time.Second)
 	if err := ag.Reset(context.Background()); err != nil {
 		t.Fatalf("reset: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestAgentResetSkipsSummaryOnEmptyHistory(t *testing.T) {
 	sessionStore := session.New(sessionPath)
 	memoryDir := filepath.Join(t.TempDir(), "memory")
 	memoryStore := memory.New(memoryDir)
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, memoryStore, 4000, 10, time.Second)
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, memoryStore, 4000, 10, 0, 0, time.Second)
 	if err := ag.Reset(context.Background()); err != nil {
 		t.Fatalf("reset: %v", err)
 	}
@@ -376,7 +376,7 @@ func TestAgentSessionStoresTruncatedToolOutput(t *testing.T) {
 
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	sessionStore := session.New(sessionPath)
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, time.Second)
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, 0, 0, time.Second)
 	writer := &captureWriter{}
 
 	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "run the tool"}); err != nil {

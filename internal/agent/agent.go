@@ -19,7 +19,6 @@ import (
 	"github.com/machinae/betterclaw/internal/tools"
 )
 
-const defaultAgentMaxIterations = 10
 const defaultRequestTimeout = 30 * time.Second
 
 // Agent implements the runtime Handler for one conversation.
@@ -29,6 +28,7 @@ type Agent struct {
 	approver          approval.Approver
 	systemPrompt      string
 	maxIter           int
+	toolOutputLength  int
 	maxContextTokens  int
 	recentMessages    int
 	history           []provider.ChatMessage
@@ -53,7 +53,6 @@ func New(provider provider.Provider, registry *tools.Registry, approver approval
 		registry:     registry,
 		approver:     approver,
 		systemPrompt: systemPrompt,
-		maxIter:      defaultAgentMaxIterations,
 	}
 }
 
@@ -67,6 +66,8 @@ func NewWithSession(
 	memoryStore *memory.Store,
 	maxContextTokens int,
 	recentMessages int,
+	maxToolCalls int,
+	toolOutputLength int,
 	requestTimeout time.Duration,
 ) *Agent {
 	ag := New(provider, registry, approver, systemPrompt)
@@ -74,11 +75,19 @@ func NewWithSession(
 	ag.memoryStore = memoryStore
 	ag.maxContextTokens = maxContextTokens
 	ag.recentMessages = recentMessages
+	ag.maxIter = maxToolCalls
+	ag.toolOutputLength = toolOutputLength
 	ag.requestTimeout = requestTimeout
 	if ag.requestTimeout <= 0 {
 		ag.requestTimeout = defaultRequestTimeout
 	}
 	return ag
+}
+
+// ConfigureContext sets per-conversation context limits for tool calls and output.
+func (a *Agent) ConfigureContext(maxToolCalls, toolOutputLength int) {
+	a.maxIter = maxToolCalls
+	a.toolOutputLength = toolOutputLength
 }
 
 // ConfigureCosts enables cost tracking and optional daily/monthly spend limits.
@@ -140,6 +149,7 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg
 		a.systemPrompt,
 		messages,
 		a.maxIter,
+		a.toolOutputLength,
 		func(usage provider.TokenUsage) error {
 			if err := a.recordUsage(ctx, usage); err != nil {
 				logging.Logger().Warn("failed to record llm usage", "err", err)

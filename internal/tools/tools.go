@@ -12,7 +12,7 @@ import (
 	"github.com/machinae/betterclaw/internal/provider"
 )
 
-const maxInlineOutputChars = 2000
+const defaultInlineOutputChars = 2000
 
 // Permission classifies whether a tool can run automatically or needs user approval.
 type Permission int
@@ -60,14 +60,19 @@ type ToolResult struct {
 
 // TruncateOutput stores very large output in a temp file and returns a compact result.
 func TruncateOutput(output string) (*ToolResult, error) {
-	if len(output) <= maxInlineOutputChars {
-		return &ToolResult{Output: output}, nil
-	}
-
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, fmt.Errorf("load config for tool output path: %w", err)
 	}
+	limit := cfg.Context.ToolOutputLength
+	if limit <= 0 {
+		limit = defaultInlineOutputChars
+	}
+
+	if len(output) <= limit {
+		return &ToolResult{Output: output}, nil
+	}
+
 	tmpDir := cfg.ToolTmpDir()
 	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create workspace directory for tool output: %w", err)
@@ -84,7 +89,7 @@ func TruncateOutput(output string) (*ToolResult, error) {
 	}
 
 	return &ToolResult{
-		Output:         output[:maxInlineOutputChars],
+		Output:         output[:limit],
 		Truncated:      true,
 		FullOutputPath: tempFile.Name(),
 	}, nil

@@ -15,6 +15,7 @@ import (
 )
 
 const defaultMaxIterations = 10
+const defaultToolOutputLength = 2000
 
 // Run executes the agent loop until the model returns a final text response.
 func Run(
@@ -25,6 +26,7 @@ func Run(
 	systemPrompt string,
 	messages []provider.ChatMessage,
 	maxIterations int,
+	toolOutputLength int,
 	onLLMResponse func(usage provider.TokenUsage) error,
 ) (*provider.ChatResponse, []provider.ChatMessage, error) {
 	if modelProvider == nil {
@@ -35,6 +37,9 @@ func Run(
 	}
 	if maxIterations <= 0 {
 		maxIterations = defaultMaxIterations
+	}
+	if toolOutputLength <= 0 {
+		toolOutputLength = defaultToolOutputLength
 	}
 
 	history := append([]provider.ChatMessage(nil), messages...)
@@ -190,8 +195,8 @@ func Run(
 			)
 
 			content := result.Output
-			if len(content) > 2000 {
-				content = content[:2000]
+			if len(content) > toolOutputLength {
+				content = content[:toolOutputLength]
 			}
 			history = append(history, provider.ChatMessage{
 				Role:       provider.RoleTool,

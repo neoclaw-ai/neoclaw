@@ -156,7 +156,7 @@ func startTelegram(
 		return nil, err
 	}
 
-	systemPrompt, err := agent.BuildSystemPrompt(cfg.AgentDir(), memoryStore)
+	systemPrompt, err := agent.BuildSystemPrompt(cfg.AgentDir(), memoryStore, cfg.Context.DailyLogLookback, cfg.Context.MaxSoulLength)
 	if err != nil {
 		return nil, err
 	}
@@ -170,8 +170,10 @@ func startTelegram(
 		systemPrompt,
 		sessionStore,
 		memoryStore,
-		cfg.Costs.MaxContextTokens,
-		cfg.Costs.RecentMessages,
+		cfg.Context.MaxTokens,
+		cfg.Context.RecentMessages,
+		cfg.Context.MaxToolCalls,
+		cfg.Context.ToolOutputLength,
 		llmCfg.RequestTimeout,
 	)
 	handler.ConfigureCosts(
