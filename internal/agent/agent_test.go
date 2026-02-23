@@ -296,6 +296,67 @@ func TestCompactHistoryIfNeededFallbackRecentOnlyOnSummaryFailure(t *testing.T) 
 	}
 }
 
+func TestCompactHistoryIfNeeded_AdjustsBoundaryToIncludeToolTurn(t *testing.T) {
+	modelProvider := &recordingProvider{
+		responses: []*provider.ChatResponse{{Content: "summary output"}},
+	}
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, DefaultSystemPrompt)
+	ag.maxContextTokens = 10
+	ag.recentMessages = 2
+	messages := []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "1111111111"},
+		{
+			Role: provider.RoleAssistant,
+			ToolCalls: []provider.ToolCall{
+				{ID: "toolu_1", Name: "memory_append", Arguments: `{"x":"y"}`},
+			},
+		},
+		{Role: provider.RoleTool, ToolCallID: "toolu_1", Content: "ok"},
+		{Role: provider.RoleUser, Content: "3333333333"},
+	}
+
+	compacted, err := ag.compactHistoryIfNeeded(context.Background(), messages)
+	if err != nil {
+		t.Fatalf("compact history: %v", err)
+	}
+	if len(compacted) != 4 {
+		t.Fatalf("expected summary + assistant/tool/user (4 messages), got %d", len(compacted))
+	}
+	if compacted[1].Role != provider.RoleAssistant || len(compacted[1].ToolCalls) != 1 {
+		t.Fatalf("expected assistant tool-call message kept after summary, got %#v", compacted[1])
+	}
+	if compacted[2].Role != provider.RoleTool || compacted[2].ToolCallID != "toolu_1" {
+		t.Fatalf("expected matching tool result kept after assistant tool-call, got %#v", compacted[2])
+	}
+}
+
+func TestCompactHistoryIfNeeded_SkipsOrphanToolResultAtBoundary(t *testing.T) {
+	modelProvider := &recordingProvider{
+		responses: []*provider.ChatResponse{{Content: "summary output"}},
+	}
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, DefaultSystemPrompt)
+	ag.maxContextTokens = 10
+	ag.recentMessages = 3
+	messages := []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "1111111111"},
+		{Role: provider.RoleAssistant, Content: "2222222222"},
+		{Role: provider.RoleTool, ToolCallID: "orphan", Content: "bad"},
+		{Role: provider.RoleUser, Content: "3333333333"},
+		{Role: provider.RoleAssistant, Content: "4444444444"},
+	}
+
+	compacted, err := ag.compactHistoryIfNeeded(context.Background(), messages)
+	if err != nil {
+		t.Fatalf("compact history: %v", err)
+	}
+	if len(compacted) != 3 {
+		t.Fatalf("expected summary + 2 recent messages, got %d", len(compacted))
+	}
+	if compacted[1].Role == provider.RoleTool {
+		t.Fatalf("expected recent window not to start with RoleTool, got %#v", compacted[1])
+	}
+}
+
 func TestAgentSessionStoresTruncatedToolOutput(t *testing.T) {
 	registry := tools.NewRegistry()
 	if err := registry.Register(truncatingTool{}); err != nil {

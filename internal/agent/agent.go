@@ -121,12 +121,17 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg
 	}
 
 	baseHistory := append([]provider.ChatMessage{}, a.history...)
+	baseHistory, _ = sanitizeToolTurns(baseHistory)
 	messages := appendUserMessage(baseHistory, msg.Text)
 	uncompactedMessages := append([]provider.ChatMessage{}, messages...)
 	messages, err = a.compactHistoryIfNeeded(ctx, messages)
 	if err != nil {
 		return err
 	}
+	// Compaction can cut through a tool turn boundary (assistant tool_use +
+	// following tool_result messages). Re-sanitize after compaction so provider
+	// payloads never contain orphan tool_result blocks.
+	messages, _ = sanitizeToolTurns(messages)
 	resp, history, err := Run(
 		ctx,
 		a.provider,

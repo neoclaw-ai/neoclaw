@@ -19,7 +19,8 @@ func (a *Agent) compactHistoryIfNeeded(ctx context.Context, messages []provider.
 	if a.maxContextTokens <= 0 {
 		return append([]provider.ChatMessage{}, messages...), nil
 	}
-	if estimateTokens(a.systemPrompt, messages) <= a.maxContextTokens {
+	estimatedTokens := estimateTokens(a.systemPrompt, messages)
+	if estimatedTokens <= a.maxContextTokens {
 		return append([]provider.ChatMessage{}, messages...), nil
 	}
 	if len(messages) == 0 {
@@ -30,7 +31,17 @@ func (a *Agent) compactHistoryIfNeeded(ctx context.Context, messages []provider.
 	if recentCount <= 0 || recentCount > len(messages) {
 		recentCount = len(messages)
 	}
-	olderCount := len(messages) - recentCount
+	initialStart := len(messages) - recentCount
+	olderCount := compactionRecentStart(messages, initialStart)
+	logging.Logger().Info(
+		"history compaction triggered",
+		"estimated_tokens", estimatedTokens,
+		"max_context_tokens", a.maxContextTokens,
+		"message_count", len(messages),
+		"requested_recent_count", recentCount,
+		"recent_start", olderCount,
+		"recent_start_adjusted", olderCount != initialStart,
+	)
 	recent := append([]provider.ChatMessage{}, messages[olderCount:]...)
 	if olderCount <= 0 {
 		return recent, nil
@@ -150,4 +161,30 @@ func sameMessageSlice(a, b []provider.ChatMessage) bool {
 		}
 	}
 	return true
+}
+
+// compactionRecentStart adjusts the recent-window start so compaction does not
+// begin on RoleTool. If the window would start mid tool-turn, it expands
+// backward to include the matching assistant tool-call message when available;
+// otherwise it skips forward past orphan tool-result blocks.
+func compactionRecentStart(messages []provider.ChatMessage, start int) int {
+	if start <= 0 || start >= len(messages) || messages[start].Role != provider.RoleTool {
+		return start
+	}
+
+	toolBlockStart := start
+	for toolBlockStart > 0 && messages[toolBlockStart-1].Role == provider.RoleTool {
+		toolBlockStart--
+	}
+
+	assistantIdx := toolBlockStart - 1
+	if assistantIdx >= 0 && messages[assistantIdx].Role == provider.RoleAssistant && len(messages[assistantIdx].ToolCalls) > 0 {
+		return assistantIdx
+	}
+
+	i := start
+	for i < len(messages) && messages[i].Role == provider.RoleTool {
+		i++
+	}
+	return i
 }

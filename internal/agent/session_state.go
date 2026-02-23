@@ -17,6 +17,7 @@ func (a *Agent) ensureHistoryLoaded(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	history, _ = sanitizeToolTurns(history)
 	a.history = history
 	a.historyLoadedOnce = true
 	return nil
