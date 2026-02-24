@@ -17,6 +17,8 @@ import (
 
 const defaultDailyLogLookback = 24 * time.Hour
 
+const resolveRelativeTimeInstruction = "Resolve relative date/time phrases (for example: tomorrow, next week, in 2 hours) using the current time and timezone above. When replying about dates/times, include absolute dates where useful."
+
 // BuildSystemPrompt assembles the runtime system prompt from base instructions,
 // SOUL.md, USER.md, long-term memory, and recent daily log entries.
 func BuildSystemPrompt(agentDir string, store *memory.Store, contextCfg config.ContextConfig) (string, error) {
@@ -35,7 +37,17 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 		dailyLogLookback = defaultDailyLogLookback
 	}
 
-	prompt := DefaultSystemPrompt + "\n\n" + autoRememberInstruction
+	var promptBuilder strings.Builder
+	promptBuilder.WriteString(DefaultSystemPrompt)
+	promptBuilder.WriteString("\n\n")
+	promptBuilder.WriteString(autoRememberInstruction)
+	if timeLine := currentTimeContextLine(now); timeLine != "" {
+		promptBuilder.WriteString("\n\n")
+		promptBuilder.WriteString(timeLine)
+		promptBuilder.WriteString("\n")
+		promptBuilder.WriteString(resolveRelativeTimeInstruction)
+	}
+	prompt := promptBuilder.String()
 
 	soulPath := filepath.Join(agentDir, config.SoulFilePath)
 	soulText, soulExists, err := readOptionalFile(soulPath)
@@ -124,6 +136,25 @@ func truncateStringByChars(s string, maxChars int) (string, bool) {
 		charCount++
 	}
 	return b.String(), true
+}
+
+// currentTimeContextLine returns a one-line current-time context string.
+func currentTimeContextLine(now time.Time) string {
+	if now.IsZero() {
+		return ""
+	}
+	timestamp := now.Format(time.RFC3339)
+	if strings.TrimSpace(timestamp) == "" {
+		return ""
+	}
+	locationName := ""
+	if loc := now.Location(); loc != nil {
+		locationName = strings.TrimSpace(loc.String())
+	}
+	if locationName == "" {
+		return fmt.Sprintf("Current time: %s", timestamp)
+	}
+	return fmt.Sprintf("Current time: %s (%s)", timestamp, locationName)
 }
 
 func readOptionalFile(path string) (text string, exists bool, err error) {

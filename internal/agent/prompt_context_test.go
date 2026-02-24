@@ -87,3 +87,36 @@ func TestBuildSystemPromptDailyLogLookbackWindow(t *testing.T) {
 		t.Fatalf("did not expect outside-lookback entry in prompt, got %q", got)
 	}
 }
+
+func TestCurrentTimeContextLineFormatsRFC3339WithTimezone(t *testing.T) {
+	loc := time.FixedZone("America/Los_Angeles", -8*60*60)
+	now := time.Date(2026, 2, 24, 15, 4, 5, 0, loc)
+
+	got := currentTimeContextLine(now)
+	want := "Current time: 2026-02-24T15:04:05-08:00 (America/Los_Angeles)"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestBuildSystemPromptIncludesCurrentTimeAndDateResolutionInstruction(t *testing.T) {
+	agentDir := t.TempDir()
+	memoryDir := filepath.Join(agentDir, "memory")
+	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
+		t.Fatalf("mkdir memory dir: %v", err)
+	}
+	store := memory.New(memoryDir)
+	loc := time.FixedZone("America/Los_Angeles", -8*60*60)
+	now := time.Date(2026, 2, 24, 15, 4, 5, 0, loc)
+
+	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookback: 24 * time.Hour})
+	if err != nil {
+		t.Fatalf("build system prompt: %v", err)
+	}
+	if !strings.Contains(got, "Current time: 2026-02-24T15:04:05-08:00 (America/Los_Angeles)") {
+		t.Fatalf("expected current time context in prompt, got %q", got)
+	}
+	if !strings.Contains(got, "Resolve relative date/time phrases") {
+		t.Fatalf("expected relative time instruction in prompt, got %q", got)
+	}
+}
