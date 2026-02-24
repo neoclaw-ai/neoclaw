@@ -83,6 +83,7 @@ func Initialize(cfg *config.Config) error {
 		{path: cfg.CostsPath(), content: ""},
 
 		{path: cfg.SoulPath(), content: defaultSoulMarkdown()},
+		{path: cfg.UserPath(), content: defaultUserMarkdown()},
 		{path: cfg.JobsPath(), content: "[]\n"},
 		{path: cfg.MemoryPath(), content: "# Memory\n"},
 		{path: cfg.CLIContextPath(), content: ""},
@@ -144,14 +145,25 @@ func defaultSoulMarkdown() string {
 ## Persona
 You are a helpful personal assistant.
 
-## User
-
-
 ## Preferences
 
 
 ## Tool Conventions
 - Use tools when they improve accuracy.
 - Keep outputs concise and actionable.
+`
+}
+
+func defaultUserMarkdown() string {
+	return `# User
+
+## Profile
+
+
+## Preferences
+
+
+## Current Context
+
 `
 }

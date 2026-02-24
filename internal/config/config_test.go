@@ -337,6 +337,9 @@ func TestPathResolutionMethods(t *testing.T) {
 	if cfg.SoulPath() != "/tmp/neoclaw/data/agents/default/SOUL.md" {
 		t.Fatalf("unexpected soul path: %q", cfg.SoulPath())
 	}
+	if cfg.UserPath() != "/tmp/neoclaw/data/agents/default/USER.md" {
+		t.Fatalf("unexpected user path: %q", cfg.UserPath())
+	}
 	if cfg.MemoryPath() != "/tmp/neoclaw/data/agents/default/memory/memory.md" {
 		t.Fatalf("unexpected memory path: %q", cfg.MemoryPath())
 	}

@@ -21,6 +21,7 @@ const (
 	DefaultSessionPath = "default.jsonl"
 	JobsFilePath       = "jobs.json"
 	SoulFilePath       = "SOUL.md"
+	UserFilePath       = "USER.md"
 	MemoryFilePath     = "memory.md"
 
 	AllowedDomainsFileName  = "allowed_domains.json"
@@ -123,6 +124,10 @@ func (c *Config) JobsPath() string {
 
 func (c *Config) SoulPath() string {
 	return filepath.Join(c.AgentDir(), SoulFilePath)
+}
+
+func (c *Config) UserPath() string {
+	return filepath.Join(c.AgentDir(), UserFilePath)
 }
 
 func (c *Config) MemoryPath() string {

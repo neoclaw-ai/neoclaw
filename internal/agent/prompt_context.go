@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
 	"github.com/neoclaw-ai/neoclaw/internal/memory"
 	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
@@ -17,7 +18,7 @@ import (
 const defaultDailyLogLookback = 24 * time.Hour
 
 // BuildSystemPrompt assembles the runtime system prompt from base instructions,
-// SOUL.md, long-term memory, and recent daily log entries.
+// SOUL.md, USER.md, long-term memory, and recent daily log entries.
 func BuildSystemPrompt(agentDir string, store *memory.Store, contextCfg config.ContextConfig) (string, error) {
 	return buildSystemPromptAt(agentDir, store, time.Now(), contextCfg)
 }
@@ -37,9 +38,20 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 	prompt := DefaultSystemPrompt + "\n\n" + autoRememberInstruction
 
 	soulPath := filepath.Join(agentDir, config.SoulFilePath)
-	soulText, err := readOptionalFile(soulPath)
+	soulText, soulExists, err := readOptionalFile(soulPath)
 	if err != nil {
 		return "", err
+	}
+	if !soulExists {
+		logging.Logger().Warn("missing SOUL.md; continuing without soul context", "path", soulPath)
+	}
+	userPath := filepath.Join(agentDir, config.UserFilePath)
+	userText, userExists, err := readOptionalFile(userPath)
+	if err != nil {
+		return "", err
+	}
+	if !userExists {
+		logging.Logger().Warn("missing USER.md; continuing without user context", "path", userPath)
 	}
 	memoryText, err := store.LoadContext()
 	if err != nil {
@@ -50,7 +62,7 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 		return "", err
 	}
 
-	if soulText == "" && memoryText == "" && len(recentLogs) == 0 {
+	if soulText == "" && userText == "" && memoryText == "" && len(recentLogs) == 0 {
 		return prompt, nil
 	}
 
@@ -61,6 +73,13 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 		b.WriteString("\n[SOUL.md]\n")
 		b.WriteString(soulText)
 		if !strings.HasSuffix(soulText, "\n") {
+			b.WriteByte('\n')
+		}
+	}
+	if userText != "" {
+		b.WriteString("\n[USER.md]\n")
+		b.WriteString(userText)
+		if !strings.HasSuffix(userText, "\n") {
 			b.WriteByte('\n')
 		}
 	}
@@ -107,13 +126,13 @@ func truncateStringByChars(s string, maxChars int) (string, bool) {
 	return b.String(), true
 }
 
-func readOptionalFile(path string) (string, error) {
+func readOptionalFile(path string) (text string, exists bool, err error) {
 	content, err := store.ReadFile(path)
 	if err == nil {
-		return content, nil
+		return content, true, nil
 	}
 	if errors.Is(err, os.ErrNotExist) {
-		return "", nil
+		return "", false, nil
 	}
-	return "", fmt.Errorf("read %s: %w", path, err)
+	return "", false, fmt.Errorf("read %s: %w", path, err)
 }

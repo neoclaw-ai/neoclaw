@@ -11,7 +11,7 @@ import (
 	"github.com/neoclaw-ai/neoclaw/internal/memory"
 )
 
-func TestBuildSystemPromptIncludesSoulMemoryAndRecentDailyLogs(t *testing.T) {
+func TestBuildSystemPromptIncludesSoulUserMemoryAndRecentDailyLogs(t *testing.T) {
 	agentDir := t.TempDir()
 	memoryDir := filepath.Join(agentDir, "memory")
 	if err := os.MkdirAll(filepath.Join(memoryDir, "daily"), 0o755); err != nil {
@@ -23,6 +23,13 @@ func TestBuildSystemPromptIncludesSoulMemoryAndRecentDailyLogs(t *testing.T) {
 		0o644,
 	); err != nil {
 		t.Fatalf("write soul: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(agentDir, "USER.md"),
+		[]byte("# User\n\n## Profile\nIlya\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write user: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(memoryDir, "memory.md"), []byte("# Memory\n\n## Preferences\n- Vegetarian\n"), 0o644); err != nil {
 		t.Fatalf("write memory: %v", err)
@@ -42,6 +49,9 @@ func TestBuildSystemPromptIncludesSoulMemoryAndRecentDailyLogs(t *testing.T) {
 	}
 	if !strings.Contains(got, "[SOUL.md]") || !strings.Contains(got, "Helpful assistant") {
 		t.Fatalf("expected SOUL context, got %q", got)
+	}
+	if !strings.Contains(got, "[USER.md]") || !strings.Contains(got, "Ilya") {
+		t.Fatalf("expected USER context, got %q", got)
 	}
 	if !strings.Contains(got, "[Long-term memory]") || !strings.Contains(got, "Vegetarian") {
 		t.Fatalf("expected long-term memory context, got %q", got)

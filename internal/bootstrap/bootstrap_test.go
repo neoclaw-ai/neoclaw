@@ -29,6 +29,7 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		cfg.LogsDir(),
 		cfg.CostsPath(),
 		cfg.SoulPath(),
+		cfg.UserPath(),
 		cfg.JobsPath(),
 		cfg.MemoryPath(),
 		cfg.CLIContextPath(),
@@ -47,8 +48,21 @@ func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
 		t.Fatalf("read SOUL.md: %v", err)
 	}
 	soul := string(soulRaw)
-	if !strings.Contains(soul, "## Persona") || !strings.Contains(soul, "## User") || !strings.Contains(soul, "## Preferences") {
+	if !strings.Contains(soul, "## Persona") || !strings.Contains(soul, "## Preferences") {
 		t.Fatalf("expected SOUL.md template sections, got %q", soul)
+	}
+	if strings.Contains(soul, "## User") {
+		t.Fatalf("did not expect user section in SOUL.md, got %q", soul)
+	}
+
+	userPath := cfg.UserPath()
+	userRaw, err := os.ReadFile(userPath)
+	if err != nil {
+		t.Fatalf("read USER.md: %v", err)
+	}
+	user := string(userRaw)
+	if !strings.Contains(user, "## Profile") || !strings.Contains(user, "## Preferences") || !strings.Contains(user, "## Current Context") {
+		t.Fatalf("expected USER.md template sections, got %q", user)
 	}
 
 	domainsPath := cfg.AllowedDomainsPath()
