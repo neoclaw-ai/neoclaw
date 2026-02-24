@@ -139,7 +139,7 @@ func TestSearchLogsAcrossMultipleDays(t *testing.T) {
 
 	fromTime := time.Date(2026, 2, 16, 0, 0, 0, 0, time.Local)
 	toTime := time.Date(2026, 2, 17, 23, 59, 59, 0, time.Local)
-	got, err := store.SearchLogs("migration", fromTime, toTime)
+	got, err := store.SearchLogs("migration", fromTime, toTime, SearchModeSubstring)
 	if err != nil {
 		t.Fatalf("search logs: %v", err)
 	}

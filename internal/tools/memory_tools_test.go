@@ -139,3 +139,70 @@ func TestSearchLogsFindsAcrossMultipleDays(t *testing.T) {
 		t.Fatalf("expected exact daily log lines, got %q", res.Output)
 	}
 }
+
+func TestSearchLogsRegexModeFindsMatches(t *testing.T) {
+	memoryDir := t.TempDir()
+	dailyDir := filepath.Join(memoryDir, "daily")
+	if err := os.MkdirAll(dailyDir, 0o755); err != nil {
+		t.Fatalf("mkdir daily dir: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(dailyDir, "2026-02-17.md"),
+		[]byte("# 2026-02-17\n\n- 09:00:00: API migration work\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write day 1: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(dailyDir, "2026-02-16.md"),
+		[]byte("# 2026-02-16\n\n- 11:00:00: Discussed migration timeline\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write day 2: %v", err)
+	}
+
+	store := memory.New(memoryDir)
+	tool := SearchLogsTool{
+		Store: store,
+		Now:   func() time.Time { return time.Date(2026, 2, 17, 12, 0, 0, 0, time.Local) },
+	}
+	res, err := tool.Execute(context.Background(), map[string]any{
+		"query":     "(migration work|migration timeline)",
+		"matchMode": "regex",
+		"fromTime":  time.Date(2026, 2, 16, 0, 0, 0, 0, time.Local).Format(time.RFC3339),
+	})
+	if err != nil {
+		t.Fatalf("search logs regex: %v", err)
+	}
+	if !strings.Contains(res.Output, "2026-02-17T09:00:00") || !strings.Contains(res.Output, "2026-02-16T11:00:00") {
+		t.Fatalf("expected regex matches from both days, got %q", res.Output)
+	}
+}
+
+func TestSearchLogsRegexModeInvalidPatternReturnsError(t *testing.T) {
+	memoryDir := t.TempDir()
+	store := memory.New(memoryDir)
+	tool := SearchLogsTool{Store: store}
+
+	_, err := tool.Execute(context.Background(), map[string]any{
+		"query":     "[",
+		"matchMode": "regex",
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid regex pattern") {
+		t.Fatalf("expected invalid regex error, got %v", err)
+	}
+}
+
+func TestSearchLogsRejectsUnknownMatchMode(t *testing.T) {
+	memoryDir := t.TempDir()
+	store := memory.New(memoryDir)
+	tool := SearchLogsTool{Store: store}
+
+	_, err := tool.Execute(context.Background(), map[string]any{
+		"query":     "migration",
+		"matchMode": "glob",
+	})
+	if err == nil || !strings.Contains(err.Error(), "argument matchMode must be one of: substring, regex") {
+		t.Fatalf("expected invalid matchMode error, got %v", err)
+	}
+}

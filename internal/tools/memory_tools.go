@@ -227,7 +227,7 @@ func (t SearchLogsTool) Name() string {
 
 // Description returns the tool description for the model.
 func (t SearchLogsTool) Description() string {
-	return "Search past daily logs"
+	return "Search past daily logs using substring (default) or regex matching"
 }
 
 // Schema returns the JSON schema for search_logs args.
@@ -237,7 +237,12 @@ func (t SearchLogsTool) Schema() map[string]any {
 		"properties": map[string]any{
 			"query": map[string]any{
 				"type":        "string",
-				"description": "Query substring to search for",
+				"description": "Search query text or regex pattern",
+			},
+			"matchMode": map[string]any{
+				"type":        "string",
+				"description": "Optional match mode: substring (default) or regex",
+				"enum":        []string{memory.SearchModeSubstring, memory.SearchModeRegex},
 			},
 			"fromTime": map[string]any{
 				"type":        "string",
@@ -279,8 +284,12 @@ func (t SearchLogsTool) Execute(_ context.Context, args map[string]any) (*ToolRe
 	if err != nil {
 		return nil, err
 	}
+	matchMode, err := optionalSearchMatchModeArg(args, "matchMode", memory.SearchModeSubstring)
+	if err != nil {
+		return nil, err
+	}
 
-	text, err := t.Store.SearchLogs(query, fromTime, toTime)
+	text, err := t.Store.SearchLogs(query, fromTime, toTime, matchMode)
 	if err != nil {
 		return nil, err
 	}
@@ -305,4 +314,26 @@ func optionalRFC3339Arg(args map[string]any, key string, def time.Time) (time.Ti
 		return time.Time{}, fmt.Errorf("argument %s must be RFC3339 format", key)
 	}
 	return parsed, nil
+}
+
+// optionalSearchMatchModeArg parses an optional search match mode argument.
+func optionalSearchMatchModeArg(args map[string]any, key, def string) (string, error) {
+	raw, ok := args[key]
+	if !ok {
+		return def, nil
+	}
+	s, ok := raw.(string)
+	if !ok {
+		return "", fmt.Errorf("argument %s must be a string", key)
+	}
+	s = strings.TrimSpace(strings.ToLower(s))
+	if s == "" {
+		return def, nil
+	}
+	switch s {
+	case memory.SearchModeSubstring, memory.SearchModeRegex:
+		return s, nil
+	default:
+		return "", fmt.Errorf("argument %s must be one of: %s, %s", key, memory.SearchModeSubstring, memory.SearchModeRegex)
+	}
 }

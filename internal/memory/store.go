@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -18,6 +19,13 @@ import (
 const (
 	memoryFileName = "memory.md"
 	dailyDirName   = "daily"
+)
+
+const (
+	// SearchModeSubstring performs case-insensitive substring matching.
+	SearchModeSubstring = "substring"
+	// SearchModeRegex performs regex matching using Go's RE2 engine.
+	SearchModeRegex = "regex"
 )
 
 // Store manages long-term memory and daily log files.
@@ -218,8 +226,8 @@ func (s *Store) GetAllDailyLogs() ([]LogEntry, error) {
 	return s.GetDailyLogs(time.Time{}, time.Time{})
 }
 
-// SearchLogs does case-insensitive substring search across daily logs in the time range.
-func (s *Store) SearchLogs(query string, fromTime, toTime time.Time) (string, error) {
+// SearchLogs searches logs with substring or regex matching across the time range.
+func (s *Store) SearchLogs(query string, fromTime, toTime time.Time, mode string) (string, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return "", errors.New("query is required")
@@ -229,11 +237,32 @@ func (s *Store) SearchLogs(query string, fromTime, toTime time.Time) (string, er
 		return "", err
 	}
 
-	lowerQuery := strings.ToLower(query)
+	mode = strings.TrimSpace(strings.ToLower(mode))
+	if mode == "" {
+		mode = SearchModeSubstring
+	}
+
+	var matcher func(string) bool
+	switch mode {
+	case SearchModeSubstring:
+		lowerQuery := strings.ToLower(query)
+		matcher = func(line string) bool {
+			return strings.Contains(strings.ToLower(line), lowerQuery)
+		}
+	case SearchModeRegex:
+		pattern, err := regexp.Compile(query)
+		if err != nil {
+			return "", fmt.Errorf("invalid regex pattern: %w", err)
+		}
+		matcher = pattern.MatchString
+	default:
+		return "", fmt.Errorf("unsupported search mode %s", mode)
+	}
+
 	var out strings.Builder
 	for _, entry := range entries {
 		line := formatDailyLogLine(entry)
-		if !strings.Contains(strings.ToLower(line), lowerQuery) {
+		if !matcher(line) {
 			continue
 		}
 		if out.Len() > 0 {
