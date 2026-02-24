@@ -395,7 +395,7 @@ func TestTelegramListener_HelpCommandHandledByCommandsHandler(t *testing.T) {
 	if len(msgs) != 1 {
 		t.Fatalf("expected one command response, got %#v", msgs)
 	}
-	if !strings.Contains(msgs[0], "Commands: /help") {
+	if !strings.Contains(msgs[0], "/new, /reset - Clear the current session") {
 		t.Fatalf("unexpected /help response: %q", msgs[0])
 	}
 }

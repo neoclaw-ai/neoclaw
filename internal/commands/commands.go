@@ -13,7 +13,11 @@ import (
 	"github.com/neoclaw-ai/neoclaw/internal/scheduler"
 )
 
-const helpText = "Commands: /help, /commands, /new, /reset, /stop, /jobs, /usage"
+const helpText = `Available commands:
+/help - Show available commands
+/new, /reset - Clear the current session
+/jobs - List scheduled jobs
+/usage - Show cost usage`
 
 // Resetter resets the active conversation/session state.
 type Resetter interface {
@@ -47,7 +51,7 @@ func (h *Handler) Handle(ctx context.Context, cmd string, w runtime.ResponseWrit
 	}
 
 	switch normalize(cmd) {
-	case "/help", "/commands":
+	case "/help":
 		return true, h.handleHelp(ctx, w)
 	case "/new", "/reset":
 		return true, h.handleReset(ctx, w)
