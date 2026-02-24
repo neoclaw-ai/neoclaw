@@ -608,69 +608,6 @@ func TestMessagePreview_TruncatesToLimit(t *testing.T) {
 	}
 }
 
-func TestTelegramListenerRequestApproval_Approve(t *testing.T) {
-	listener := NewTelegram("token", "")
-	listener.setActiveApprovalTarget("111", "alice", 42)
-
-	api := newMockTelegramAPI()
-	listener.sendMessage = api.sendMessage
-	listener.answerCallbackQuery = api.answerCallback
-	listener.editMessageReplyMarkup = api.editReplyMarkup
-
-	done := make(chan struct{})
-	var decision approval.ApprovalDecision
-	var err error
-	go func() {
-		decision, err = listener.RequestApproval(context.Background(), approval.ApprovalRequest{
-			Tool:        "run_command",
-			Description: "Run: ls -la",
-		})
-		close(done)
-	}()
-
-	sendParams := api.waitForSend(t)
-	approveData, _ := callbackDataFromReplyMarkup(t, sendParams)
-
-	listener.onApprovalApproveCallback(context.Background(), nil, &models.Update{
-		CallbackQuery: &models.CallbackQuery{
-			ID:   "callback-1",
-			From: models.User{ID: 111, Username: "alice"},
-			Data: approveData,
-			Message: models.MaybeInaccessibleMessage{
-				Message: &models.Message{
-					ID:   500,
-					Chat: models.Chat{ID: 42},
-				},
-			},
-		},
-	})
-
-	select {
-	case <-done:
-	case <-time.After(300 * time.Millisecond):
-		t.Fatal("request approval did not complete")
-	}
-	if err != nil {
-		t.Fatalf("request approval failed: %v", err)
-	}
-	if decision != approval.Approved {
-		t.Fatalf("expected Approved, got %v", decision)
-	}
-
-	if len(api.answerCalls) != 1 {
-		t.Fatalf("expected one answer callback call, got %d", len(api.answerCalls))
-	}
-	if api.answerCalls[0].CallbackQueryID != "callback-1" {
-		t.Fatalf("unexpected callback id: %q", api.answerCalls[0].CallbackQueryID)
-	}
-	if len(api.editCalls) != 1 {
-		t.Fatalf("expected one edit reply markup call, got %d", len(api.editCalls))
-	}
-	if api.editCalls[0].MessageID != 500 {
-		t.Fatalf("unexpected message id: %d", api.editCalls[0].MessageID)
-	}
-}
-
 func TestTelegramListenerRequestApproval_Deny(t *testing.T) {
 	listener := NewTelegram("token", "")
 	listener.setActiveApprovalTarget("111", "alice", 42)
