@@ -58,7 +58,7 @@ func (c Checker) Allow(ctx context.Context, host string) error {
 	}
 
 	if c.Approver == nil {
-		return fmt.Errorf("domain %q is not allowlisted and no approver is configured", target)
+		return fmt.Errorf("domain %s is not allowlisted and no approver is configured", target)
 	}
 
 	decision, err := c.Approver.RequestApproval(ctx, ApprovalRequest{
@@ -121,7 +121,7 @@ func loadDomainPolicy(path string) (domainPolicy, error) {
 
 	raw, err := store.ReadFile(path)
 	if err != nil {
-		return domainPolicy{}, fmt.Errorf("read domain policy %q: %w", path, err)
+		return domainPolicy{}, fmt.Errorf("read domain policy %s: %w", path, err)
 	}
 	if strings.TrimSpace(raw) == "" {
 		return domainPolicy{}, nil
@@ -129,7 +129,7 @@ func loadDomainPolicy(path string) (domainPolicy, error) {
 
 	var policy domainPolicy
 	if err := json.Unmarshal([]byte(raw), &policy); err != nil {
-		return domainPolicy{}, fmt.Errorf("decode domain policy %q: %w", path, err)
+		return domainPolicy{}, fmt.Errorf("decode domain policy %s: %w", path, err)
 	}
 	return policy, nil
 }
@@ -146,7 +146,7 @@ func saveDomainPolicy(path string, policy domainPolicy) error {
 	}
 	encoded = append(encoded, '\n')
 	if err := store.WriteFile(path, encoded); err != nil {
-		return fmt.Errorf("write domain policy %q: %w", path, err)
+		return fmt.Errorf("write domain policy %s: %w", path, err)
 	}
 	return nil
 }
@@ -187,14 +187,14 @@ func normalizeDomain(raw string) (string, error) {
 	if strings.Contains(value, "://") {
 		parsed, err := url.Parse(value)
 		if err != nil {
-			return "", fmt.Errorf("parse domain %q: %w", raw, err)
+			return "", fmt.Errorf("parse domain %s: %w", raw, err)
 		}
 		host = parsed.Host
 	}
 
 	host = strings.TrimSpace(host)
 	if host == "" {
-		return "", fmt.Errorf("invalid domain %q", raw)
+		return "", fmt.Errorf("invalid domain %s", raw)
 	}
 
 	parsedHost, _, err := net.SplitHostPort(host)
@@ -208,7 +208,7 @@ func normalizeDomain(raw string) (string, error) {
 		host = strings.TrimPrefix(host, "*.")
 	}
 	if host == "" {
-		return "", fmt.Errorf("invalid domain %q", raw)
+		return "", fmt.Errorf("invalid domain %s", raw)
 	}
 	return host, nil
 }

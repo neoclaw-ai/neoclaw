@@ -172,7 +172,7 @@ func (s *Store) GetDailyLogs(fromTime, toTime time.Time) ([]LogEntry, error) {
 		return []LogEntry{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read daily log directory %q: %w", dailyDir, err)
+		return nil, fmt.Errorf("read daily log directory %s: %w", dailyDir, err)
 	}
 
 	logFiles := make([]string, 0, len(files))
@@ -194,7 +194,7 @@ func (s *Store) GetDailyLogs(fromTime, toTime time.Time) ([]LogEntry, error) {
 		path := filepath.Join(dailyDir, name)
 		lines, err := readAllLines(path)
 		if err != nil {
-			return nil, fmt.Errorf("read daily log %q: %w", path, err)
+			return nil, fmt.Errorf("read daily log %s: %w", path, err)
 		}
 		for _, line := range lines {
 			entry, ok := parseDailyLogLine(day, line)
@@ -357,7 +357,7 @@ func readOptionalFile(path string) (string, error) {
 	case errors.Is(err, os.ErrNotExist):
 		return "", nil
 	default:
-		return "", fmt.Errorf("read %q: %w", path, err)
+		return "", fmt.Errorf("read %s: %w", path, err)
 	}
 }
 
@@ -421,7 +421,7 @@ func readAllLines(path string) ([]string, error) {
 		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scan %q: %w", path, err)
+		return nil, fmt.Errorf("scan %s: %w", path, err)
 	}
 	return lines, nil
 }

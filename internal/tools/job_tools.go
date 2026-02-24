@@ -270,11 +270,11 @@ func (t JobRunTool) Execute(ctx context.Context, args map[string]any) (*ToolResu
 func objectArg(args map[string]any, key string) (map[string]any, error) {
 	v, ok := args[key]
 	if !ok {
-		return nil, fmt.Errorf("missing required argument %q", key)
+		return nil, fmt.Errorf("missing required argument %s", key)
 	}
 	obj, ok := v.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("argument %q must be an object", key)
+		return nil, fmt.Errorf("argument %s must be an object", key)
 	}
 	out := make(map[string]any, len(obj))
 	for k, value := range obj {
@@ -288,6 +288,6 @@ func validateJobAction(action scheduler.Action) error {
 	case scheduler.ActionSendMessage, scheduler.ActionRunCommand, scheduler.ActionHTTPRequest:
 		return nil
 	default:
-		return fmt.Errorf("unsupported job action %q", action)
+		return fmt.Errorf("unsupported job action %s", action)
 	}
 }

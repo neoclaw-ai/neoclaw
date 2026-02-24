@@ -50,7 +50,7 @@ func NewRootCmd() *cobra.Command {
 			if _, err := os.Stat(configPath); errors.Is(err, os.ErrNotExist) {
 				firstRun = true
 			} else if err != nil {
-				return fmt.Errorf("stat BetterClaw config file %q: %w", configPath, err)
+				return fmt.Errorf("stat BetterClaw config file %s: %w", configPath, err)
 			}
 
 			if err := bootstrap.Initialize(cfg); err != nil {

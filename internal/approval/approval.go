@@ -75,7 +75,7 @@ func ExecuteTool(ctx context.Context, approver Approver, tool tools.Tool, args m
 
 	if permission == tools.RequiresApproval {
 		if approver == nil {
-			return nil, fmt.Errorf("tool %q requires approval but no approver is configured", tool.Name())
+			return nil, fmt.Errorf("tool %s requires approval but no approver is configured", tool.Name())
 		}
 		decision, err := approver.RequestApproval(ctx, ApprovalRequest{
 			Tool:        tool.Name(),
@@ -155,7 +155,7 @@ func promptForRunCommandPolicy(
 	command string,
 ) (tools.Permission, error) {
 	if approver == nil {
-		return tools.RequiresApproval, fmt.Errorf("tool %q requires approval but no approver is configured", toolName)
+		return tools.RequiresApproval, fmt.Errorf("tool %s requires approval but no approver is configured", toolName)
 	}
 
 	pattern, ok := generateCommandPattern(command)
@@ -426,7 +426,7 @@ func loadCommandPolicy(path string) (commandPolicy, error) {
 
 	var policy commandPolicy
 	if err := json.Unmarshal([]byte(raw), &policy); err != nil {
-		return commandPolicy{}, fmt.Errorf("decode command policy %q: %w", path, err)
+		return commandPolicy{}, fmt.Errorf("decode command policy %s: %w", path, err)
 	}
 	return policy, nil
 }
@@ -448,15 +448,15 @@ func saveCommandPolicy(path string, policy commandPolicy) error {
 func commandArg(args map[string]any) (string, error) {
 	raw, ok := args["command"]
 	if !ok {
-		return "", fmt.Errorf("missing required argument %q", "command")
+		return "", fmt.Errorf("missing required argument %s", "command")
 	}
 	command, ok := raw.(string)
 	if !ok {
-		return "", fmt.Errorf("argument %q must be a string", "command")
+		return "", fmt.Errorf("argument %s must be a string", "command")
 	}
 	command = strings.TrimSpace(command)
 	if command == "" {
-		return "", fmt.Errorf("argument %q cannot be empty", "command")
+		return "", fmt.Errorf("argument %s cannot be empty", "command")
 	}
 	return command, nil
 }
@@ -474,7 +474,7 @@ func appendUnique(values []string, value string) []string {
 // Build standard user-facing denial guidance.
 func toolDeniedError(toolName string) error {
 	return fmt.Errorf(
-		"user denied tool %q. User denied this action. Try a different approach or ask the user for guidance",
+		"user denied tool %s. User denied this action. Try a different approach or ask the user for guidance",
 		toolName,
 	)
 }

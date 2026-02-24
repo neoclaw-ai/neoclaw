@@ -115,7 +115,7 @@ func (r *Registry) Register(tool Tool) error {
 		return errors.New("tool name cannot be empty")
 	}
 	if _, exists := r.byName[name]; exists {
-		return fmt.Errorf("tool %q already registered", name)
+		return fmt.Errorf("tool %s already registered", name)
 	}
 	r.byName[name] = tool
 	return nil

@@ -144,7 +144,7 @@ func TestHTTPRequestToolRejectsInvalidHeaderValueType(t *testing.T) {
 			"X-Test": 1,
 		},
 	})
-	if err == nil || !strings.Contains(err.Error(), "header \"X-Test\" must be a string") {
+	if err == nil || !strings.Contains(err.Error(), "header X-Test must be a string") {
 		t.Fatalf("expected header type error, got %v", err)
 	}
 }

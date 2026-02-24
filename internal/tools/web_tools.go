@@ -61,7 +61,7 @@ func (t WebSearchTool) Execute(ctx context.Context, args map[string]any) (*ToolR
 		provider = "brave"
 	}
 	if provider != "brave" {
-		return nil, fmt.Errorf("unsupported web.search.provider %q", provider)
+		return nil, fmt.Errorf("unsupported web.search.provider %s", provider)
 	}
 	if strings.TrimSpace(t.APIKey) == "" {
 		return nil, errors.New("web.search.api_key is required")
@@ -199,7 +199,7 @@ func (t HTTPRequestTool) Execute(ctx context.Context, args map[string]any) (*Too
 		http.MethodTrace,
 		http.MethodConnect:
 	default:
-		return nil, fmt.Errorf("unsupported method %q", method)
+		return nil, fmt.Errorf("unsupported method %s", method)
 	}
 
 	rawURL, err := stringArg(args, "url")
@@ -211,7 +211,7 @@ func (t HTTPRequestTool) Execute(ctx context.Context, args map[string]any) (*Too
 	if raw, ok := args["body"]; ok {
 		value, ok := raw.(string)
 		if !ok {
-			return nil, fmt.Errorf("argument %q must be a string", "body")
+			return nil, fmt.Errorf("argument %s must be a string", "body")
 		}
 		body = value
 	}
@@ -264,13 +264,13 @@ func parseHeaderArgs(args map[string]any) (map[string]string, error) {
 
 	obj, ok := rawHeaders.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("argument %q must be an object", "headers")
+		return nil, fmt.Errorf("argument %s must be an object", "headers")
 	}
 	headers := make(map[string]string, len(obj))
 	for key, rawValue := range obj {
 		value, ok := rawValue.(string)
 		if !ok {
-			return nil, fmt.Errorf("header %q must be a string", key)
+			return nil, fmt.Errorf("header %s must be a string", key)
 		}
 		headers[key] = value
 	}

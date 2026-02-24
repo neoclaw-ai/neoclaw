@@ -55,7 +55,7 @@ func restrictProcessImpl(mode, dataDir string) error {
 
 	profile := darwinProfile(mode, absDataDir)
 	if strings.TrimSpace(profile) == "" {
-		return fmt.Errorf("unsupported security mode %q", mode)
+		return fmt.Errorf("unsupported security mode %s", mode)
 	}
 
 	args := append([]string{

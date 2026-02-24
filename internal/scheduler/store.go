@@ -94,7 +94,7 @@ func (s *jobStore) get(ctx context.Context, id string) (Job, error) {
 			return job, nil
 		}
 	}
-	return Job{}, fmt.Errorf("job %q not found", target)
+	return Job{}, fmt.Errorf("job %s not found", target)
 }
 
 // Create validates and persists a new enabled job.
@@ -169,7 +169,7 @@ func (s *jobStore) Delete(ctx context.Context, id string) error {
 		logging.Logger().Info("scheduled job deleted", "job_id", target)
 		return nil
 	}
-	return fmt.Errorf("job %q not found", target)
+	return fmt.Errorf("job %s not found", target)
 }
 
 func (s *jobStore) setEntryID(jobID string, entryID cron.EntryID) {
@@ -208,7 +208,7 @@ func (s *jobStore) readLocked() ([]Job, error) {
 	case errors.Is(err, os.ErrNotExist):
 		return []Job{}, nil
 	default:
-		return nil, fmt.Errorf("read jobs file %q: %w", s.path, err)
+		return nil, fmt.Errorf("read jobs file %s: %w", s.path, err)
 	}
 
 	if len(strings.TrimSpace(content)) == 0 {
@@ -217,11 +217,11 @@ func (s *jobStore) readLocked() ([]Job, error) {
 
 	var jobs []Job
 	if err := json.Unmarshal([]byte(content), &jobs); err != nil {
-		return nil, fmt.Errorf("decode jobs file %q: %w", s.path, err)
+		return nil, fmt.Errorf("decode jobs file %s: %w", s.path, err)
 	}
 	for _, job := range jobs {
 		if err := validateJob(job); err != nil {
-			return nil, fmt.Errorf("invalid job %q: %w", job.ID, err)
+			return nil, fmt.Errorf("invalid job %s: %w", job.ID, err)
 		}
 	}
 	return jobs, nil
@@ -271,7 +271,7 @@ func validateAction(action Action) error {
 	case ActionSendMessage, ActionRunCommand, ActionHTTPRequest:
 		return nil
 	default:
-		return fmt.Errorf("unsupported job action %q", action)
+		return fmt.Errorf("unsupported job action %s", action)
 	}
 }
 
@@ -281,7 +281,7 @@ func validateCron(spec string) error {
 		return errors.New("job cron is required")
 	}
 	if _, err := cron.ParseStandard(trimmed); err != nil {
-		return fmt.Errorf("invalid cron expression %q: %w", spec, err)
+		return fmt.Errorf("invalid cron expression %s: %w", spec, err)
 	}
 	return nil
 }

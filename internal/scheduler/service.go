@@ -52,7 +52,7 @@ func (s *Service) Start(ctx context.Context) error {
 			continue
 		}
 		if err := s.addCronEntry(job, ctx); err != nil {
-			return fmt.Errorf("register cron job %q: %w", job.ID, err)
+			return fmt.Errorf("register cron job %s: %w", job.ID, err)
 		}
 	}
 
@@ -158,7 +158,7 @@ func (s *Service) register(ctx context.Context, job Job) error {
 	}
 
 	if err := s.addCronEntry(job, s.runCtx); err != nil {
-		return fmt.Errorf("register cron job %q: %w", job.ID, err)
+		return fmt.Errorf("register cron job %s: %w", job.ID, err)
 	}
 	return nil
 }

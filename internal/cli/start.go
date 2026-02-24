@@ -57,7 +57,7 @@ func newStartCmd() *cobra.Command {
 
 			pidFilePath := cfg.PIDPath()
 			if err := os.WriteFile(pidFilePath, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0o644); err != nil {
-				return fmt.Errorf("write pid file %q: %w", pidFilePath, err)
+				return fmt.Errorf("write pid file %s: %w", pidFilePath, err)
 			}
 			defer func() {
 				os.Remove(pidFilePath)
@@ -202,7 +202,7 @@ func startTelegram(
 func registerTelegramChannelWriters(channelWriters map[string]io.Writer, allowedUsersPath string, listener *channels.TelegramListener) error {
 	usersFile, err := approval.LoadUsers(allowedUsersPath)
 	if err != nil {
-		return fmt.Errorf("load allowed users %q: %w", allowedUsersPath, err)
+		return fmt.Errorf("load allowed users %s: %w", allowedUsersPath, err)
 	}
 
 	for _, user := range usersFile.Users {

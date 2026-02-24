@@ -125,7 +125,7 @@ func Run(
 					Role:       provider.RoleTool,
 					ToolCallID: call.ID,
 					Content: fmt.Sprintf(
-						`tool execution error: unknown tool %q. Available tools: %s. Use an available tool name exactly.`,
+						`tool execution error: unknown tool %s. Available tools: %s. Use an available tool name exactly.`,
 						call.Name,
 						availableTools,
 					),
@@ -146,7 +146,7 @@ func Run(
 					history = append(history, provider.ChatMessage{
 						Role:       provider.RoleTool,
 						ToolCallID: call.ID,
-						Content:    fmt.Sprintf("tool execution error: invalid tool arguments for %q: %v", call.Name, err),
+						Content:    fmt.Sprintf("tool execution error: invalid tool arguments for %s: %v", call.Name, err),
 					})
 					continue
 				}

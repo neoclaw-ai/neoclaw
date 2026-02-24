@@ -357,7 +357,7 @@ func validateSecurityMode(mode string) error {
 	case SecurityModeStandard, SecurityModeDanger, SecurityModeStrict:
 		return nil
 	default:
-		return fmt.Errorf("invalid security.mode %q (allowed: %q, %q, %q)", mode, SecurityModeStandard, SecurityModeDanger, SecurityModeStrict)
+		return fmt.Errorf("invalid security.mode %s (allowed: %s, %s, %s)", mode, SecurityModeStandard, SecurityModeDanger, SecurityModeStrict)
 	}
 }
 
@@ -389,7 +389,7 @@ func (c LLMProviderConfig) Validate() error {
 	case "ollama":
 		// Local provider, no API key required.
 	default:
-		return fmt.Errorf("unsupported provider %q", c.Provider)
+		return fmt.Errorf("unsupported provider %s", c.Provider)
 	}
 	return nil
 }
@@ -456,7 +456,7 @@ func (c WebConfig) Validate() error {
 	case "", "brave":
 		return nil
 	default:
-		return fmt.Errorf("unsupported web.search.provider %q", c.Search.Provider)
+		return fmt.Errorf("unsupported web.search.provider %s", c.Search.Provider)
 	}
 }
 

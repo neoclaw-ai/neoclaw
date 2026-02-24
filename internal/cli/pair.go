@@ -37,7 +37,7 @@ func newPairCmd() *cobra.Command {
 			if _, err := os.Stat(pidFilePath); err == nil {
 				return errors.New("server is already running. Stop it first, then run claw pair")
 			} else if !errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("stat pid file %q: %w", pidFilePath, err)
+				return fmt.Errorf("stat pid file %s: %w", pidFilePath, err)
 			}
 
 			pairingCtx, cancel := context.WithTimeout(cmd.Context(), pairTimeout)

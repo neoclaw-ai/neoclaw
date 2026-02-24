@@ -386,7 +386,7 @@ func (t *TelegramListener) RequestApproval(ctx context.Context, req approval.App
 func (t *TelegramListener) loadAllowedUsers() error {
 	usersFile, err := approval.LoadUsers(t.allowedUsersPath)
 	if err != nil {
-		return fmt.Errorf("load allowed users %q: %w", t.allowedUsersPath, err)
+		return fmt.Errorf("load allowed users %s: %w", t.allowedUsersPath, err)
 	}
 
 	allowed := make(map[string]struct{}, len(usersFile.Users))

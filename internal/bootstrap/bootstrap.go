@@ -68,7 +68,7 @@ func Initialize(cfg *config.Config) error {
 
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("create directory %q: %w", dir, err)
+			return fmt.Errorf("create directory %s: %w", dir, err)
 		}
 	}
 
@@ -101,11 +101,11 @@ func writeFileIfMissing(path, content string) error {
 	if _, err := os.Stat(path); err == nil {
 		return nil
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("stat %q: %w", path, err)
+		return fmt.Errorf("stat %s: %w", path, err)
 	}
 
 	if err := store.WriteFile(path, []byte(content)); err != nil {
-		return fmt.Errorf("write file %q: %w", path, err)
+		return fmt.Errorf("write file %s: %w", path, err)
 	}
 	return nil
 }

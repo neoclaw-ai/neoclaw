@@ -42,12 +42,12 @@ func WriteFile(path string, data []byte) error {
 
 	dir := filepath.Dir(cleanPath)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create directory %q: %w", dir, err)
+		return fmt.Errorf("create directory %s: %w", dir, err)
 	}
 
 	tempFile, err := os.CreateTemp(dir, filepath.Base(cleanPath)+".tmp-*")
 	if err != nil {
-		return fmt.Errorf("create temp file for %q: %w", cleanPath, err)
+		return fmt.Errorf("create temp file for %s: %w", cleanPath, err)
 	}
 	tempPath := tempFile.Name()
 	defer func() {
@@ -56,17 +56,17 @@ func WriteFile(path string, data []byte) error {
 
 	if _, err := tempFile.Write(data); err != nil {
 		tempFile.Close()
-		return fmt.Errorf("write temp file for %q: %w", cleanPath, err)
+		return fmt.Errorf("write temp file for %s: %w", cleanPath, err)
 	}
 	if err := tempFile.Chmod(0o644); err != nil {
 		tempFile.Close()
-		return fmt.Errorf("chmod temp file for %q: %w", cleanPath, err)
+		return fmt.Errorf("chmod temp file for %s: %w", cleanPath, err)
 	}
 	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("close temp file for %q: %w", cleanPath, err)
+		return fmt.Errorf("close temp file for %s: %w", cleanPath, err)
 	}
 	if err := os.Rename(tempPath, cleanPath); err != nil {
-		return fmt.Errorf("replace file %q: %w", cleanPath, err)
+		return fmt.Errorf("replace file %s: %w", cleanPath, err)
 	}
 
 	return nil
@@ -85,17 +85,17 @@ func AppendFile(path string, data []byte) error {
 
 	dir := filepath.Dir(cleanPath)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create directory %q: %w", dir, err)
+		return fmt.Errorf("create directory %s: %w", dir, err)
 	}
 
 	f, err := os.OpenFile(cleanPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
-		return fmt.Errorf("open file %q for append: %w", cleanPath, err)
+		return fmt.Errorf("open file %s for append: %w", cleanPath, err)
 	}
 	defer f.Close()
 
 	if _, err := f.Write(data); err != nil {
-		return fmt.Errorf("append file %q: %w", cleanPath, err)
+		return fmt.Errorf("append file %s: %w", cleanPath, err)
 	}
 	return nil
 }

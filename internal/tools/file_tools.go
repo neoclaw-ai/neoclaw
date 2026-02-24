@@ -19,15 +19,15 @@ import (
 func stringArg(args map[string]any, key string) (string, error) {
 	v, ok := args[key]
 	if !ok {
-		return "", fmt.Errorf("missing required argument %q", key)
+		return "", fmt.Errorf("missing required argument %s", key)
 	}
 	s, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("argument %q must be a string", key)
+		return "", fmt.Errorf("argument %s must be a string", key)
 	}
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return "", fmt.Errorf("argument %q cannot be empty", key)
+		return "", fmt.Errorf("argument %s cannot be empty", key)
 	}
 	return s, nil
 }
@@ -72,7 +72,7 @@ func resolveWorkspacePath(workspaceDir, input string) (string, error) {
 		return "", fmt.Errorf("resolve relative path: %w", err)
 	}
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return "", fmt.Errorf("path %q is outside workspace", input)
+		return "", fmt.Errorf("path %s is outside workspace", input)
 	}
 	// Return the real path so subsequent mkdir/write operations target the
 	// validated location, not an unresolved symlink chain.
@@ -195,7 +195,7 @@ func (t ReadFileTool) Execute(_ context.Context, args map[string]any) (*ToolResu
 	data := []byte(content)
 
 	if isBinary(data) {
-		return nil, fmt.Errorf("file %q appears to be binary", path)
+		return nil, fmt.Errorf("file %s appears to be binary", path)
 	}
 
 	return &ToolResult{Output: string(data)}, nil

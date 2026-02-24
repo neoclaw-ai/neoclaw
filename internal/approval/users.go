@@ -38,7 +38,7 @@ func LoadUsers(path string) (UsersFile, error) {
 	case errors.Is(err, os.ErrNotExist):
 		return UsersFile{Users: []User{}}, nil
 	default:
-		return UsersFile{}, fmt.Errorf("read allowed users file %q: %w", trimmedPath, err)
+		return UsersFile{}, fmt.Errorf("read allowed users file %s: %w", trimmedPath, err)
 	}
 
 	if len(strings.TrimSpace(content)) == 0 {
@@ -47,7 +47,7 @@ func LoadUsers(path string) (UsersFile, error) {
 
 	var usersFile UsersFile
 	if err := json.Unmarshal([]byte(content), &usersFile); err != nil {
-		return UsersFile{}, fmt.Errorf("decode allowed users file %q: %w", trimmedPath, err)
+		return UsersFile{}, fmt.Errorf("decode allowed users file %s: %w", trimmedPath, err)
 	}
 	if usersFile.Users == nil {
 		usersFile.Users = []User{}
@@ -71,7 +71,7 @@ func saveUsers(path string, usersFile UsersFile) error {
 	encoded = append(encoded, '\n')
 
 	if err := store.WriteFile(trimmedPath, encoded); err != nil {
-		return fmt.Errorf("write allowed users file %q: %w", trimmedPath, err)
+		return fmt.Errorf("write allowed users file %s: %w", trimmedPath, err)
 	}
 	return nil
 }

@@ -181,7 +181,7 @@ func (t RunCommandTool) validateArgs(args map[string]any) (string, string, error
 	if raw, ok := args["workdir"]; ok {
 		value, ok := raw.(string)
 		if !ok {
-			return "", "", fmt.Errorf("argument %q must be a string", "workdir")
+			return "", "", fmt.Errorf("argument %s must be a string", "workdir")
 		}
 		value = strings.TrimSpace(value)
 		if value != "" {

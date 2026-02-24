@@ -69,6 +69,6 @@ func (r *Runner) Run(ctx context.Context, job Job) (string, error) {
 		}
 		return r.httpRequest(ctx, args)
 	default:
-		return "", fmt.Errorf("unsupported action %q", job.Action)
+		return "", fmt.Errorf("unsupported action %s", job.Action)
 	}
 }

@@ -133,7 +133,7 @@ func toAnthropicMessages(messages []ChatMessage) ([]anthropic.MessageParam, erro
 				input := map[string]any{}
 				if tc.Arguments != "" {
 					if err := json.Unmarshal([]byte(tc.Arguments), &input); err != nil {
-						return nil, fmt.Errorf("parse assistant tool call args for %q: %w", tc.Name, err)
+						return nil, fmt.Errorf("parse assistant tool call args for %s: %w", tc.Name, err)
 					}
 				}
 				blocks = append(blocks, anthropic.NewToolUseBlock(tc.ID, input, tc.Name))
@@ -156,7 +156,7 @@ func toAnthropicMessages(messages []ChatMessage) ([]anthropic.MessageParam, erro
 			}
 			out = append(out, anthropic.NewUserMessage(blocks...))
 		default:
-			return nil, fmt.Errorf("unsupported message role %q", msg.Role)
+			return nil, fmt.Errorf("unsupported message role %s", msg.Role)
 		}
 	}
 	applyHistoryCacheBreakpoint(out)

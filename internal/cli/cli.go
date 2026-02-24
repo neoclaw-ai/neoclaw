@@ -196,7 +196,7 @@ func buildToolRegistry(
 	}
 	for _, tool := range coreTools {
 		if err := registry.Register(tool); err != nil {
-			return nil, fmt.Errorf("register tool %q: %w", tool.Name(), err)
+			return nil, fmt.Errorf("register tool %s: %w", tool.Name(), err)
 		}
 	}
 	return registry, nil

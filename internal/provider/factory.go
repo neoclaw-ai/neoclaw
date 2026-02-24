@@ -22,6 +22,6 @@ func NewProviderFromConfig(cfg config.LLMProviderConfig) (Provider, error) {
 	case "openrouter":
 		return newOpenRouterProvider(cfg)
 	default:
-		return nil, fmt.Errorf("unsupported provider %q", cfg.Provider)
+		return nil, fmt.Errorf("unsupported provider %s", cfg.Provider)
 	}
 }

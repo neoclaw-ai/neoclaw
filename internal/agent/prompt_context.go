@@ -115,5 +115,5 @@ func readOptionalFile(path string) (string, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return "", nil
 	}
-	return "", fmt.Errorf("read %q: %w", path, err)
+	return "", fmt.Errorf("read %s: %w", path, err)
 }

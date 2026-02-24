@@ -294,7 +294,7 @@ func optionalRFC3339Arg(args map[string]any, key string, def time.Time) (time.Ti
 	}
 	s, ok := raw.(string)
 	if !ok {
-		return time.Time{}, fmt.Errorf("argument %q must be an RFC3339 timestamp string", key)
+		return time.Time{}, fmt.Errorf("argument %s must be an RFC3339 timestamp string", key)
 	}
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -302,7 +302,7 @@ func optionalRFC3339Arg(args map[string]any, key string, def time.Time) (time.Ti
 	}
 	parsed, err := time.Parse(time.RFC3339, s)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("argument %q must be RFC3339 format", key)
+		return time.Time{}, fmt.Errorf("argument %s must be RFC3339 format", key)
 	}
 	return parsed, nil
 }
