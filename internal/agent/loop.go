@@ -15,7 +15,7 @@ import (
 )
 
 const defaultMaxIterations = 10
-const defaultToolOutputLength = 2000
+const defaultToolOutputLength = 2500
 
 // Run executes the agent loop until the model returns a final text response.
 func Run(

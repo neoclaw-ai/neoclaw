@@ -83,7 +83,7 @@ func TestTruncateOutput_StoresLargeOutputInTempFile(t *testing.T) {
 	t.Setenv("NEOCLAW_HOME", dataDir)
 	tmpDir := filepath.Join(dataDir, "data", "agents", "default", "workspace", "tmp")
 
-	long := make([]byte, 2100)
+	long := make([]byte, 2600)
 	for i := range long {
 		long[i] = 'a'
 	}
@@ -95,8 +95,8 @@ func TestTruncateOutput_StoresLargeOutputInTempFile(t *testing.T) {
 	if !res.Truncated {
 		t.Fatalf("expected truncated result")
 	}
-	if len(res.Output) != 2000 {
-		t.Fatalf("expected inline output to be 2000 chars, got %d", len(res.Output))
+	if len(res.Output) != 2500 {
+		t.Fatalf("expected inline output to be 2500 chars, got %d", len(res.Output))
 	}
 	if res.FullOutputPath == "" {
 		t.Fatalf("expected full output path")

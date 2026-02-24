@@ -398,11 +398,11 @@ func TestAgentSessionStoresTruncatedToolOutput(t *testing.T) {
 	if toolMsg == nil {
 		t.Fatalf("expected persisted tool message, got %#v", loaded)
 	}
-	if len(toolMsg.Content) != 2000 {
-		t.Fatalf("expected truncated tool output length 2000, got %d", len(toolMsg.Content))
+	if len(toolMsg.Content) != 2500 {
+		t.Fatalf("expected truncated tool output length 2500, got %d", len(toolMsg.Content))
 	}
-	if toolMsg.Content != strings.Repeat("x", 2000) {
-		t.Fatalf("expected stored tool output to be truncated 2000-byte prefix")
+	if toolMsg.Content != strings.Repeat("x", 2500) {
+		t.Fatalf("expected stored tool output to be truncated 2500-byte prefix")
 	}
 }
 

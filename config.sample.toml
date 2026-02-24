@@ -60,21 +60,21 @@ monthly_limit = 0.0
 # Token budget for the conversation context window. When the session history
 # exceeds this limit, older messages are summarised to free up space. Lower
 # values reduce per-request cost; higher values give the model more history.
-max_tokens = 4000
+max_tokens = 10000
 
 # Number of recent messages always kept verbatim (never summarised), regardless
 # of max_tokens. Ensures the model always sees the latest exchanges.
-recent_messages = 10
+recent_messages = 12
 
 # Maximum number of tool-call iterations per message before the agent stops.
 max_tool_calls = 10
 
 # Maximum characters of tool output included inline in the conversation history.
 # Larger outputs are written to a temp file and only the first N chars are shown.
-tool_output_length = 2000
+tool_output_length = 2500
 
 # How far back recent daily log entries are injected into the system prompt.
-daily_log_lookback = "24h"
+daily_log_lookback = "12h"
 
 # ── Web search ────────────────────────────────────────────────────────────────
 [web.search]

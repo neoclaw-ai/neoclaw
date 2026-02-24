@@ -114,11 +114,11 @@ var defaultConfig = Config{
 		MonthlyLimit: 0,
 	},
 	Context: ContextConfig{
-		MaxTokens:        4000,
-		RecentMessages:   10,
+		MaxTokens:        10000,
+		RecentMessages:   12,
 		MaxToolCalls:     10,
-		ToolOutputLength: 2000,
-		DailyLogLookback: 24 * time.Hour,
+		ToolOutputLength: 2500,
+		DailyLogLookback: 12 * time.Hour,
 	},
 	Web: WebConfig{
 		Search: WebSearchConfig{

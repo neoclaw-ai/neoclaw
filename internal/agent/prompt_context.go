@@ -15,7 +15,7 @@ import (
 	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
-const defaultDailyLogLookback = 24 * time.Hour
+const defaultDailyLogLookback = 12 * time.Hour
 
 const resolveRelativeTimeInstruction = "Resolve relative date/time phrases (for example: tomorrow, next week, in 2 hours) using the current time and timezone above. When replying about dates/times, include absolute dates where useful."
 
