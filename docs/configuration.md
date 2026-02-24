@@ -24,7 +24,7 @@ request_timeout = "30s"
 | Key | Default | Description |
 |---|---|---|
 | `provider` | `"anthropic"` | LLM provider. Options: `anthropic`, `openrouter` |
-| `api_key` | *(required)* | API key. Supports `$ENV_VAR` expansion. Not required for `ollama`. |
+| `api_key` | *(required)* | API key. Supports `$ENV_VAR` expansion. |
 | `model` | `"claude-sonnet-4-6"` | Model name. See provider docs for valid values. |
 | `max_tokens` | `8192` | Maximum tokens the model may generate per response. |
 | `request_timeout` | `"30s"` | How long to wait for an API response before giving up. |
@@ -114,7 +114,7 @@ monthly_limit = 0.0
 | `daily_limit` | `0.0` | Soft daily spend limit in USD. `0` = disabled. Checked before each LLM call. |
 | `monthly_limit` | `0.0` | Soft monthly spend limit in USD. `0` = disabled. |
 
-When a limit is reached, NeoClaw stops making LLM calls and sends you a message explaining why. Use `/usage` to see current spending. Use `/limit <amount>` to set a per-session limit within an active chat.
+When a limit is reached, NeoClaw stops making LLM calls and sends you a message explaining why. Use `/usage` to see current spending.
 
 Limits are "soft" — a request that starts just under the limit can still complete and push you slightly over. NeoClaw checks the limit before each call, not during.
 
@@ -174,7 +174,20 @@ To enable Brave Search:
 
 ---
 
-## Environment variable expansion
+## Environment variables
+
+### `NEOCLAW_HOME`
+
+By default, NeoClaw stores all its data in `~/.neoclaw/`. Set `NEOCLAW_HOME` to use a different location:
+
+```bash
+export NEOCLAW_HOME=/opt/neoclaw
+claw start
+```
+
+This is useful if you're running multiple instances, want data on a separate disk, or are deploying as a system service under a non-home directory.
+
+### Config value expansion
 
 String config values support `$ENV_VAR` expansion. This is useful for keeping secrets out of your config file:
 

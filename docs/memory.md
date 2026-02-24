@@ -221,28 +221,6 @@ The split between SOUL.md and USER.md is intentional: SOUL.md controls how the b
 
 ---
 
-## Memory tools
-
-The bot has built-in tools for managing memory. You can use these directly in conversation:
-
-| Tool | What it does |
-|---|---|
-| `memory_read` | Read the full contents of `memory.md` |
-| `memory_append` | Add a fact to a section in `memory.md` |
-| `memory_remove` | Remove a matching fact from `memory.md` |
-| `daily_log` | Append an entry to today's daily log |
-| `search_logs` | Search past daily logs for something specific |
-
-You generally don't need to invoke these directly — the bot uses them automatically. But you can ask:
-
-> *"What do you know about me?"* → bot calls `memory_read`
-
-> *"Forget that I'm vegetarian"* → bot calls `memory_remove`
-
-> *"What were we working on last week?"* → bot calls `search_logs`
-
----
-
 ## Resetting memory
 
 To clear the conversation history without affecting memory:

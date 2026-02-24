@@ -86,7 +86,7 @@ Send your bot a message on Telegram to confirm everything is working.
 
 To authorize another Telegram user (a family member, colleague, etc.):
 
-1. Stop the server: `Ctrl+C` or `systemctl --user stop neoclaw`
+1. Stop the server: `Ctrl+C`
 2. Run `claw pair` again
 3. Have the new user send a message to the bot
 4. They'll receive a code; you type it in the terminal
@@ -100,7 +100,7 @@ Each authorized user gets their own separate conversation history. Memory and sc
 
 **The bot doesn't respond to my messages.**
 
-- Confirm the server is running (`claw start` or check `systemctl --user status neoclaw`).
+- Confirm the server is running (`claw start`).
 - Make sure you've paired your account. Run `claw pair` to add yourself if you haven't.
 - Check that the token in your config is correct — copy it fresh from BotFather if unsure.
 

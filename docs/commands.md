@@ -11,10 +11,9 @@ Send them as a message to the bot on Telegram, or type them in `claw cli`.
 | Command | Aliases | Description |
 |---|---|---|
 | `/new` | `/reset` | Clear the current session and start fresh |
-| `/status` | | Show model, token usage, and context stats |
-| `/usage` | `/cost` | Show API spending summary |
 | `/jobs` | | List scheduled jobs |
-| `/help` | `/commands` | List all available commands |
+| `/usage` | | Show API spending summary |
+| `/help` | | List all available commands |
 
 ---
 
@@ -31,23 +30,7 @@ Use this when the conversation has gone off track, the context window is clutter
 
 ---
 
-## `/status`
-
-Shows current session information: the model in use, token usage for this session, and how full the context window is.
-
-```
-/status
-→ Model:   anthropic/claude-sonnet-4-6
-  Session: 4,200 tokens in · 1,100 tokens out
-  Context: 3,800 / 4,000 tokens (95%)
-  Uptime:  2h 14m
-```
-
-When context usage is high (near 100%), the bot will automatically summarize older messages on the next request.
-
----
-
-## `/usage` · `/cost`
+## `/usage`
 
 Shows how much you've spent on API calls today and this month.
 
@@ -90,7 +73,7 @@ To create, update, or delete jobs, ask the bot in natural language:
 
 ---
 
-## `/help` · `/commands`
+## `/help`
 
 Lists all available slash commands.
 
@@ -98,8 +81,7 @@ Lists all available slash commands.
 /help
 → Available commands:
   /new, /reset  — Clear session, start fresh
-  /status       — Show model and token usage
-  /usage        — Show spending summary
   /jobs         — List scheduled jobs
+  /usage        — Show spending summary
   /help         — Show this message
 ```

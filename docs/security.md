@@ -4,7 +4,7 @@ NeoClaw is built around the idea that giving an AI assistant access to your serv
 
 ---
 
-## Overview: six layers of defense
+## Overview: five layers of defense
 
 NeoClaw uses multiple independent layers of protection. Each one stops a different category of problem.
 
@@ -15,9 +15,33 @@ NeoClaw uses multiple independent layers of protection. Each one stops a differe
 | **Trust hierarchy** | Owner instructions always override anything else |
 | **Process sandbox** | The bot process is isolated at the OS level |
 | **Network proxy** | Outbound network access from commands is filtered |
-| **Timeouts** | Commands are killed if they run too long |
 
 These layers work independently. If one is bypassed, the others still apply.
+
+---
+
+## Security modes
+
+Set the overall security mode in `config.toml`:
+
+```toml
+[security]
+mode = "standard"   # or "strict" or "danger"
+```
+
+| Mode | Approval prompts | Read access | Write access | Network proxy |
+|---|---|---|---|---|
+| `standard` | Yes | Full filesystem | `~/.neoclaw/` only | Applied |
+| `strict` | Yes | Workspace + system dirs only | Workspace only | Applied |
+| `danger` | None — auto-approved | Unrestricted | Unrestricted | Not applied |
+
+**`standard`** is the recommended mode for most users. The bot can read files anywhere on your system to help you work, but can only write inside its own data directory.
+
+**`strict`** restricts read access as well. The bot can only read files inside its own workspace directory and standard system binary paths. This is the safest option, but it means the bot can't read your code, configs, or other files outside the workspace.
+
+> **Note:** `strict` mode requires a compatible kernel on Linux. NeoClaw will refuse to start if it can't apply the sandbox. On macOS, `strict` mode is always available.
+
+**`danger`** disables all approval prompts and sandbox protections. Commands run without asking, and the network proxy is not started. Only use this in a fully trusted local environment.
 
 ---
 
@@ -96,17 +120,7 @@ When the bot runs a shell command, that command runs inside an OS-level process 
 
 **On macOS:** The sandbox uses the built-in `sandbox-exec` facility.
 
-| Mode | Read access | Write access |
-|---|---|---|
-| `standard` | Full filesystem | `~/.neoclaw/` only |
-| `strict` | Workspace directory + system binaries | Workspace directory only |
-| `danger` | Unrestricted | Unrestricted |
-
-In `standard` mode (the default), the bot can read files anywhere on your system to help you work, but can only write inside its own data directory. Your SSH keys, git config, and other personal files cannot be modified.
-
-In `strict` mode, read access is also restricted to the workspace. This is the safest option but may limit what the bot can help with (it can't read files outside the workspace).
-
-> **Note:** `strict` mode requires a compatible kernel on Linux. NeoClaw will warn you at startup if your system doesn't support it. On macOS, `strict` mode is always available.
+See the [Security modes](#security-modes) table above for read and write access by mode.
 
 ---
 
@@ -137,40 +151,6 @@ When a command tries to reach an unknown domain, you're prompted in Telegram. Ap
 The default allow list includes `api.anthropic.com`, `api.openrouter.ai`, and `api.search.brave.com`. Everything else is blocked until you approve it.
 
 > **Note:** This proxy applies to subprocess commands (`run_command`). The bot's own web tools (`web_search`, `http_request`) check the domain list directly without the proxy.
-
----
-
-## Layer 6 — Timeouts
-
-All shell commands have a maximum execution time. If a command runs longer than the limit, it's killed automatically. The default is 5 minutes, configurable in `config.toml`:
-
-```toml
-[security]
-command_timeout = "5m"
-```
-
----
-
-## Security modes
-
-Set the overall security mode in `config.toml`:
-
-```toml
-[security]
-mode = "standard"   # or "strict" or "danger"
-```
-
-| Mode | Approval prompts | Process sandbox | Network proxy |
-|---|---|---|---|
-| `standard` | Yes | Applied (warns if unavailable) | Applied |
-| `strict` | Yes | Applied (fails to start if unavailable) | Applied |
-| `danger` | None — everything auto-approved | Not applied | Not applied |
-
-**`standard`** is the recommended mode for most users. Approval prompts are active, the sandbox is applied when available, and the network proxy filters unknown domains.
-
-**`strict`** is the most locked-down option. The sandbox is required — NeoClaw will refuse to start if it can't apply it. Read access is limited to the workspace directory.
-
-**`danger`** disables all approval prompts and sandbox protections. Commands run without asking, and the network proxy is not started. Only use this in a fully trusted local environment where the convenience tradeoff is intentional.
 
 ---
 
