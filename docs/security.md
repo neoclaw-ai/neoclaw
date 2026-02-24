@@ -13,7 +13,7 @@ NeoClaw uses multiple independent layers of protection. Each one stops a differe
 | **Telegram allowlist** | Only authorized Telegram accounts can talk to the bot |
 | **Command approval** | Shell commands need your approval before they run |
 | **Trust hierarchy** | Owner instructions always override anything else |
-| **Process sandbox** | The bot process is isolated at the OS level |
+| **Process sandbox** | The claw process is isolated at the OS level |
 | **Network proxy** | Outbound network access from commands is filtered |
 
 These layers work independently. If one is bypassed, the others still apply.
@@ -39,7 +39,7 @@ mode = "standard"   # or "strict" or "danger"
 
 **`strict`** restricts read access as well. The bot can only read files inside its own workspace directory and standard system binary paths. This is the safest option, but it means the bot can't read your code, configs, or other files outside the workspace.
 
-> **Note:** `strict` mode requires a compatible kernel on Linux. NeoClaw will refuse to start if it can't apply the sandbox. On macOS, `strict` mode is always available.
+> **Note:** `strict` mode requires a compatible kernel on Linux. NeoClaw will refuse to start if it can't apply the sandbox. `strict` mode requires a recent version of macOS.
 
 **`danger`** disables all approval prompts and sandbox protections. Commands run without asking, and the network proxy is not started. Only use this in a fully trusted local environment.
 
@@ -65,7 +65,12 @@ Before running any shell command (`run_command` tool), NeoClaw checks the comman
 2. **Prompted** — the command is unknown; you get a Telegram message with [✅ Approve] and [❌ Deny] buttons.
 3. **Blocked** — the command matches a pattern on your deny list and is refused.
 
-When you approve or deny a command, the decision is saved permanently. NeoClaw generates a pattern from the command (e.g. `git commit *`) so that similar future commands are handled the same way without prompting again.
+When you approve or deny a command, the decision is saved permanently.
+To remove a command that has been allowed previously, edit the policy file
+manually.
+
+NeoClaw generates a pattern from the command (e.g. `git commit *`) so that similar future commands are handled the same way without prompting again.
+
 
 ### The policy file
 
@@ -116,9 +121,7 @@ The system prompt is structured so that your messages always take priority over 
 
 When the bot runs a shell command, that command runs inside an OS-level process sandbox.
 
-**On Linux:** The sandbox uses kernel-level isolation to restrict what the process can read and write.
-
-**On macOS:** The sandbox uses the built-in `sandbox-exec` facility.
+The sandbox uses kernel-level isolation to restrict what the process can read and write. Malicous skills or even scripts claw executes are not able to breach the boundaries of the sandbox.
 
 See the [Security modes](#security-modes) table above for read and write access by mode.
 
@@ -160,6 +163,9 @@ NeoClaw protects your filesystem and network from unintended access. It does **n
 
 - Protect against malicious content in files the bot reads (prompt injection via file content is a real risk on any AI assistant).
 - Restrict the bot from reading files in `standard` mode — it can read your code, configs, and documents to help you work.
+- Filter all network traffic. NeoClaw filters HTTP requests. However,
+  sophisticated attackers may still be able to exfiltrate data using
+  DNS, SSH, or other protocols.
 - Provide protection if you run in `danger` mode.
 
 For the highest confidence, run in `strict` mode and review the allow lists before deploying on a sensitive server.

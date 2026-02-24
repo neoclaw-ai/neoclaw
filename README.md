@@ -1,6 +1,6 @@
 # 🐊 NeoClaw
 
-**Personal AI assistant for developers. Single Go binary. Telegram interface. Secure by default.**
+**NeoClaw is a secure, stable, and powerful AI assistant**
 
 [![Release](https://img.shields.io/github/v/release/neoclaw-ai/neoclaw?style=flat-square)](https://github.com/neoclaw-ai/neoclaw/releases)
 [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
