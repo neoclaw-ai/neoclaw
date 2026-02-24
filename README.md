@@ -12,6 +12,8 @@ NeoClaw is a self-hosted AI assistant that runs as a Telegram bot on your own se
 
 Built as a lean alternative to [OpenClaw](https://github.com/openclaw/openclaw). OpenClaw sends your full conversation history with every request — sessions that grow to 50,000+ tokens — which is why users regularly see $50–200/month API bills. NeoClaw's context management and built-in cost controls bring that to $3–15/month.
 
+**[→ Get started in 5 minutes](#-quick-start)**
+
 ---
 
 ## ⚡ Simple to run
@@ -56,15 +58,16 @@ Works with Anthropic directly, or through OpenRouter for access to DeepSeek, Mis
 
 | Platform | Download |
 |---|---|
-| Linux x86-64 | [claw-linux-amd64](https://github.com/neoclaw-ai/neoclaw/releases/latest/download/claw-linux-amd64) |
-| Linux ARM64 | [claw-linux-arm64](https://github.com/neoclaw-ai/neoclaw/releases/latest/download/claw-linux-arm64) |
-| macOS (Apple Silicon) | [claw-darwin-arm64](https://github.com/neoclaw-ai/neoclaw/releases/latest/download/claw-darwin-arm64) |
-| macOS (Intel) | [claw-darwin-amd64](https://github.com/neoclaw-ai/neoclaw/releases/latest/download/claw-darwin-amd64) |
+| Linux x86-64 | [neoclaw-linux-amd64.tar.gz](https://github.com/neoclaw-ai/neoclaw/releases/latest/download/neoclaw-linux-amd64.tar.gz) |
+| Linux ARM64 | [neoclaw-linux-arm64.tar.gz](https://github.com/neoclaw-ai/neoclaw/releases/latest/download/neoclaw-linux-arm64.tar.gz) |
+| macOS (Apple Silicon) | [neoclaw-darwin-arm64.tar.gz](https://github.com/neoclaw-ai/neoclaw/releases/latest/download/neoclaw-darwin-arm64.tar.gz) |
+| macOS (Intel) | [neoclaw-darwin-amd64.tar.gz](https://github.com/neoclaw-ai/neoclaw/releases/latest/download/neoclaw-darwin-amd64.tar.gz) |
 
 Windows: run the Linux binary under WSL2.
 
 ```bash
-chmod +x claw && sudo mv claw /usr/local/bin/
+tar -xzf neoclaw_*.tar.gz
+sudo mv claw /usr/local/bin/
 ```
 
 **2. Configure**

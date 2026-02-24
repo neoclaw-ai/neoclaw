@@ -16,16 +16,16 @@ Download the binary for your platform from the [releases page](https://github.co
 
 | Platform | File |
 |---|---|
-| Linux x86-64 | `claw-linux-amd64` |
-| Linux ARM64 | `claw-linux-arm64` |
-| macOS (Apple Silicon) | `claw-darwin-arm64` |
-| macOS (Intel) | `claw-darwin-amd64` |
+| Linux x86-64 | `neoclaw-linux-amd64.tar.gz` |
+| Linux ARM64 | `neoclaw-linux-arm64.tar.gz` |
+| macOS (Apple Silicon) | `neoclaw-darwin-arm64.tar.gz` |
+| macOS (Intel) | `neoclaw-darwin-amd64.tar.gz` |
 
-Make it executable and move it onto your PATH:
+Extract and move onto your PATH:
 
 ```bash
-chmod +x claw-*
-sudo mv claw-* /usr/local/bin/claw
+tar -xzf neoclaw_*.tar.gz
+sudo mv claw /usr/local/bin/
 ```
 
 Verify it works:
