@@ -131,20 +131,20 @@ daily_limit = 5.0
 
 ```toml
 [context]
-max_tokens        = 4000
-recent_messages   = 10
-max_tool_calls    = 10
-tool_output_length = 2000
-daily_log_lookback = "24h"
+max_tokens         = 10000
+recent_messages    = 12
+max_tool_calls     = 10
+tool_output_length = 2500
+daily_log_lookback = "12h"
 ```
 
 | Key | Default | Description |
 |---|---|---|
-| `max_tokens` | `4000` | Token budget for conversation context. When history exceeds this, older messages are summarized. |
-| `recent_messages` | `10` | Number of recent messages always kept verbatim, regardless of `max_tokens`. |
+| `max_tokens` | `10000` | Token budget for conversation context. When history exceeds this, older messages are summarized. |
+| `recent_messages` | `12` | Number of recent messages always kept verbatim, regardless of `max_tokens`. |
 | `max_tool_calls` | `10` | Maximum tool-call iterations per message before the agent stops. |
-| `tool_output_length` | `2000` | Maximum characters of tool output stored inline in history. Larger outputs are saved to a temp file. |
-| `daily_log_lookback` | `"24h"` | How far back daily log entries are injected into the system prompt. |
+| `tool_output_length` | `2500` | Maximum characters of tool output stored inline in history. Larger outputs are saved to a temp file. |
+| `daily_log_lookback` | `"12h"` | How far back daily log entries are injected into the system prompt. |
 
 **Tuning for cost:** Lowering `max_tokens` reduces the amount of history sent with each request, which lowers per-request token cost at the expense of the bot remembering less context.
 
@@ -223,11 +223,11 @@ daily_limit   = 5.0
 monthly_limit = 50.0
 
 [context]
-max_tokens         = 4000
-recent_messages    = 10
+max_tokens         = 10000
+recent_messages    = 12
 max_tool_calls     = 10
-tool_output_length = 2000
-daily_log_lookback = "24h"
+tool_output_length = 2500
+daily_log_lookback = "12h"
 
 [web.search]
 provider = "brave"

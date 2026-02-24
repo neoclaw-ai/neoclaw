@@ -32,22 +32,22 @@ The single biggest lever on per-request cost is how many tokens are sent with ea
 
 ```toml
 [context]
-max_tokens = 4000   # default
+max_tokens = 10000   # default
 ```
 
 Lowering this means older messages get summarized sooner, reducing what's sent with each request. The trade-off is that the bot has less immediate conversation context to work with.
 
 | Setting | Effect |
 |---|---|
-| `4000` (default) | Good balance for most use |
-| `2000` | Aggressive summarization, lower cost |
-| `6000` | More context, higher cost |
+| `10000` (default) | Good balance for most use |
+| `4000` | Aggressive summarization, lower cost |
+| `16000` | More context, higher cost |
 
 The `recent_messages` setting controls how many of the most recent messages are always kept verbatim regardless of the token budget:
 
 ```toml
 [context]
-recent_messages = 10   # default
+recent_messages = 12   # default
 ```
 
 Reducing this (e.g. to `5`) means fewer messages are preserved before summarization kicks in.
@@ -60,25 +60,25 @@ When the agent runs a tool — reading a file, running a command, fetching a URL
 
 ```toml
 [context]
-tool_output_length = 2000   # characters — default
+tool_output_length = 2500   # characters — default
 ```
 
 When a tool output exceeds this limit, the full output is saved to a temp file and only a truncated version is kept in history. Lowering this reduces how much tool output accumulates in the context window.
 
-For most tasks `2000` characters is sufficient. If the agent frequently needs to reference large outputs, you can raise it — but be aware of the cost impact.
+For most tasks `2500` characters is sufficient. If the agent frequently needs to reference large outputs, you can raise it — but be aware of the cost impact.
 
 ---
 
 ## Daily log injection
 
-NeoClaw automatically injects recent daily log entries into every request so the bot remembers what you've been working on. The default is 24 hours.
+NeoClaw automatically injects recent daily log entries into every request so the bot remembers what you've been working on. The default is 12 hours.
 
 ```toml
 [context]
-daily_log_lookback = "24h"   # default
+daily_log_lookback = "12h"   # default
 ```
 
-If your daily logs are long (many conversations throughout the day), reducing this to `"12h"` or `"6h"` trims the injected context. If you rarely need cross-day memory, you can reduce it further.
+If your daily logs are long (many conversations throughout the day), reducing this to `"6h"` or `"3h"` trims the injected context. Increase it to `"24h"` or `"48h"` if you want the bot to be aware of more recent history across sessions.
 
 ---
 
