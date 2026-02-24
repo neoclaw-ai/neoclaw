@@ -81,7 +81,6 @@ func strictLinuxReadRules(dataDir string) []landlock.Rule {
 		"/proc",
 		"/sys",
 		"/run",
-		"/tmp",
 	}
 	rules := make([]landlock.Rule, 0, len(readRoots))
 	for _, root := range readRoots {

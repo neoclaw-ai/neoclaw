@@ -93,7 +93,9 @@ func darwinProfile(mode, dataDir string) string {
 // Uses deny-default with an explicit read allowlist, protecting user home files
 // (such as ~/.ssh and ~/.aws) while allowing system paths and the betterclaw home directory.
 // Writes are restricted to dataDir plus essential device handles.
-// /Users is intentionally absent from the read allowlist.
+// /Users and /tmp (including /private/tmp) are intentionally absent from the read allowlist.
+// Real paths (/private/etc, /private/var) are used instead of symlinks (/etc, /var, /tmp)
+// so that /private/tmp cannot be accessed via either path.
 func strictDarwinProfile(dataDir string) string {
 	homeDir := filepath.Dir(dataDir)
 	var b strings.Builder
@@ -103,6 +105,8 @@ func strictDarwinProfile(dataDir string) string {
 
 	// Read allowlist: system paths + betterclaw home (contains config.toml).
 	// /Users is intentionally absent — protects ~/.ssh, ~/.aws, etc.
+	// /private/etc and /private/var are used instead of their symlinks /etc and /var
+	// so that /private/tmp remains blocked via both the symlink and real path.
 	b.WriteString("(allow file-read* file-test-existence\n")
 	b.WriteString("  (literal \"/\")\n")
 	b.WriteString(fmt.Sprintf("  (subpath %q)\n", homeDir))
@@ -111,11 +115,9 @@ func strictDarwinProfile(dataDir string) string {
 	b.WriteString("  (subpath \"/usr\")\n")
 	b.WriteString("  (subpath \"/bin\")\n")
 	b.WriteString("  (subpath \"/sbin\")\n")
-	b.WriteString("  (subpath \"/etc\")\n")
-	b.WriteString("  (subpath \"/private\")\n")
+	b.WriteString("  (subpath \"/private/etc\")\n")
+	b.WriteString("  (subpath \"/private/var\")\n")
 	b.WriteString("  (subpath \"/dev\")\n")
-	b.WriteString("  (subpath \"/tmp\")\n")
-	b.WriteString("  (subpath \"/var\")\n")
 	b.WriteString("  (subpath \"/Applications\"))\n\n")
 
 	// Metadata traversal everywhere (stat/lstat, not content reads).
