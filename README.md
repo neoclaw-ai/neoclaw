@@ -68,7 +68,7 @@ Works with Anthropic directly, or through OpenRouter for access to DeepSeek, Mis
 Windows: Run the Linux binary under WSL2.
 
 ```bash
-tar -xzf neoclaw_*.tar.gz
+tar -xzf neoclaw-*.tar.gz
 sudo mv claw /usr/local/bin/
 ```
 
