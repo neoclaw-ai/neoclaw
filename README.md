@@ -8,9 +8,11 @@
 [![Build](https://img.shields.io/github/actions/workflow/status/neoclaw-ai/neoclaw/ci.yml?branch=main&style=flat-square)](https://github.com/neoclaw-ai/neoclaw/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
-NeoClaw is a self-hosted AI assistant that runs as a Telegram bot on your own server. No subscription, no SaaS — just a single binary, your API key, and full control. It connects to [Anthropic](https://anthropic.com) directly, or to any model on [OpenRouter](https://openrouter.ai).
+NeoClaw is a self-hosted AI assistant that runs as a Telegram bot on your own server. No subscription, no SaaS — just a single binary, your API key, and full control. It connects to Anthropic directly, or to any model on [OpenRouter](https://openrouter.ai).
 
-Built as a lean alternative to [OpenClaw](https://github.com/openclaw/openclaw). OpenClaw sends your full conversation history with every request — sessions that grow to 50,000+ tokens — which is why users regularly see $50–200/month API bills. NeoClaw's context management and built-in cost controls bring that to $3–15/month.
+NeoClaw is a lightweight, secure alternative to OpenClaw. OpenClaw sends your full conversation history with every request — sessions that grow to 50,000+ tokens — which is why users regularly see $50–200/month API bills. NeoClaw's context management and built-in cost controls bring that to $3–15/month.
+
+NeoClaw is hardened with battle-tested security by default. Your bot cannot delete your important files. You're in complete control over what commands run and what websites are accessed. 
 
 **[→ Get started in 5 minutes](#-quick-start)**
 
@@ -63,7 +65,7 @@ Works with Anthropic directly, or through OpenRouter for access to DeepSeek, Mis
 | macOS (Apple Silicon) | [neoclaw-darwin-arm64.tar.gz](https://github.com/neoclaw-ai/neoclaw/releases/latest/download/neoclaw-darwin-arm64.tar.gz) |
 | macOS (Intel) | [neoclaw-darwin-amd64.tar.gz](https://github.com/neoclaw-ai/neoclaw/releases/latest/download/neoclaw-darwin-amd64.tar.gz) |
 
-Windows: run the Linux binary under WSL2.
+Windows: Run the Linux binary under WSL2.
 
 ```bash
 tar -xzf neoclaw_*.tar.gz
