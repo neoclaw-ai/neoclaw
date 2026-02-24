@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/anthropics/anthropic-sdk-go v1.22.1
 	github.com/chzyer/readline v1.5.1
+	github.com/elazarl/goproxy v1.8.2
 	github.com/go-telegram/bot v1.19.0
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
@@ -18,7 +19,6 @@ require (
 )
 
 require (
-	github.com/elazarl/goproxy v1.8.2 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
