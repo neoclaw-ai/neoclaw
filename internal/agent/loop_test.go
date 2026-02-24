@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/provider"
-	"github.com/machinae/betterclaw/internal/tools"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/tools"
 )
 
 func TestRun_DispatchesToolAndReturnsFinalResponse(t *testing.T) {

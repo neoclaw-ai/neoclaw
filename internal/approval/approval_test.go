@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/tools"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/tools"
 )
 
 func TestExecuteTool_AutoApproveSkipsApprover(t *testing.T) {
@@ -76,7 +76,7 @@ func TestExecuteTool_DangerModeSkipsAllApprovals(t *testing.T) {
 	useIsolatedPolicyCache(t)
 
 	homeDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", homeDir)
+	t.Setenv("NEOCLAW_HOME", homeDir)
 	writeDangerConfig(t, homeDir)
 
 	appr := &fakeApprover{decision: Denied}
@@ -127,7 +127,7 @@ func TestExecuteTool_ApprovalBehaviorBySecurityMode(t *testing.T) {
 			useIsolatedPolicyCache(t)
 
 			homeDir := t.TempDir()
-			t.Setenv("BETTERCLAW_HOME", homeDir)
+			t.Setenv("NEOCLAW_HOME", homeDir)
 			writeSecurityModeConfig(t, homeDir, tc.mode)
 
 			appr := &fakeApprover{decision: Denied}
@@ -159,7 +159,7 @@ func TestExecuteTool_RunCommandAllowPatternAutoApproves(t *testing.T) {
 	useIsolatedPolicyCache(t)
 
 	dataDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 	writeCommandPolicyFile(t, dataDir, commandPolicy{
 		Allow: []string{"git status"},
 		Deny:  nil,
@@ -183,7 +183,7 @@ func TestExecuteTool_RunCommandDenyPatternAutoDenies(t *testing.T) {
 	useIsolatedPolicyCache(t)
 
 	dataDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 	writeCommandPolicyFile(t, dataDir, commandPolicy{
 		Allow: []string{"git *"},
 		Deny:  []string{"git push *"},
@@ -204,7 +204,7 @@ func TestExecuteTool_RunCommandNoMatchPromptsWithPatternAndPersistsAllow(t *test
 	useIsolatedPolicyCache(t)
 
 	dataDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 
 	appr := &fakeApprover{decision: Approved}
 	tool := fakeTool{name: "run_command", permission: tools.RequiresApproval, output: "done"}
@@ -239,7 +239,7 @@ func TestExecuteTool_RunCommandNoMatchPromptsAndPersistsDeny(t *testing.T) {
 	useIsolatedPolicyCache(t)
 
 	dataDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 
 	appr := &fakeApprover{decision: Denied}
 	tool := fakeTool{name: "run_command", permission: tools.RequiresApproval, output: "done"}
@@ -268,7 +268,7 @@ func TestExecuteTool_RunCommandSubsequentInvocationUsesPersistedAllow(t *testing
 	useIsolatedPolicyCache(t)
 
 	dataDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 
 	firstApprover := &fakeApprover{decision: Approved}
 	tool := fakeTool{name: "run_command", permission: tools.RequiresApproval, output: "done"}
@@ -306,7 +306,7 @@ func TestExecuteTool_RunCommandNoMatchMissingApprover(t *testing.T) {
 	useIsolatedPolicyCache(t)
 
 	dataDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 
 	tool := fakeTool{name: "run_command", permission: tools.RequiresApproval, output: "done"}
 	_, err := ExecuteTool(context.Background(), nil, tool, map[string]any{"command": "python3 script.py"}, "Run: python3 script.py")
@@ -319,7 +319,7 @@ func TestExecuteTool_RunCommandFlushDiscardsSubprocessPolicyTamper(t *testing.T)
 	useIsolatedPolicyCache(t)
 
 	dataDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 	writeCommandPolicyFile(t, dataDir, commandPolicy{
 		Allow: []string{"echo safe"},
 		Deny:  []string{"rm -rf *"},
@@ -391,7 +391,7 @@ func TestExecuteTool_RunCommandDomainApprovalDuringCommandSurvivesFlush(t *testi
 	useIsolatedPolicyCache(t)
 
 	dataDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 	writeCommandPolicyFile(t, dataDir, commandPolicy{
 		Allow: []string{"echo safe"},
 		Deny:  nil,
@@ -445,7 +445,7 @@ func TestExecuteTool_RunCommandDangerModeSkipsFlush(t *testing.T) {
 	useIsolatedPolicyCache(t)
 
 	dataDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 	writeDangerConfig(t, dataDir)
 	writeCommandPolicyFile(t, dataDir, commandPolicy{
 		Allow: []string{"echo safe"},

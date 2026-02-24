@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/approval"
-	"github.com/machinae/betterclaw/internal/runtime"
+	"github.com/neoclaw-ai/neoclaw/internal/approval"
+	"github.com/neoclaw-ai/neoclaw/internal/runtime"
 )
 
 func TestCLIListenerListenDispatchesMessages(t *testing.T) {

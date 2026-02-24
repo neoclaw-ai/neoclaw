@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 )
 
 func TestInitializeCreatesRequiredFilesAndDirs(t *testing.T) {
-	homeDir := filepath.Join(t.TempDir(), ".betterclaw")
+	homeDir := filepath.Join(t.TempDir(), ".neoclaw")
 	cfg := &config.Config{
 		HomeDir: homeDir,
 		Agent:   "default",
@@ -136,7 +136,7 @@ func containsString(values []string, target string) bool {
 }
 
 func TestInitializeIsIdempotent(t *testing.T) {
-	homeDir := filepath.Join(t.TempDir(), ".betterclaw")
+	homeDir := filepath.Join(t.TempDir(), ".neoclaw")
 	cfg := &config.Config{
 		HomeDir: homeDir,
 		Agent:   "default",

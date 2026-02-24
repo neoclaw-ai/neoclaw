@@ -12,8 +12,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 func stringArg(args map[string]any, key string) (string, error) {

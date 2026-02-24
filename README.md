@@ -1,4 +1,4 @@
-# betterclaw
+# NeoClaw
 
 A better OpenClaw alternative
 

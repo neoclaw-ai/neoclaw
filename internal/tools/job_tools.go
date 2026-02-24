@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/machinae/betterclaw/internal/scheduler"
+	"github.com/neoclaw-ai/neoclaw/internal/scheduler"
 )
 
 // JobListTool lists scheduled jobs from jobs.json.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 // User is one authorized user record in allowed_users.json.

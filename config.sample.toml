@@ -1,5 +1,5 @@
-# BetterClaw sample config — copy to $BETTERCLAW_HOME/config.toml and fill in your values.
-# Default location: ~/.betterclaw/config.toml
+# NeoClaw sample config — copy to $NEOCLAW_HOME/config.toml and fill in your values.
+# Default location: ~/.neoclaw/config.toml
 
 # ── LLM provider ──────────────────────────────────────────────────────────────
 [llm.default]

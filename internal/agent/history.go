@@ -1,6 +1,6 @@
 package agent
 
-import "github.com/machinae/betterclaw/internal/provider"
+import "github.com/neoclaw-ai/neoclaw/internal/provider"
 
 func appendUserMessage(history []provider.ChatMessage, text string) []provider.ChatMessage {
 	next := append([]provider.ChatMessage{}, history...)

@@ -9,7 +9,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
-	"github.com/machinae/betterclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 )
 
 type anthropicProvider struct {

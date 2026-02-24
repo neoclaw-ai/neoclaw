@@ -3,9 +3,9 @@ package cli
 import (
 	"strings"
 
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/logging"
-	"github.com/machinae/betterclaw/internal/sandbox"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/sandbox"
 )
 
 // Emit startup warnings derived from non-fatal config/runtime conditions.

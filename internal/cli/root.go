@@ -7,11 +7,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/machinae/betterclaw/internal/bootstrap"
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/logging"
-	"github.com/machinae/betterclaw/internal/provider"
-	"github.com/machinae/betterclaw/internal/sandbox"
+	"github.com/neoclaw-ai/neoclaw/internal/bootstrap"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/sandbox"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +23,7 @@ func NewRootCmd() *cobra.Command {
 
 	root := &cobra.Command{
 		Use:   "claw",
-		Short: "BetterClaw CLI",
+		Short: "NeoClaw CLI",
 		// Let main handle fatal error rendering through structured logs.
 		SilenceErrors: true,
 		SilenceUsage:  true,
@@ -50,7 +50,7 @@ func NewRootCmd() *cobra.Command {
 			if _, err := os.Stat(configPath); errors.Is(err, os.ErrNotExist) {
 				firstRun = true
 			} else if err != nil {
-				return fmt.Errorf("stat BetterClaw config file %s: %w", configPath, err)
+				return fmt.Errorf("stat NeoClaw config file %s: %w", configPath, err)
 			}
 
 			if err := bootstrap.Initialize(cfg); err != nil {
@@ -62,7 +62,7 @@ func NewRootCmd() *cobra.Command {
 				// Print guidance and exit cleanly so logs do not report failures.
 				fmt.Fprintf(
 					cmd.ErrOrStderr(),
-					"First run setup complete.\nEdit config file: %s\nRestart BetterClaw.\n",
+					"First run setup complete.\nEdit config file: %s\nRestart NeoClaw.\n",
 					configPath,
 				)
 				os.Exit(0)

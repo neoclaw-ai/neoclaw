@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/logging"
-	"github.com/machinae/betterclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
 )
 
 func (a *Agent) ensureHistoryLoaded(ctx context.Context) error {

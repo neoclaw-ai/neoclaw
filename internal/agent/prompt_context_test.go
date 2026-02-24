@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/memory"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/memory"
 )
 
 func TestBuildSystemPromptIncludesSoulMemoryAndRecentDailyLogs(t *testing.T) {

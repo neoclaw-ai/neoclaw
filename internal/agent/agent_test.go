@@ -10,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/memory"
-	"github.com/machinae/betterclaw/internal/runtime"
+	"github.com/neoclaw-ai/neoclaw/internal/memory"
+	"github.com/neoclaw-ai/neoclaw/internal/runtime"
 
-	"github.com/machinae/betterclaw/internal/approval"
-	"github.com/machinae/betterclaw/internal/costs"
-	"github.com/machinae/betterclaw/internal/provider"
-	"github.com/machinae/betterclaw/internal/session"
-	"github.com/machinae/betterclaw/internal/tools"
+	"github.com/neoclaw-ai/neoclaw/internal/approval"
+	"github.com/neoclaw-ai/neoclaw/internal/costs"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/session"
+	"github.com/neoclaw-ai/neoclaw/internal/tools"
 )
 
 func TestAgentHandleMessageWritesResponse(t *testing.T) {

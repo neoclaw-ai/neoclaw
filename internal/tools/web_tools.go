@@ -11,7 +11,7 @@ import (
 )
 
 const braveSearchEndpoint = "https://api.search.brave.com/res/v1/web/search"
-const defaultUserAgent = "BetterClaw"
+const defaultUserAgent = "NeoClaw"
 
 // WebSearchTool searches the web and returns structured text results for the LLM.
 type WebSearchTool struct {

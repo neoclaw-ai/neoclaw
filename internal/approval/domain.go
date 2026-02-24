@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 type domainMatchDecision int

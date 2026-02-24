@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/scheduler"
+	"github.com/neoclaw-ai/neoclaw/internal/scheduler"
 )
 
 func TestJobCreateListDeleteTools(t *testing.T) {

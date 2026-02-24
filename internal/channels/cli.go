@@ -13,9 +13,9 @@ import (
 	"strings"
 
 	"github.com/chzyer/readline"
-	"github.com/machinae/betterclaw/internal/approval"
-	"github.com/machinae/betterclaw/internal/logging"
-	"github.com/machinae/betterclaw/internal/runtime"
+	"github.com/neoclaw-ai/neoclaw/internal/approval"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/runtime"
 	"golang.org/x/term"
 )
 
@@ -273,7 +273,7 @@ func newReadline(in io.Reader, out io.Writer) (*readline.Instance, error) {
 
 	return readline.NewEx(&readline.Config{
 		Prompt:          defaultReplPrompt,
-		HistoryFile:     filepath.Join(os.TempDir(), ".betterclaw_history"),
+		HistoryFile:     filepath.Join(os.TempDir(), ".neoclaw_history"),
 		HistoryLimit:    200,
 		InterruptPrompt: "^C",
 		EOFPrompt:       "exit",

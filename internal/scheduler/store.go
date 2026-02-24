@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/logging"
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 	"github.com/robfig/cron/v3"
 )
 

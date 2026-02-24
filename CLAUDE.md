@@ -1,4 +1,4 @@
-# BetterClaw
+# NeoClaw
 A better version of OpenClaw. A lightweight personal AI assistant.
 80% of the features of OpenClaw, none of the headaches.
 
@@ -18,8 +18,8 @@ A better version of OpenClaw. A lightweight personal AI assistant.
 4. Optimize for lower token costs and efficient token usage. Do not make LLM calls when local processing will suffice. 
 
 ## Repository
-- Canonical GitHub URL: https://github.com/machinae/betterclaw
-- Go module path must be: github.com/machinae/betterclaw
+- Canonical GitHub URL: https://github.com/neoclaw-ai/neoclaw
+- Go module path must be: github.com/neoclaw-ai/neoclaw
 
 ## Formatting Policy
 - After editing Go files, always run `gofmt` on changed files before running tests or builds.

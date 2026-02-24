@@ -26,8 +26,8 @@ func TestWebSearchToolExecute(t *testing.T) {
 			if got := req.Header.Get("X-Subscription-Token"); got != "brave-key" {
 				t.Fatalf("expected brave token header, got %q", got)
 			}
-			if got := req.Header.Get("User-Agent"); got != "BetterClaw" {
-				t.Fatalf("expected BetterClaw user agent, got %q", got)
+			if got := req.Header.Get("User-Agent"); got != "NeoClaw" {
+				t.Fatalf("expected NeoClaw user agent, got %q", got)
 			}
 			body := `{"web":{"results":[{"title":"Go","url":"https://go.dev","description":"The Go programming language"}]}}`
 			return &http.Response{
@@ -90,8 +90,8 @@ func TestHTTPRequestToolExecute(t *testing.T) {
 			if got := req.Header.Get("Accept"); got != "application/json, text/markdown, text/plain" {
 				t.Fatalf("expected multi Accept header, got %q", got)
 			}
-			if got := req.Header.Get("User-Agent"); got != "BetterClaw" {
-				t.Fatalf("expected BetterClaw user agent, got %q", got)
+			if got := req.Header.Get("User-Agent"); got != "NeoClaw" {
+				t.Fatalf("expected NeoClaw user agent, got %q", got)
 			}
 			if got := req.Header.Get("X-Test"); got != "value" {
 				t.Fatalf("expected custom header value, got %q", got)

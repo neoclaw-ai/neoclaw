@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/landlock-lsm/go-landlock/landlock"
-	"github.com/machinae/betterclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 	"golang.org/x/sys/unix"
 )
 

@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 // Record is one persisted usage entry.

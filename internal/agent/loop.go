@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/approval"
-	"github.com/machinae/betterclaw/internal/logging"
-	"github.com/machinae/betterclaw/internal/provider"
-	"github.com/machinae/betterclaw/internal/tools"
+	"github.com/neoclaw-ai/neoclaw/internal/approval"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/tools"
 )
 
 const defaultMaxIterations = 10

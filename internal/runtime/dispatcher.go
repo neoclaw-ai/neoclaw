@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
 )
 
 const userVisibleHandlerError = "There was an error with your request. Check server logs for details"

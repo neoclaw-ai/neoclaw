@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/costs"
-	"github.com/machinae/betterclaw/internal/runtime"
-	"github.com/machinae/betterclaw/internal/scheduler"
+	"github.com/neoclaw-ai/neoclaw/internal/costs"
+	"github.com/neoclaw-ai/neoclaw/internal/runtime"
+	"github.com/neoclaw-ai/neoclaw/internal/scheduler"
 )
 
 func TestHelpCommand(t *testing.T) {

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/logging"
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 const schedulerOutputJobIDArg = "job_id"

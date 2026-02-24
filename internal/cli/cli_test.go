@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
 )
 
 func TestCLIFlagParsing(t *testing.T) {

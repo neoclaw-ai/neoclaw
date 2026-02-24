@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/machinae/betterclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 	"github.com/spf13/cobra"
 )
 

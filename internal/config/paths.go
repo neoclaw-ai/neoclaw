@@ -3,14 +3,14 @@ package config
 import "path/filepath"
 
 const (
-	// Global layout under BETTERCLAW_HOME.
+	// Global layout under NEOCLAW_HOME.
 	ConfigFilePath = "config.toml"
 	DataDirPath    = "data"
 	PolicyDirPath  = "policy"
 	LogsDirPath    = "logs"
 	PIDFilePath    = "claw.pid"
 
-	// Agent directory layout under BETTERCLAW_HOME/data/agents/{agent}/.
+	// Agent directory layout under NEOCLAW_HOME/data/agents/{agent}/.
 	AgentsDirPath      = "agents"
 	WorkspaceDirPath   = "workspace"
 	TmpDirPath         = "tmp"
@@ -34,7 +34,7 @@ func homeConfigPath(home string) string {
 }
 
 func defaultHomePath(home string) string {
-	return filepath.Join(home, ".betterclaw")
+	return filepath.Join(home, ".neoclaw")
 }
 
 func homeDataPath(home string) string {

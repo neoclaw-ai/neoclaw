@@ -1,6 +1,6 @@
 package agent
 
-import "github.com/machinae/betterclaw/internal/provider"
+import "github.com/neoclaw-ai/neoclaw/internal/provider"
 
 // sanitizeToolTurns normalizes tool-use/tool-result sequencing for Anthropic.
 func sanitizeToolTurns(messages []provider.ChatMessage) ([]provider.ChatMessage, bool) {

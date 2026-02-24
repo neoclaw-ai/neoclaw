@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/machinae/betterclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 )
 
 const defaultOpenRouterURL = "https://openrouter.ai/api/v1/chat/completions"

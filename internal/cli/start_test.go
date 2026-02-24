@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/channels"
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/scheduler"
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/channels"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/scheduler"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 func TestStartLoadsDefaultsAndBootstraps(t *testing.T) {

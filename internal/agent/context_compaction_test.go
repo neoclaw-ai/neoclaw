@@ -3,7 +3,7 @@ package agent
 import (
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
 )
 
 func TestCompactionRecentStart_NoAdjustmentWhenNotTool(t *testing.T) {

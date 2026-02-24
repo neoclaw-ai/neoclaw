@@ -1,4 +1,4 @@
-module github.com/machinae/betterclaw
+module github.com/neoclaw-ai/neoclaw
 
 go 1.24.0
 

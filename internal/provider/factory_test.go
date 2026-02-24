@@ -3,7 +3,7 @@ package provider
 import (
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 )
 
 func TestNewProviderFromConfig_SelectsAnthropic(t *testing.T) {

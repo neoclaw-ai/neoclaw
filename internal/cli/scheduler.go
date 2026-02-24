@@ -6,11 +6,11 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/machinae/betterclaw/internal/approval"
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/sandbox"
-	"github.com/machinae/betterclaw/internal/scheduler"
-	"github.com/machinae/betterclaw/internal/tools"
+	"github.com/neoclaw-ai/neoclaw/internal/approval"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/sandbox"
+	"github.com/neoclaw-ai/neoclaw/internal/scheduler"
+	"github.com/neoclaw-ai/neoclaw/internal/tools"
 )
 
 func newSchedulerService(cfg *config.Config, channelWriters map[string]io.Writer) (*scheduler.Service, error) {

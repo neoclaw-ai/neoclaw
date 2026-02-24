@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/machinae/betterclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 )
 
 func resolveMaxTokens(requestMaxTokens, configuredMaxTokens int) int {

@@ -8,8 +8,8 @@ import (
 	"os"
 	"sort"
 
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
 )
 
 const defaultInlineOutputChars = 2000
@@ -78,7 +78,7 @@ func TruncateOutput(output string) (*ToolResult, error) {
 		return nil, fmt.Errorf("create workspace directory for tool output: %w", err)
 	}
 
-	tempFile, err := os.CreateTemp(tmpDir, "betterclaw-tool-output-*.txt")
+	tempFile, err := os.CreateTemp(tmpDir, "neoclaw-tool-output-*.txt")
 	if err != nil {
 		return nil, fmt.Errorf("create temp output file: %w", err)
 	}

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/logging"
-	"github.com/machinae/betterclaw/internal/store"
-	"github.com/machinae/betterclaw/internal/tools"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/tools"
 )
 
 // Approver requests and returns user approval decisions.

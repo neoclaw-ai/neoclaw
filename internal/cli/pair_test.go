@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/approval"
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/approval"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 func TestPair_MissingTokenFails(t *testing.T) {

@@ -12,10 +12,10 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
-	"github.com/machinae/betterclaw/internal/approval"
-	"github.com/machinae/betterclaw/internal/commands"
-	"github.com/machinae/betterclaw/internal/runtime"
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/approval"
+	"github.com/neoclaw-ai/neoclaw/internal/commands"
+	"github.com/neoclaw-ai/neoclaw/internal/runtime"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 func TestFormatTelegramMappings(t *testing.T) {

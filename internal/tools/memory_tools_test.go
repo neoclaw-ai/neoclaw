@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/memory"
+	"github.com/neoclaw-ai/neoclaw/internal/memory"
 )
 
 func TestMemoryAppendCreatesAndUpdatesSections(t *testing.T) {

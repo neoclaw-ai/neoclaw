@@ -1,4 +1,4 @@
-// Package config loads BetterClaw runtime configuration from a TOML file and environment variables, exposing typed structs and accessors for all sections.
+// Package config loads NeoClaw runtime configuration from a TOML file and environment variables, exposing typed structs and accessors for all sections.
 package config
 
 import (
@@ -28,7 +28,7 @@ const (
 
 // Config is the runtime configuration loaded from defaults, config.toml, and env vars.
 type Config struct {
-	// HomeDir is runtime-resolved from BETTERCLAW_HOME and not read from config.
+	// HomeDir is runtime-resolved from NEOCLAW_HOME and not read from config.
 	HomeDir string `mapstructure:"-"`
 	// Agent is runtime-selected (MVP default: "default"), not read from config.
 	Agent    string                       `mapstructure:"-"`
@@ -156,10 +156,10 @@ var defaultUserConfig = Config{
 	},
 }
 
-// homeDir returns the BetterClaw home directory.
-// Uses BETTERCLAW_HOME env var if set, otherwise defaults to ~/.betterclaw.
+// homeDir returns the NeoClaw home directory.
+// Uses NEOCLAW_HOME env var if set, otherwise defaults to ~/.neoclaw.
 func homeDir() (string, error) {
-	if dir := os.Getenv("BETTERCLAW_HOME"); dir != "" {
+	if dir := os.Getenv("NEOCLAW_HOME"); dir != "" {
 		return dir, nil
 	}
 	home, err := os.UserHomeDir()
@@ -170,8 +170,8 @@ func homeDir() (string, error) {
 }
 
 // Load merges hardcoded defaults and config file values in that order.
-// The runtime data directory is BETTERCLAW_HOME/data (default: ~/.betterclaw/data).
-// Config is always at $BETTERCLAW_HOME/config.toml.
+// The runtime data directory is NEOCLAW_HOME/data (default: ~/.neoclaw/data).
+// Config is always at $NEOCLAW_HOME/config.toml.
 func Load() (*Config, error) {
 	homeDir, err := homeDir()
 	if err != nil {

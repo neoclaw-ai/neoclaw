@@ -1,8 +1,8 @@
 package agent
 
 const (
-	// DefaultSystemPrompt is the base system identity for BetterClaw.
-	DefaultSystemPrompt = "You are BetterClaw, a lightweight personal AI assistant."
+	// DefaultSystemPrompt is the base system identity for NeoClaw.
+	DefaultSystemPrompt = "You are NeoClaw, a lightweight personal AI assistant."
 
 	// autoRememberInstruction tells the model to persist important user facts.
 	autoRememberInstruction = "When you learn something important about the user (preferences, facts, relationships, ongoing constraints), write it to memory using memory_append without asking permission."

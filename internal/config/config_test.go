@@ -10,11 +10,11 @@ import (
 )
 
 func TestLoad_FileOverridesDefaults(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	dataDir := filepath.Join(t.TempDir(), ".neoclaw")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatalf("mkdir data dir: %v", err)
 	}
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 
 	configBody := `
 [llm.default]
@@ -60,11 +60,11 @@ token = "bot-token"
 }
 
 func TestLoad_ExpandsEnvVarsInStringValues(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	dataDir := filepath.Join(t.TempDir(), ".neoclaw")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatalf("mkdir data dir: %v", err)
 	}
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 	t.Setenv("ANTHROPIC_API_KEY", "expanded-key")
 	t.Setenv("BRAVE_API_KEY", "expanded-brave-key")
 
@@ -94,8 +94,8 @@ func TestLoad_ExpandsEnvVarsInStringValues(t *testing.T) {
 }
 
 func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	dataDir := filepath.Join(t.TempDir(), ".neoclaw")
+	t.Setenv("NEOCLAW_HOME", dataDir)
 
 	cfg, err := Load()
 	if err != nil {
@@ -152,11 +152,11 @@ func TestLoad_DefaultsApplyWithoutConfigFile(t *testing.T) {
 }
 
 func TestLoad_ValidSecurityModeFromFile(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	dataDir := filepath.Join(t.TempDir(), ".neoclaw")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatalf("mkdir data dir: %v", err)
 	}
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 
 	configBody := `
 [security]
@@ -176,11 +176,11 @@ mode = "strict"
 }
 
 func TestLoad_InvalidSecurityModeDoesNotFail(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	dataDir := filepath.Join(t.TempDir(), ".neoclaw")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatalf("mkdir data dir: %v", err)
 	}
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 
 	configBody := `
 [security]
@@ -200,11 +200,11 @@ mode = "banana"
 }
 
 func TestLoad_ZeroNumericValuesFallbackToDefaults(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	dataDir := filepath.Join(t.TempDir(), ".neoclaw")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatalf("mkdir data dir: %v", err)
 	}
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 
 	configBody := `
 [llm.default]
@@ -260,12 +260,12 @@ daily_log_lookback = "0s"
 	}
 }
 
-func TestLoad_BetterclawHomeOverridesDefault(t *testing.T) {
+func TestLoad_NeoClawHomeOverridesDefault(t *testing.T) {
 	customDir := filepath.Join(t.TempDir(), "custom-home")
 	if err := os.MkdirAll(customDir, 0o755); err != nil {
 		t.Fatalf("mkdir custom dir: %v", err)
 	}
-	t.Setenv("BETTERCLAW_HOME", customDir)
+	t.Setenv("NEOCLAW_HOME", customDir)
 
 	cfg, err := Load()
 	if err != nil {
@@ -278,7 +278,7 @@ func TestLoad_BetterclawHomeOverridesDefault(t *testing.T) {
 }
 
 func TestHomeDir_DefaultsToUserHome(t *testing.T) {
-	t.Setenv("BETTERCLAW_HOME", "")
+	t.Setenv("NEOCLAW_HOME", "")
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatalf("get user home: %v", err)
@@ -288,15 +288,15 @@ func TestHomeDir_DefaultsToUserHome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("home dir: %v", err)
 	}
-	expected := filepath.Join(home, ".betterclaw")
+	expected := filepath.Join(home, ".neoclaw")
 	if dir != expected {
 		t.Fatalf("expected %q, got %q", expected, dir)
 	}
 }
 
 func TestHomeDir_RespectsEnvVar(t *testing.T) {
-	customDir := "/tmp/my-betterclaw"
-	t.Setenv("BETTERCLAW_HOME", customDir)
+	customDir := "/tmp/my-neoclaw"
+	t.Setenv("NEOCLAW_HOME", customDir)
 
 	dir, err := homeDir()
 	if err != nil {
@@ -308,49 +308,49 @@ func TestHomeDir_RespectsEnvVar(t *testing.T) {
 }
 
 func TestPathResolutionMethods(t *testing.T) {
-	cfg := &Config{HomeDir: "/tmp/betterclaw", Agent: "default"}
+	cfg := &Config{HomeDir: "/tmp/neoclaw", Agent: "default"}
 
-	if cfg.ConfigPath() != "/tmp/betterclaw/config.toml" {
+	if cfg.ConfigPath() != "/tmp/neoclaw/config.toml" {
 		t.Fatalf("unexpected config path: %q", cfg.ConfigPath())
 	}
-	if cfg.DataDir() != "/tmp/betterclaw/data" {
+	if cfg.DataDir() != "/tmp/neoclaw/data" {
 		t.Fatalf("unexpected data dir: %q", cfg.DataDir())
 	}
-	if cfg.PolicyDir() != "/tmp/betterclaw/data/policy" {
+	if cfg.PolicyDir() != "/tmp/neoclaw/data/policy" {
 		t.Fatalf("unexpected policy dir: %q", cfg.PolicyDir())
 	}
-	if cfg.AllowedCommandsPath() != "/tmp/betterclaw/data/policy/allowed_commands.json" {
+	if cfg.AllowedCommandsPath() != "/tmp/neoclaw/data/policy/allowed_commands.json" {
 		t.Fatalf("unexpected allowed commands path: %q", cfg.AllowedCommandsPath())
 	}
-	if cfg.AllowedDomainsPath() != "/tmp/betterclaw/data/policy/allowed_domains.json" {
+	if cfg.AllowedDomainsPath() != "/tmp/neoclaw/data/policy/allowed_domains.json" {
 		t.Fatalf("unexpected allowed domains path: %q", cfg.AllowedDomainsPath())
 	}
-	if cfg.AllowedUsersPath() != "/tmp/betterclaw/data/policy/allowed_users.json" {
+	if cfg.AllowedUsersPath() != "/tmp/neoclaw/data/policy/allowed_users.json" {
 		t.Fatalf("unexpected allowed users path: %q", cfg.AllowedUsersPath())
 	}
-	if cfg.CostsPath() != "/tmp/betterclaw/data/logs/costs.jsonl" {
+	if cfg.CostsPath() != "/tmp/neoclaw/data/logs/costs.jsonl" {
 		t.Fatalf("unexpected costs path: %q", cfg.CostsPath())
 	}
-	if cfg.PIDPath() != "/tmp/betterclaw/data/claw.pid" {
+	if cfg.PIDPath() != "/tmp/neoclaw/data/claw.pid" {
 		t.Fatalf("unexpected pid path: %q", cfg.PIDPath())
 	}
-	if cfg.SoulPath() != "/tmp/betterclaw/data/agents/default/SOUL.md" {
+	if cfg.SoulPath() != "/tmp/neoclaw/data/agents/default/SOUL.md" {
 		t.Fatalf("unexpected soul path: %q", cfg.SoulPath())
 	}
-	if cfg.MemoryPath() != "/tmp/betterclaw/data/agents/default/memory/memory.md" {
+	if cfg.MemoryPath() != "/tmp/neoclaw/data/agents/default/memory/memory.md" {
 		t.Fatalf("unexpected memory path: %q", cfg.MemoryPath())
 	}
-	if cfg.CLIContextPath() != "/tmp/betterclaw/data/agents/default/sessions/cli/default.jsonl" {
+	if cfg.CLIContextPath() != "/tmp/neoclaw/data/agents/default/sessions/cli/default.jsonl" {
 		t.Fatalf("unexpected cli context path: %q", cfg.CLIContextPath())
 	}
 }
 
 func TestWrite_PrintsDefaultsAndOverrides(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
+	dataDir := filepath.Join(t.TempDir(), ".neoclaw")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatalf("mkdir data dir: %v", err)
 	}
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	t.Setenv("NEOCLAW_HOME", dataDir)
 
 	configBody := `
 [llm.default]

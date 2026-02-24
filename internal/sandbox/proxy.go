@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/elazarl/goproxy"
-	"github.com/machinae/betterclaw/internal/approval"
+	"github.com/neoclaw-ai/neoclaw/internal/approval"
 )
 
 // DomainProxy enforces outbound domain policy for subprocess HTTP(S) traffic.

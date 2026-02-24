@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/channels"
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/channels"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
 	"github.com/spf13/cobra"
 )
 

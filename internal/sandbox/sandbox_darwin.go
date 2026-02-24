@@ -10,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/machinae/betterclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 )
 
 // IsSandboxSupported reports whether sandbox-exec is available on Darwin.
@@ -91,7 +91,7 @@ func darwinProfile(mode, dataDir string) string {
 
 // strictDarwinProfile returns the SBPL profile for strict mode.
 // Uses deny-default with an explicit read allowlist, protecting user home files
-// (such as ~/.ssh and ~/.aws) while allowing system paths and the betterclaw home directory.
+// (such as ~/.ssh and ~/.aws) while allowing system paths and the neoclaw home directory.
 // Writes are restricted to dataDir plus essential device handles.
 // /Users and /tmp (including /private/tmp) are intentionally absent from the read allowlist.
 // Real paths (/private/etc, /private/var) are used instead of symlinks (/etc, /var, /tmp)
@@ -103,7 +103,7 @@ func strictDarwinProfile(dataDir string) string {
 	b.WriteString("(version 1)\n")
 	b.WriteString("(deny default)\n\n")
 
-	// Read allowlist: system paths + betterclaw home (contains config.toml).
+	// Read allowlist: system paths + neoclaw home (contains config.toml).
 	// /Users is intentionally absent — protects ~/.ssh, ~/.aws, etc.
 	// /private/etc and /private/var are used instead of their symlinks /etc and /var
 	// so that /private/tmp remains blocked via both the symlink and real path.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 )
 
 type mockDomainApprover struct {
@@ -75,7 +75,7 @@ func TestCheckerAllow_DenyTakesPrecedenceOverAllow(t *testing.T) {
 
 func TestCheckerAllow_DangerModeSkipsDomainPolicyAndApproval(t *testing.T) {
 	homeDir := t.TempDir()
-	t.Setenv("BETTERCLAW_HOME", homeDir)
+	t.Setenv("NEOCLAW_HOME", homeDir)
 	writeDangerConfigDomainTest(t, homeDir)
 
 	cfg := &config.Config{HomeDir: homeDir, Agent: "default"}
@@ -130,7 +130,7 @@ func TestCheckerAllow_ApprovalBehaviorBySecurityMode(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			homeDir := t.TempDir()
-			t.Setenv("BETTERCLAW_HOME", homeDir)
+			t.Setenv("NEOCLAW_HOME", homeDir)
 			writeSecurityModeConfigDomainTest(t, homeDir, tc.mode)
 
 			cfg := &config.Config{HomeDir: homeDir, Agent: "default"}

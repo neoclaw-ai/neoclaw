@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
 	"github.com/robfig/cron/v3"
 )
 

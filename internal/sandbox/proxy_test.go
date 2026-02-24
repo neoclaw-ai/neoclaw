@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/approval"
+	"github.com/neoclaw-ai/neoclaw/internal/approval"
 )
 
 func TestDomainProxy_AllowsApprovedDomain(t *testing.T) {

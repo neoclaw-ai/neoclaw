@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 )
 
 func TestReadFile_ReadExistingFile(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/machinae/betterclaw/internal/memory"
+	"github.com/neoclaw-ai/neoclaw/internal/memory"
 )
 
 // MemoryReadTool reads the long-term memory file.

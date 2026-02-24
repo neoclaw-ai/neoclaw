@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/machinae/betterclaw/internal/provider"
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 // Store persists conversation history in a JSONL file.

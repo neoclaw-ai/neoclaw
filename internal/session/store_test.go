@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
 )
 
 func TestStoreAppendLoadRoundTrip(t *testing.T) {

@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/machinae/betterclaw/internal/provider"
+	"github.com/neoclaw-ai/neoclaw/internal/provider"
 )
 
 func createTestHome(t *testing.T) string {
 	t.Helper()
-	dataDir := filepath.Join(t.TempDir(), ".betterclaw")
-	t.Setenv("BETTERCLAW_HOME", dataDir)
+	dataDir := filepath.Join(t.TempDir(), ".neoclaw")
+	t.Setenv("NEOCLAW_HOME", dataDir)
 	return dataDir
 }
 

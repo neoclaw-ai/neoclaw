@@ -6,8 +6,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/machinae/betterclaw/internal/cli"
-	"github.com/machinae/betterclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/cli"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
 )
 
 func main() {

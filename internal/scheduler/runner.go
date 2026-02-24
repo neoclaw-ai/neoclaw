@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/machinae/betterclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
 )
 
 const schedulerOutputJobIDArg = "job_id"

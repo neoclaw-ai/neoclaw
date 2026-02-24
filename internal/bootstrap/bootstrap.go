@@ -1,4 +1,4 @@
-// Package bootstrap handles first-run initialization of the BetterClaw data directory tree, creating directories, policy files, and a starter config idempotently.
+// Package bootstrap handles first-run initialization of the NeoClaw data directory tree, creating directories, policy files, and a starter config idempotently.
 package bootstrap
 
 import (
@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/machinae/betterclaw/internal/config"
-	"github.com/machinae/betterclaw/internal/store"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
+	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 var defaultAllowedDomains = []string{
@@ -42,7 +42,7 @@ var defaultAllowedCommands = []string{
 	"whoami *",
 }
 
-// Initialize creates the expected BetterClaw data tree if missing.
+// Initialize creates the expected NeoClaw data tree if missing.
 func Initialize(cfg *config.Config) error {
 	agentDir := cfg.AgentDir()
 	policyDir := cfg.PolicyDir()
