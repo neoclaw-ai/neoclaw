@@ -72,8 +72,23 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 	if err != nil {
 		return "", err
 	}
+	includedFiles := map[string]int{}
+	if soulText != "" {
+		includedFiles[config.SoulFilePath] = estimateTokens(soulText, nil)
+	}
+	if userText != "" {
+		includedFiles[config.UserFilePath] = estimateTokens(userText, nil)
+	}
+	if memoryText != "" {
+		includedFiles[config.MemoryFilePath] = estimateTokens(memoryText, nil)
+	}
 
 	if soulText == "" && userText == "" && memoryText == "" && len(recentLogs) == 0 {
+		logging.Logger().Debug(
+			"built system prompt",
+			"included_files", includedFiles,
+			"total_tokens", estimateTokens(prompt, nil),
+		)
 		return prompt, nil
 	}
 
@@ -102,17 +117,25 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 		}
 	}
 	if len(recentLogs) > 0 {
+		dailyContentByFile := map[string]string{}
 		b.WriteString("\n[Recent daily log]\n")
 		for _, entry := range recentLogs {
-			b.WriteString("- ")
-			b.WriteString(entry.Timestamp.Format(time.RFC3339))
-			b.WriteString(": ")
-			b.WriteString(entry.Entry)
-			b.WriteByte('\n')
+			filename := entry.Timestamp.Format("2006-01-02") + ".md"
+			line := "- " + entry.Timestamp.Format(time.RFC3339) + ": " + entry.Entry + "\n"
+			dailyContentByFile[filename] += line
+			b.WriteString(line)
+		}
+		for filename, content := range dailyContentByFile {
+			includedFiles[filename] = estimateTokens(content, nil)
 		}
 	}
-
-	return b.String(), nil
+	systemPrompt := b.String()
+	logging.Logger().Debug(
+		"built system prompt",
+		"included_files", includedFiles,
+		"total_tokens", estimateTokens(systemPrompt, nil),
+	)
+	return systemPrompt, nil
 }
 
 // truncateStringByChars truncates s to at most maxChars Unicode code points,
