@@ -12,14 +12,14 @@ import (
 
 const summaryKind = "summary"
 
-func (a *Agent) compactHistoryIfNeeded(ctx context.Context, messages []provider.ChatMessage) ([]provider.ChatMessage, error) {
+func (a *Agent) compactHistoryIfNeeded(ctx context.Context, systemPrompt string, messages []provider.ChatMessage) ([]provider.ChatMessage, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if a.maxContextTokens <= 0 {
 		return append([]provider.ChatMessage{}, messages...), nil
 	}
-	estimatedTokens := estimateTokens(a.systemPrompt, messages)
+	estimatedTokens := estimateTokens(systemPrompt, messages)
 	if estimatedTokens <= a.maxContextTokens {
 		return append([]provider.ChatMessage{}, messages...), nil
 	}

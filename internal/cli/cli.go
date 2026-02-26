@@ -72,14 +72,10 @@ func newCLICmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			systemPrompt, err := agent.BuildSystemPrompt(cfg.AgentDir(), memoryStore, cfg.Context)
-			if err != nil {
-				return err
-			}
 			costTracker := costs.New(cfg.CostsPath())
 
 			if trimmedPrompt != "" {
-				handler := agent.New(modelProvider, registry, approver, systemPrompt)
+				handler := agent.New(modelProvider, registry, approver, cfg.AgentDir(), memoryStore, cfg.Context)
 				handler.ConfigureContext(cfg.Context.MaxToolCalls, cfg.Context.ToolOutputLength)
 				handler.ConfigureCosts(
 					costTracker,
@@ -97,7 +93,7 @@ func newCLICmd() *cobra.Command {
 				modelProvider,
 				registry,
 				listener,
-				systemPrompt,
+				cfg.AgentDir(),
 				sessionStore,
 				memoryStore,
 				cfg.Context.MaxTokens,
@@ -105,6 +101,7 @@ func newCLICmd() *cobra.Command {
 				cfg.Context.MaxToolCalls,
 				cfg.Context.ToolOutputLength,
 				llmCfg.RequestTimeout,
+				cfg.Context,
 			)
 			handler.ConfigureCosts(
 				costTracker,

@@ -17,8 +17,6 @@ import (
 
 const defaultDailyLogLookback = 12 * time.Hour
 
-const resolveRelativeTimeInstruction = "Resolve relative date/time phrases (for example: tomorrow, next week, in 2 hours) using the current time and timezone above. When replying about dates/times, include absolute dates where useful."
-
 // BuildSystemPrompt assembles the runtime system prompt from base instructions,
 // SOUL.md, USER.md, long-term memory, and recent daily log entries.
 func BuildSystemPrompt(agentDir string, store *memory.Store, contextCfg config.ContextConfig) (string, error) {
@@ -65,6 +63,7 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 	if !userExists {
 		logging.Logger().Warn("missing USER.md; continuing without user context", "path", userPath)
 	}
+
 	memoryText, err := store.LoadContext()
 	if err != nil {
 		return "", err

@@ -11,6 +11,7 @@ import (
 	"github.com/neoclaw-ai/neoclaw/internal/runtime"
 
 	"github.com/neoclaw-ai/neoclaw/internal/approval"
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 	"github.com/neoclaw-ai/neoclaw/internal/costs"
 	"github.com/neoclaw-ai/neoclaw/internal/logging"
 	"github.com/neoclaw-ai/neoclaw/internal/memory"
@@ -26,7 +27,8 @@ type Agent struct {
 	provider          provider.Provider
 	registry          *tools.Registry
 	approver          approval.Approver
-	systemPrompt      string
+	agentDir          string
+	contextCfg        config.ContextConfig
 	maxIter           int
 	toolOutputLength  int
 	maxContextTokens  int
@@ -44,15 +46,14 @@ type Agent struct {
 }
 
 // New creates a conversation-scoped Agent.
-func New(provider provider.Provider, registry *tools.Registry, approver approval.Approver, systemPrompt string) *Agent {
-	if strings.TrimSpace(systemPrompt) == "" {
-		systemPrompt = DefaultSystemPrompt
-	}
+func New(provider provider.Provider, registry *tools.Registry, approver approval.Approver, agentDir string, memoryStore *memory.Store, contextCfg config.ContextConfig) *Agent {
 	return &Agent{
-		provider:     provider,
-		registry:     registry,
-		approver:     approver,
-		systemPrompt: systemPrompt,
+		provider:    provider,
+		registry:    registry,
+		approver:    approver,
+		agentDir:    agentDir,
+		memoryStore: memoryStore,
+		contextCfg:  contextCfg,
 	}
 }
 
@@ -61,7 +62,7 @@ func NewWithSession(
 	provider provider.Provider,
 	registry *tools.Registry,
 	approver approval.Approver,
-	systemPrompt string,
+	agentDir string,
 	sessionStore *session.Store,
 	memoryStore *memory.Store,
 	maxContextTokens int,
@@ -69,10 +70,10 @@ func NewWithSession(
 	maxToolCalls int,
 	toolOutputLength int,
 	requestTimeout time.Duration,
+	contextCfg config.ContextConfig,
 ) *Agent {
-	ag := New(provider, registry, approver, systemPrompt)
+	ag := New(provider, registry, approver, agentDir, memoryStore, contextCfg)
 	ag.sessionStore = sessionStore
-	ag.memoryStore = memoryStore
 	ag.maxContextTokens = maxContextTokens
 	ag.recentMessages = recentMessages
 	ag.maxIter = maxToolCalls
@@ -129,11 +130,18 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg
 		return err
 	}
 
+	// Rebuild system prompt on every request so memory, daily logs, and
+	// current time are always fresh.
+	systemPrompt, err := BuildSystemPrompt(a.agentDir, a.memoryStore, a.contextCfg)
+	if err != nil {
+		return err
+	}
+
 	baseHistory := append([]provider.ChatMessage{}, a.history...)
 	baseHistory, _ = sanitizeToolTurns(baseHistory)
 	messages := appendUserMessage(baseHistory, msg.Text)
 	uncompactedMessages := append([]provider.ChatMessage{}, messages...)
-	messages, err = a.compactHistoryIfNeeded(ctx, messages)
+	messages, err = a.compactHistoryIfNeeded(ctx, systemPrompt, messages)
 	if err != nil {
 		return err
 	}
@@ -146,7 +154,7 @@ func (a *Agent) HandleMessage(ctx context.Context, w runtime.ResponseWriter, msg
 		a.provider,
 		a.registry,
 		a.approver,
-		a.systemPrompt,
+		systemPrompt,
 		messages,
 		a.maxIter,
 		a.toolOutputLength,

@@ -156,18 +156,13 @@ func startTelegram(
 		return nil, err
 	}
 
-	systemPrompt, err := agent.BuildSystemPrompt(cfg.AgentDir(), memoryStore, cfg.Context)
-	if err != nil {
-		return nil, err
-	}
-
 	costTracker := costs.New(cfg.CostsPath())
 	sessionStore := session.New(cfg.TelegramContextPath())
 	handler := agent.NewWithSession(
 		modelProvider,
 		registry,
 		listener,
-		systemPrompt,
+		cfg.AgentDir(),
 		sessionStore,
 		memoryStore,
 		cfg.Context.MaxTokens,
@@ -175,6 +170,7 @@ func startTelegram(
 		cfg.Context.MaxToolCalls,
 		cfg.Context.ToolOutputLength,
 		llmCfg.RequestTimeout,
+		cfg.Context,
 	)
 	handler.ConfigureCosts(
 		costTracker,

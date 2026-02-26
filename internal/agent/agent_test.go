@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/neoclaw-ai/neoclaw/internal/config"
 	"github.com/neoclaw-ai/neoclaw/internal/memory"
 	"github.com/neoclaw-ai/neoclaw/internal/runtime"
 
@@ -25,7 +26,7 @@ func TestAgentHandleMessageWritesResponse(t *testing.T) {
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "hello"}},
 	}
-	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
 	writer := &captureWriter{}
 
 	err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "hi"})
@@ -45,7 +46,7 @@ func TestAgentHandleMessageAccumulatesHistory(t *testing.T) {
 			{Content: "r2"},
 		},
 	}
-	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
 	writer := &captureWriter{}
 
 	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "one"}); err != nil {
@@ -68,7 +69,7 @@ func TestAgentHandleMessageProviderErrorIsFatal(t *testing.T) {
 	modelProvider := &recordingProvider{
 		err: errors.New("provider unavailable"),
 	}
-	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
 	writer := &captureWriter{}
 
 	err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "hi"})
@@ -85,7 +86,7 @@ func TestAgentHandleMessageCanceledContextIsFatal(t *testing.T) {
 	modelProvider := &recordingProvider{
 		requireLiveContext: true,
 	}
-	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
 	writer := &captureWriter{}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -111,7 +112,7 @@ func TestAgentWithSessionLoadsHistoryAndAppendsTurn(t *testing.T) {
 		t.Fatalf("seed session: %v", err)
 	}
 
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, 0, 0, time.Second)
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, memory.New(t.TempDir()), 4000, 10, 0, 0, time.Second, config.ContextConfig{})
 	writer := &captureWriter{}
 
 	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "next"}); err != nil {
@@ -142,7 +143,10 @@ func TestAgentWithSessionLoadsHistoryAndAppendsTurn(t *testing.T) {
 func TestAgentResetResetsSession(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
-		responses: []*provider.ChatResponse{{Content: "after reset"}},
+		responses: []*provider.ChatResponse{
+			{Content: "summary"},     // consumed by async summarize goroutine
+			{Content: "after reset"}, // consumed by post-reset HandleMessage
+		},
 	}
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	sessionStore := session.New(sessionPath)
@@ -153,12 +157,9 @@ func TestAgentResetResetsSession(t *testing.T) {
 		t.Fatalf("seed session: %v", err)
 	}
 
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, 0, 0, time.Second)
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, memory.New(t.TempDir()), 4000, 10, 0, 0, time.Second, config.ContextConfig{})
 	if err := ag.Reset(context.Background()); err != nil {
 		t.Fatalf("reset: %v", err)
-	}
-	if len(modelProvider.requests) != 0 {
-		t.Fatalf("expected no provider call for reset")
 	}
 
 	loaded, err := sessionStore.Load(context.Background())
@@ -169,14 +170,18 @@ func TestAgentResetResetsSession(t *testing.T) {
 		t.Fatalf("expected empty session after reset, got %#v", loaded)
 	}
 
+	// Wait for async summary goroutine to finish before calling HandleMessage.
+	time.Sleep(100 * time.Millisecond)
+
 	writer := &captureWriter{}
 	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "fresh"}); err != nil {
 		t.Fatalf("handle post-reset message: %v", err)
 	}
-	if len(modelProvider.requests) != 1 {
-		t.Fatalf("expected one provider request after reset, got %d", len(modelProvider.requests))
+	// 2 requests total: 1 for the async summary, 1 for HandleMessage.
+	if len(modelProvider.requests) != 2 {
+		t.Fatalf("expected two provider requests after reset, got %d", len(modelProvider.requests))
 	}
-	if got := len(modelProvider.requests[0].Messages); got != 1 {
+	if got := len(modelProvider.requests[1].Messages); got != 1 {
 		t.Fatalf("expected only fresh user message after reset, got %d", got)
 	}
 }
@@ -197,7 +202,7 @@ func TestAgentResetWritesSummaryToDailyLog(t *testing.T) {
 
 	memoryDir := filepath.Join(t.TempDir(), "memory")
 	memoryStore := memory.New(memoryDir)
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, memoryStore, 4000, 10, 0, 0, time.Second)
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, memoryStore, 4000, 10, 0, 0, time.Second, config.ContextConfig{})
 	if err := ag.Reset(context.Background()); err != nil {
 		t.Fatalf("reset: %v", err)
 	}
@@ -227,7 +232,7 @@ func TestAgentResetSkipsSummaryOnEmptyHistory(t *testing.T) {
 	sessionStore := session.New(sessionPath)
 	memoryDir := filepath.Join(t.TempDir(), "memory")
 	memoryStore := memory.New(memoryDir)
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, memoryStore, 4000, 10, 0, 0, time.Second)
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, memoryStore, 4000, 10, 0, 0, time.Second, config.ContextConfig{})
 	if err := ag.Reset(context.Background()); err != nil {
 		t.Fatalf("reset: %v", err)
 	}
@@ -245,7 +250,7 @@ func TestCompactHistoryIfNeededAddsSummaryMessage(t *testing.T) {
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "summary output"}},
 	}
-	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
 	ag.maxContextTokens = 10
 	ag.recentMessages = 2
 	messages := []provider.ChatMessage{
@@ -255,7 +260,7 @@ func TestCompactHistoryIfNeededAddsSummaryMessage(t *testing.T) {
 		{Role: provider.RoleAssistant, Content: "4444444444"},
 	}
 
-	compacted, err := ag.compactHistoryIfNeeded(context.Background(), messages)
+	compacted, err := ag.compactHistoryIfNeeded(context.Background(), DefaultSystemPrompt, messages)
 	if err != nil {
 		t.Fatalf("compact history: %v", err)
 	}
@@ -274,7 +279,7 @@ func TestCompactHistoryIfNeededFallbackRecentOnlyOnSummaryFailure(t *testing.T) 
 	modelProvider := &recordingProvider{
 		errs: []error{errors.New("summary failed")},
 	}
-	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
 	ag.maxContextTokens = 10
 	ag.recentMessages = 2
 	messages := []provider.ChatMessage{
@@ -284,7 +289,7 @@ func TestCompactHistoryIfNeededFallbackRecentOnlyOnSummaryFailure(t *testing.T) 
 		{Role: provider.RoleAssistant, Content: "4444444444"},
 	}
 
-	compacted, err := ag.compactHistoryIfNeeded(context.Background(), messages)
+	compacted, err := ag.compactHistoryIfNeeded(context.Background(), DefaultSystemPrompt, messages)
 	if err != nil {
 		t.Fatalf("compact history: %v", err)
 	}
@@ -300,7 +305,7 @@ func TestCompactHistoryIfNeeded_AdjustsBoundaryToIncludeToolTurn(t *testing.T) {
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "summary output"}},
 	}
-	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
 	ag.maxContextTokens = 10
 	ag.recentMessages = 2
 	messages := []provider.ChatMessage{
@@ -315,7 +320,7 @@ func TestCompactHistoryIfNeeded_AdjustsBoundaryToIncludeToolTurn(t *testing.T) {
 		{Role: provider.RoleUser, Content: "3333333333"},
 	}
 
-	compacted, err := ag.compactHistoryIfNeeded(context.Background(), messages)
+	compacted, err := ag.compactHistoryIfNeeded(context.Background(), DefaultSystemPrompt, messages)
 	if err != nil {
 		t.Fatalf("compact history: %v", err)
 	}
@@ -334,7 +339,7 @@ func TestCompactHistoryIfNeeded_SkipsOrphanToolResultAtBoundary(t *testing.T) {
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "summary output"}},
 	}
-	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
 	ag.maxContextTokens = 10
 	ag.recentMessages = 3
 	messages := []provider.ChatMessage{
@@ -345,7 +350,7 @@ func TestCompactHistoryIfNeeded_SkipsOrphanToolResultAtBoundary(t *testing.T) {
 		{Role: provider.RoleAssistant, Content: "4444444444"},
 	}
 
-	compacted, err := ag.compactHistoryIfNeeded(context.Background(), messages)
+	compacted, err := ag.compactHistoryIfNeeded(context.Background(), DefaultSystemPrompt, messages)
 	if err != nil {
 		t.Fatalf("compact history: %v", err)
 	}
@@ -376,7 +381,7 @@ func TestAgentSessionStoresTruncatedToolOutput(t *testing.T) {
 
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	sessionStore := session.New(sessionPath)
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, DefaultSystemPrompt, sessionStore, nil, 4000, 10, 0, 0, time.Second)
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, memory.New(t.TempDir()), 4000, 10, 0, 0, time.Second, config.ContextConfig{})
 	writer := &captureWriter{}
 
 	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "run the tool"}); err != nil {
@@ -411,7 +416,7 @@ func TestAgentSpendLimitBlocksLLMCall(t *testing.T) {
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "should not be called"}},
 	}
-	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
 	costPath := filepath.Join(t.TempDir(), "costs.jsonl")
 	tracker := costs.New(costPath)
 	if err := tracker.Append(context.Background(), costs.Record{
@@ -460,7 +465,7 @@ func TestAgentRecordsUsageForEachLLMCall(t *testing.T) {
 			},
 		},
 	}
-	ag := New(modelProvider, registry, noopApprover{}, DefaultSystemPrompt)
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
 	costPath := filepath.Join(t.TempDir(), "costs.jsonl")
 	tracker := costs.New(costPath)
 	ag.ConfigureCosts(tracker, "anthropic", "claude-sonnet-4-6", 0, 0)
@@ -488,6 +493,20 @@ func TestAgentRecordsUsageForEachLLMCall(t *testing.T) {
 	if lineCount != 2 {
 		t.Fatalf("expected 2 cost records for 2 LLM calls, got %d", lineCount)
 	}
+}
+
+// makeAgentDir creates a temp agent directory with empty SOUL.md and USER.md
+// so BuildSystemPrompt doesn't log warnings about missing files.
+func makeAgentDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, config.SoulFilePath), []byte(""), 0o644); err != nil {
+		t.Fatalf("write SOUL.md: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, config.UserFilePath), []byte(""), 0o644); err != nil {
+		t.Fatalf("write USER.md: %v", err)
+	}
+	return dir
 }
 
 type noopApprover struct{}
