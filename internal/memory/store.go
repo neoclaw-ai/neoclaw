@@ -12,13 +12,16 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
 	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
 const (
 	memoryFileName = "memory.md"
 	dailyDirName   = "daily"
+	maxLoggedChars = 200
 )
 
 const (
@@ -79,11 +82,26 @@ func (s *Store) AppendFact(section, fact string) error {
 	}
 	next, changed := addFact(content, section, fact)
 	if !changed {
+		logging.Logger().Debug(
+			"memory write skipped",
+			"operation", "append_fact",
+			"file", memoryFileName,
+			"section", section,
+			"fact", truncateForLog(fact, maxLoggedChars),
+			"reason", "already_exists",
+		)
 		return nil
 	}
 	if err := store.WriteFile(path, []byte(next)); err != nil {
 		return fmt.Errorf("write memory file: %w", err)
 	}
+	logging.Logger().Debug(
+		"memory write",
+		"operation", "append_fact",
+		"file", memoryFileName,
+		"section", section,
+		"fact", truncateForLog(fact, maxLoggedChars),
+	)
 	return nil
 }
 
@@ -162,6 +180,12 @@ func (s *Store) AppendDailyLog(now time.Time, entry string) error {
 	if err := store.AppendFile(path, []byte(line)); err != nil {
 		return fmt.Errorf("append daily log: %w", err)
 	}
+	logging.Logger().Debug(
+		"memory write",
+		"operation", "append_daily_log",
+		"file", dailyLogFilename(now),
+		"entry", truncateForLog(entry, maxLoggedChars),
+	)
 	return nil
 }
 
@@ -453,4 +477,24 @@ func readAllLines(path string) ([]string, error) {
 		return nil, fmt.Errorf("scan %s: %w", path, err)
 	}
 	return lines, nil
+}
+
+// truncateForLog bounds log field content so debug logs stay concise.
+func truncateForLog(text string, maxChars int) string {
+	if maxChars <= 0 {
+		return ""
+	}
+	if utf8.RuneCountInString(text) <= maxChars {
+		return text
+	}
+	var b strings.Builder
+	charCount := 0
+	for _, r := range text {
+		if charCount >= maxChars {
+			break
+		}
+		b.WriteRune(r)
+		charCount++
+	}
+	return fmt.Sprintf("%s...[truncated %d chars]", b.String(), utf8.RuneCountInString(text)-maxChars)
 }

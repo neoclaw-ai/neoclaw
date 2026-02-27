@@ -21,6 +21,12 @@ func (a *Agent) compactHistoryIfNeeded(ctx context.Context, systemPrompt string,
 	}
 	estimatedTokens := estimateTokens(systemPrompt, messages)
 	if estimatedTokens <= a.maxContextTokens {
+		logging.Logger().Debug(
+			"context compaction skipped",
+			"estimated_tokens", estimatedTokens,
+			"max_context_tokens", a.maxContextTokens,
+			"message_count", len(messages),
+		)
 		return append([]provider.ChatMessage{}, messages...), nil
 	}
 	if len(messages) == 0 {
@@ -33,7 +39,7 @@ func (a *Agent) compactHistoryIfNeeded(ctx context.Context, systemPrompt string,
 	}
 	initialStart := len(messages) - recentCount
 	olderCount := compactionRecentStart(messages, initialStart)
-	logging.Logger().Info(
+	logging.Logger().Debug(
 		"history compaction triggered",
 		"estimated_tokens", estimatedTokens,
 		"max_context_tokens", a.maxContextTokens,
@@ -65,6 +71,11 @@ func (a *Agent) compactHistoryIfNeeded(ctx context.Context, systemPrompt string,
 		Content: summary,
 	})
 	compacted = append(compacted, recent...)
+	logging.Logger().Debug(
+		"context compaction complete",
+		"messages_before", len(messages),
+		"messages_after", len(compacted),
+	)
 	return compacted, nil
 }
 
