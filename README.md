@@ -74,6 +74,12 @@ mv claw ~/.local/bin/
 ```
 We recommend keeping the claw binary in your `$HOME/.local/bin` directory for easy updates.
 
+**Or build from source** (requires Go 1.21+):
+
+```bash
+go install github.com/neoclaw-ai/neoclaw/cmd/claw@latest
+```
+
 **2. Configure**
 
 Run `claw start` once — it creates `~/.neoclaw/config.toml` and exits with setup instructions. Open that file and fill in two values:
