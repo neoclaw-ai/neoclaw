@@ -357,7 +357,7 @@ func TestPathResolutionMethods(t *testing.T) {
 	if cfg.AllowedUsersPath() != "/tmp/neoclaw/data/policy/allowed_users.json" {
 		t.Fatalf("unexpected allowed users path: %q", cfg.AllowedUsersPath())
 	}
-	if cfg.CostsPath() != "/tmp/neoclaw/data/logs/costs.jsonl" {
+	if cfg.CostsPath() != "/tmp/neoclaw/data/logs/costs.tsv" {
 		t.Fatalf("unexpected costs path: %q", cfg.CostsPath())
 	}
 	if cfg.PIDPath() != "/tmp/neoclaw/data/claw.pid" {
