@@ -32,6 +32,8 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 	var promptBuilder strings.Builder
 	promptBuilder.WriteString(DefaultSystemPrompt)
 	promptBuilder.WriteString("\n\n")
+	promptBuilder.WriteString(toolGuidance)
+	promptBuilder.WriteString("\n\n")
 	promptBuilder.WriteString(autoRememberInstruction)
 	if timeLine := currentTimeContextLine(now); timeLine != "" {
 		promptBuilder.WriteString("\n\n")
