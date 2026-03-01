@@ -131,11 +131,11 @@ daily_limit = 5.0
 
 ```toml
 [context]
-max_tokens         = 10000
-recent_messages    = 12
-max_tool_calls     = 10
-tool_output_length = 2500
-daily_log_lookback = "12h"
+max_tokens             = 10000
+recent_messages        = 12
+max_tool_calls         = 10
+tool_output_length     = 2500
+daily_log_lookback_days = 2
 ```
 
 | Key | Default | Description |
@@ -144,11 +144,11 @@ daily_log_lookback = "12h"
 | `recent_messages` | `12` | Number of recent messages always kept verbatim, regardless of `max_tokens`. |
 | `max_tool_calls` | `10` | Maximum tool-call iterations per message before the agent stops. |
 | `tool_output_length` | `2500` | Maximum characters of tool output stored inline in history. Larger outputs are saved to a temp file. |
-| `daily_log_lookback` | `"12h"` | How far back daily log entries are injected into the system prompt. |
+| `daily_log_lookback_days` | `2` | Number of calendar days of daily log entries injected into the system prompt. `2` means today + yesterday. |
 
 **Tuning for cost:** Lowering `max_tokens` reduces the amount of history sent with each request, which lowers per-request token cost at the expense of the bot remembering less context.
 
-**Tuning for memory:** Increasing `daily_log_lookback` (e.g. `"48h"`) injects more daily log history into context, so the bot is aware of more recent activity.
+**Tuning for memory:** Increasing `daily_log_lookback_days` (e.g. `3` or `4`) injects more daily log history into context, so the bot is aware of more recent activity.
 
 ---
 
@@ -227,7 +227,7 @@ max_tokens         = 10000
 recent_messages    = 12
 max_tool_calls     = 10
 tool_output_length = 2500
-daily_log_lookback = "12h"
+daily_log_lookback_days = 2
 
 [web.search]
 provider = "brave"

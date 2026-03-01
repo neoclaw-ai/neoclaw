@@ -71,14 +71,14 @@ For most tasks `2500` characters is sufficient. If the agent frequently needs to
 
 ## Daily log injection
 
-NeoClaw automatically injects recent daily log entries into every request so the bot remembers what you've been working on. The default is 12 hours.
+NeoClaw automatically injects recent daily log entries into every request so the bot remembers what you've been working on. The default is 2 days (today + yesterday).
 
 ```toml
 [context]
-daily_log_lookback = "12h"   # default
+daily_log_lookback_days = 2   # today + yesterday (default)
 ```
 
-If your daily logs are long (many conversations throughout the day), reducing this to `"6h"` or `"3h"` trims the injected context. Increase it to `"24h"` or `"48h"` if you want the bot to be aware of more recent history across sessions.
+If your daily logs are long (many conversations throughout the day), reducing this to `1` (today only) trims the injected context. Increase it to `3` or `4` if you want the bot to be aware of more history across sessions.
 
 ---
 
@@ -112,7 +112,7 @@ monthly_limit = 20.0
 max_tokens         = 2000
 recent_messages    = 5
 tool_output_length = 1000
-daily_log_lookback = "12h"
+daily_log_lookback_days = 1
 ```
 
 With these settings and a cheap OpenRouter model, typical usage costs well under $5/month.
