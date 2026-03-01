@@ -40,7 +40,7 @@ func TestBuildSystemPromptIncludesSoulUserMemoryAndRecentDailyLogs(t *testing.T)
 		t.Fatalf("append recent daily log: %v", err)
 	}
 
-	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookback: 24 * time.Hour})
+	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookbackDays: 1})
 	if err != nil {
 		t.Fatalf("build system prompt: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestBuildSystemPromptDailyLogLookbackWindow(t *testing.T) {
 		t.Fatalf("append outside lookback: %v", err)
 	}
 
-	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookback: 24 * time.Hour})
+	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookbackDays: 1})
 	if err != nil {
 		t.Fatalf("build system prompt: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestBuildSystemPromptIncludesCurrentTimeAndDateResolutionInstruction(t *tes
 	loc := time.FixedZone("America/Los_Angeles", -8*60*60)
 	now := time.Date(2026, 2, 24, 15, 4, 5, 0, loc)
 
-	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookback: 24 * time.Hour})
+	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookbackDays: 1})
 	if err != nil {
 		t.Fatalf("build system prompt: %v", err)
 	}

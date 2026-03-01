@@ -71,11 +71,11 @@ type CostsConfig struct {
 
 // ContextConfig controls agent context window, prompt composition, and circuit-breaker behavior.
 type ContextConfig struct {
-	MaxTokens        int           `mapstructure:"max_tokens"`
-	RecentMessages   int           `mapstructure:"recent_messages"`
-	MaxToolCalls     int           `mapstructure:"max_tool_calls"`
-	ToolOutputLength int           `mapstructure:"tool_output_length"`
-	DailyLogLookback time.Duration `mapstructure:"daily_log_lookback"`
+	MaxTokens            int `mapstructure:"max_tokens"`
+	RecentMessages       int `mapstructure:"recent_messages"`
+	MaxToolCalls         int `mapstructure:"max_tool_calls"`
+	ToolOutputLength     int `mapstructure:"tool_output_length"`
+	DailyLogLookbackDays int `mapstructure:"daily_log_lookback_days"`
 }
 
 // WebConfig configures built-in web tool behavior.
@@ -114,11 +114,11 @@ var defaultConfig = Config{
 		MonthlyLimit: 0,
 	},
 	Context: ContextConfig{
-		MaxTokens:        10000,
-		RecentMessages:   12,
-		MaxToolCalls:     10,
-		ToolOutputLength: 2500,
-		DailyLogLookback: 12 * time.Hour,
+		MaxTokens:            10000,
+		RecentMessages:       12,
+		MaxToolCalls:         10,
+		ToolOutputLength:     2500,
+		DailyLogLookbackDays: 2,
 	},
 	Web: WebConfig{
 		Search: WebSearchConfig{
@@ -238,7 +238,6 @@ func Write(w io.Writer) error {
 	// Keep duration fields human-readable in generated TOML.
 	v.Set("llm.default.request_timeout", v.GetDuration("llm.default.request_timeout").String())
 	v.Set("security.command_timeout", v.GetDuration("security.command_timeout").String())
-	v.Set("context.daily_log_lookback", v.GetDuration("context.daily_log_lookback").String())
 
 	if err := v.WriteConfigTo(w); err != nil {
 		return fmt.Errorf("write config: %w", err)
@@ -293,7 +292,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("context.recent_messages", defaultConfig.Context.RecentMessages)
 	v.SetDefault("context.max_tool_calls", defaultConfig.Context.MaxToolCalls)
 	v.SetDefault("context.tool_output_length", defaultConfig.Context.ToolOutputLength)
-	v.SetDefault("context.daily_log_lookback", defaultConfig.Context.DailyLogLookback)
+	v.SetDefault("context.daily_log_lookback_days", defaultConfig.Context.DailyLogLookbackDays)
 
 	v.SetDefault("web.search.provider", defaultConfig.Web.Search.Provider)
 	v.SetDefault("web.search.api_key", defaultConfig.Web.Search.APIKey)
@@ -321,8 +320,8 @@ func applyZeroValueDefaults(cfg *Config) {
 	if cfg.Context.ToolOutputLength == 0 {
 		cfg.Context.ToolOutputLength = defaultConfig.Context.ToolOutputLength
 	}
-	if cfg.Context.DailyLogLookback == 0 {
-		cfg.Context.DailyLogLookback = defaultConfig.Context.DailyLogLookback
+	if cfg.Context.DailyLogLookbackDays == 0 {
+		cfg.Context.DailyLogLookbackDays = defaultConfig.Context.DailyLogLookbackDays
 	}
 
 	for name, llm := range cfg.LLM {
@@ -444,8 +443,8 @@ func (c ContextConfig) Validate() error {
 	if c.ToolOutputLength < 0 {
 		return errors.New("tool_output_length must be >= 0")
 	}
-	if c.DailyLogLookback < 0 {
-		return errors.New("daily_log_lookback must be >= 0")
+	if c.DailyLogLookbackDays < 0 {
+		return errors.New("daily_log_lookback_days must be >= 0")
 	}
 	return nil
 }

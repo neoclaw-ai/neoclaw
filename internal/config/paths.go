@@ -22,7 +22,7 @@ const (
 	JobsFilePath       = "jobs.json"
 	SoulFilePath       = "SOUL.md"
 	UserFilePath       = "USER.md"
-	MemoryFilePath     = "memory.md"
+	MemoryFilePath     = "memory.tsv"
 
 	AllowedDomainsFileName  = "allowed_domains.json"
 	AllowedCommandsFileName = "allowed_commands.json"

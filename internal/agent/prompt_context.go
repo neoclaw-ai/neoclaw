@@ -15,8 +15,6 @@ import (
 	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
 
-const defaultDailyLogLookback = 12 * time.Hour
-
 // BuildSystemPrompt assembles the runtime system prompt from base instructions,
 // SOUL.md, USER.md, long-term memory, and recent daily log entries.
 func BuildSystemPrompt(agentDir string, store *memory.Store, contextCfg config.ContextConfig) (string, error) {
@@ -30,10 +28,7 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 	if store == nil {
 		return "", errors.New("memory store is required")
 	}
-	dailyLogLookback := contextCfg.DailyLogLookback
-	if dailyLogLookback <= 0 {
-		dailyLogLookback = defaultDailyLogLookback
-	}
+	dailyLogLookback := time.Duration(contextCfg.DailyLogLookbackDays) * 24 * time.Hour
 
 	var promptBuilder strings.Builder
 	promptBuilder.WriteString(DefaultSystemPrompt)

@@ -222,7 +222,7 @@ max_tokens = 0
 recent_messages = 0
 max_tool_calls = 0
 tool_output_length = 0
-daily_log_lookback = "0s"
+daily_log_lookback_days = 0
 `
 	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -255,8 +255,37 @@ daily_log_lookback = "0s"
 	if cfg.Context.ToolOutputLength != defaultConfig.Context.ToolOutputLength {
 		t.Fatalf("expected default context tool_output_length %d, got %d", defaultConfig.Context.ToolOutputLength, cfg.Context.ToolOutputLength)
 	}
-	if cfg.Context.DailyLogLookback != defaultConfig.Context.DailyLogLookback {
-		t.Fatalf("expected default context daily_log_lookback %v, got %v", defaultConfig.Context.DailyLogLookback, cfg.Context.DailyLogLookback)
+	if cfg.Context.DailyLogLookbackDays != defaultConfig.Context.DailyLogLookbackDays {
+		t.Fatalf("expected default context daily_log_lookback_days %d, got %d", defaultConfig.Context.DailyLogLookbackDays, cfg.Context.DailyLogLookbackDays)
+	}
+}
+
+func TestLoad_DailyLogLookbackDays(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".neoclaw")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	t.Setenv("NEOCLAW_HOME", dataDir)
+
+	configBody := `
+[llm.default]
+api_key = "test-key"
+provider = "anthropic"
+model = "claude-sonnet-4-6"
+
+[context]
+daily_log_lookback_days = 3
+`
+	if err := os.WriteFile(filepath.Join(dataDir, "config.toml"), []byte(configBody), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Context.DailyLogLookbackDays != 3 {
+		t.Fatalf("expected context daily_log_lookback_days 3, got %d", cfg.Context.DailyLogLookbackDays)
 	}
 }
 
@@ -340,7 +369,7 @@ func TestPathResolutionMethods(t *testing.T) {
 	if cfg.UserPath() != "/tmp/neoclaw/data/agents/default/USER.md" {
 		t.Fatalf("unexpected user path: %q", cfg.UserPath())
 	}
-	if cfg.MemoryPath() != "/tmp/neoclaw/data/agents/default/memory/memory.md" {
+	if cfg.MemoryPath() != "/tmp/neoclaw/data/agents/default/memory/memory.tsv" {
 		t.Fatalf("unexpected memory path: %q", cfg.MemoryPath())
 	}
 	if cfg.CLIContextPath() != "/tmp/neoclaw/data/agents/default/sessions/cli/default.jsonl" {

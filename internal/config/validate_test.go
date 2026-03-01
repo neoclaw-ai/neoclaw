@@ -233,11 +233,11 @@ func TestValidateStartup_NegativeNumericFieldsFail(t *testing.T) {
 		Security: SecurityConfig{Mode: SecurityModeStandard, CommandTimeout: time.Second},
 		Costs:    CostsConfig{DailyLimit: 0, MonthlyLimit: 0},
 		Context: ContextConfig{
-			MaxTokens:        1,
-			RecentMessages:   1,
-			MaxToolCalls:     1,
-			ToolOutputLength: 1,
-			DailyLogLookback: time.Second,
+			MaxTokens:            1,
+			RecentMessages:       1,
+			MaxToolCalls:         1,
+			ToolOutputLength:     1,
+			DailyLogLookbackDays: 1,
 		},
 	}
 
