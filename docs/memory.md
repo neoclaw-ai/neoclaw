@@ -8,11 +8,17 @@ NeoClaw remembers things across conversations. This document explains how the me
 
 NeoClaw has two kinds of memory:
 
-**Long-term memory** (`memory.md`) — a curated list of facts the bot builds up over time. Things like your preferences, ongoing projects, and important context. The bot adds to this automatically when it learns something worth keeping.
+**Persistent facts** (`memory.tsv`) — things the bot should know as current state in every future conversation: your identity, preferences, timezone, tool settings, and time-bounded facts like travel plans. The bot adds and updates these automatically. Old facts are superseded by new ones on the same topic — only the latest is used.
 
-**Daily logs** — a timestamped record of each day's conversations. Today's log and recent entries are automatically included in the bot's context so it remembers what you discussed recently.
+**Daily logs** (`daily/*.tsv`) — a record of what happened each day: meetings, tasks, decisions, follow-ups, observations. One file per calendar day. Recent days are automatically included in context; older days are searchable on demand.
 
-Both live as plain markdown files in your data directory, so you can read and edit them directly.
+Both are plain TSV (tab-separated) files. You can inspect them with standard tools:
+
+```bash
+cat ~/.neoclaw/data/agents/default/memory/memory.tsv
+grep location ~/.neoclaw/data/agents/default/memory/memory.tsv
+grep followup ~/.neoclaw/data/agents/default/memory/daily/2026-02-28.tsv
+```
 
 ---
 
@@ -24,88 +30,81 @@ Both live as plain markdown files in your data directory, so you can read and ed
 └── data/
     └── agents/
         └── default/
-            ├── SOUL.md          ← Agent personality and instructions (edit this)
-            ├── USER.md          ← Optional user profile (edit this)
+            ├── SOUL.md              <- Agent personality and instructions (edit this)
+            ├── USER.md              <- Your profile (edit this)
             ├── memory/
-            │   ├── memory.md    ← Long-term memory facts
+            │   ├── memory.tsv       <- Persistent facts
             │   └── daily/
-            │       ├── 2026-02-23.md   ← Today's log
-            │       ├── 2026-02-22.md
+            │       ├── 2026-02-28.tsv   <- Today's log
+            │       ├── 2026-02-27.tsv
             │       └── ...
-            ├── workspace/       ← Sandboxed file workspace
-            ├── sessions/        ← Conversation history
-            └── jobs.json        ← Scheduled jobs
+            ├── workspace/           <- Sandboxed file workspace
+            ├── sessions/            <- Conversation history
+            └── jobs.json            <- Scheduled jobs
 ```
 
 ---
 
-## Long-term memory
+## Persistent facts
 
-`memory.md` is a structured markdown file that the bot uses to store facts it wants to remember permanently. It's organized into sections:
+`memory.tsv` stores facts the bot wants to remember across conversations. Each line has four tab-separated columns:
 
-```markdown
-# Memory
-
-## User
-- Name: Alex
-- Timezone: America/Los_Angeles
-- Works at Acme Corp
-
-## Preferences
-- Prefers concise responses
-- Uses VS Code
-- Vegetarian
-
-## People
-- Sarah (manager) — weekly 1:1 on Thursdays
-
-## Ongoing
-- Migrating the API to Go — deadline end of Q1
-- Apartment hunting in Oakland (budget $2,500/month)
+```
+ts	tags	text	kv
+2026-02-25T22:23:50.000000000-08:00	location	Lives in New York	-
+2026-02-26T10:00:00.000000000-08:00	diet	Lactose intolerant	-
+2026-02-27T18:00:00.000000000-08:00	location	In SF until Friday	expires=1740787200
 ```
 
-The bot adds to this automatically when you tell it something worth remembering:
+**How it works:**
 
-> *"Remember that I prefer bullet points over long paragraphs"*
+- The bot writes facts automatically when you mention something worth keeping — your timezone, dietary preferences, work context, tool choices, behavioral preferences.
+- Each fact has a **topic** (the first tag). When the bot learns something new about the same topic, it writes a new entry. Only the latest entry per topic is included in context — the old one stays in the file as history.
+- Facts can have an **expiry**. A travel plan or hotel stay can be set to expire automatically. When it does, the system falls back to the previous non-expired fact for that topic. For example, "In SF until Friday" expires and the bot automatically sees "Lives in New York" again.
+- The bot also stores behavioral instructions as facts. If you say "always respond in bullet points," it writes that as a persistent fact framed as an instruction to its future self.
 
-It also picks up on things naturally — if you mention your timezone in passing, it'll note it without being asked.
-
-You can read the current memory with `/memory`, or open the file directly:
+**You can inspect and search the file directly:**
 
 ```bash
-cat ~/.neoclaw/data/agents/default/memory/memory.md
+cat ~/.neoclaw/data/agents/default/memory/memory.tsv
+grep diet ~/.neoclaw/data/agents/default/memory/memory.tsv
 ```
 
-You can edit it freely — add sections, clean up outdated entries, or remove anything you don't want the bot to know.
+The file is append-only — the bot never modifies or deletes existing lines. To remove a fact, you can edit the file manually.
 
 ---
 
 ## Daily logs
 
-Each day, the bot appends entries to a dated log file as the conversation progresses:
+Each day, the bot appends structured entries to a dated TSV file as the conversation progresses:
 
 ```
-~/.neoclaw/data/agents/default/memory/daily/2026-02-23.md
+~/.neoclaw/data/agents/default/memory/daily/2026-02-28.tsv
 ```
 
 Example contents:
 
-```markdown
-# Sunday, February 23, 2026
-
-- 09:14: Discussed the API migration timeline. Decision: extend deadline to March 15.
-- 11:30: Asked to set up a daily standup reminder at 9am on weekdays.
-- 15:02: Reviewed draft email to Sarah about the budget request.
+```
+ts	tags	text	kv
+2026-02-28T09:14:00.000000000-08:00	decision,api	Extend API migration deadline to March 15	scope=project_api
+2026-02-28T11:30:00.000000000-08:00	task,scheduling	Set up daily standup reminder at 9am weekdays	status=done
+2026-02-28T15:02:00.000000000-08:00	event,email	Reviewed draft email to Sarah about budget request	actor=sarah
 ```
 
-**What gets injected into context:** The last 24 hours of daily logs are automatically included with every request. Older logs are available via the `search_logs` tool if you ask the bot to look something up.
+Each entry has a semantic type as its first tag (like `task`, `event`, `decision`, `followup`) and optional domain labels as additional tags.
 
-You can adjust how far back logs are injected in `config.toml`:
+**What gets injected into context:** Today's log and yesterday's log are automatically included in every request. Older logs are not injected but are searchable — ask the bot to look something up and it will search past logs automatically.
+
+You can adjust how many days are injected in `config.toml`:
 
 ```toml
 [context]
-daily_log_lookback = "24h"   # or "48h", "12h", etc.
+daily_log_lookback_days = 2   # today + yesterday (default)
 ```
+
+Set to `1` for today only, or `3` to include two previous days.
+
+When you run `/new` to start a new session, the bot writes a structured summary of the completed session to the daily log before clearing conversation history.
 
 ---
 
@@ -229,10 +228,12 @@ To clear the conversation history without affecting memory:
 /new
 ```
 
-To clear long-term memory, edit or delete `memory.md` directly:
+This also writes a session summary to the daily log before clearing.
+
+To clear persistent facts, delete or truncate `memory.tsv`:
 
 ```bash
-echo "# Memory\n" > ~/.neoclaw/data/agents/default/memory/memory.md
+echo -e "ts\ttags\ttext\tkv" > ~/.neoclaw/data/agents/default/memory/memory.tsv
 ```
 
 Daily logs are never automatically deleted. Archive or remove old ones manually from `~/.neoclaw/data/agents/default/memory/daily/` if needed.
