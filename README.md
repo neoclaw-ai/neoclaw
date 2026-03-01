@@ -69,8 +69,10 @@ Windows: Run the Linux binary under WSL2.
 
 ```bash
 tar -xzf neoclaw-*.tar.gz
-sudo mv claw /usr/local/bin/
+mkdir -p ~/.local/bin
+mv claw ~/.local/bin/
 ```
+We recommend keeping the claw binary in your `$HOME/.local/bin` directory for easy updates.
 
 **2. Configure**
 

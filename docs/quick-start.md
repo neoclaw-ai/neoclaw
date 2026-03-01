@@ -24,9 +24,12 @@ Download the binary for your platform from the [releases page](https://github.co
 Extract and move onto your PATH:
 
 ```bash
-tar -xzf neoclaw_*.tar.gz
-sudo mv claw /usr/local/bin/
+tar -xzf neoclaw-*.tar.gz
+mkdir -p ~/.local/bin
+mv claw ~/.local/bin/
 ```
+
+> If `claw` isn't found after installing, add `export PATH="$HOME/.local/bin:$PATH"` to your `~/.bashrc` or `~/.zshrc` and restart your shell.
 
 Verify it works:
 
