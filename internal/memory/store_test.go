@@ -155,26 +155,6 @@ func TestNewLoadsPreexistingTSVFiles(t *testing.T) {
 	}
 }
 
-func TestLoadContextReturnsMemoryOnly(t *testing.T) {
-	dir := t.TempDir()
-	memoryText := "# Memory\n\n## Preferences\n- Vegetarian\n"
-	if err := os.WriteFile(filepath.Join(dir, "memory.md"), []byte(memoryText), 0o644); err != nil {
-		t.Fatalf("write memory: %v", err)
-	}
-	writeTSVTestFile(t, filepath.Join(dir, "daily", "2026-02-17.tsv"), [][]string{
-		{"2026-02-17T09:00:00Z", "event", "API migration work", "-"},
-	})
-
-	store := mustNewStore(t, dir)
-	mem, err := store.LoadContext()
-	if err != nil {
-		t.Fatalf("load context: %v", err)
-	}
-	if mem != memoryText {
-		t.Fatalf("expected memory text %q, got %q", memoryText, mem)
-	}
-}
-
 func TestGetDailyLogsSkipsMalformedRows(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "daily", "2026-02-17.tsv")
@@ -214,37 +194,6 @@ func TestGetDailyLogsFromAfterToReturnsError(t *testing.T) {
 	_, err := store.GetDailyLogs(fromTime, toTime)
 	if err == nil {
 		t.Fatalf("expected error when fromTime is after toTime")
-	}
-}
-
-func TestGetAllDailyLogsReturnsAllEntries(t *testing.T) {
-	store := mustNewStore(t, t.TempDir())
-	if err := store.AppendDailyLog(LogEntry{
-		Timestamp: time.Date(2026, 2, 16, 9, 0, 0, 0, time.UTC),
-		Tags:      []string{"event"},
-		Text:      "first",
-		KV:        "-",
-	}); err != nil {
-		t.Fatalf("append first daily log: %v", err)
-	}
-	if err := store.AppendDailyLog(LogEntry{
-		Timestamp: time.Date(2026, 2, 17, 10, 0, 0, 0, time.UTC),
-		Tags:      []string{"event"},
-		Text:      "second",
-		KV:        "-",
-	}); err != nil {
-		t.Fatalf("append second daily log: %v", err)
-	}
-
-	entries, err := store.GetAllDailyLogs()
-	if err != nil {
-		t.Fatalf("get all daily logs: %v", err)
-	}
-	if len(entries) != 2 {
-		t.Fatalf("expected 2 entries, got %d", len(entries))
-	}
-	if entries[0].Text != "first" || entries[1].Text != "second" {
-		t.Fatalf("unexpected entries order/content: %#v", entries)
 	}
 }
 

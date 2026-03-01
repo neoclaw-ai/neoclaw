@@ -258,40 +258,11 @@ func (s *Store) GetDailyLogs(fromTime, toTime time.Time) ([]LogEntry, error) {
 	return results, nil
 }
 
-// TODO delete in Step 7: legacy helper retained until new read APIs replace it.
-// GetAllDailyLogs returns all parsed daily log entries.
-func (s *Store) GetAllDailyLogs() ([]LogEntry, error) {
-	return s.GetDailyLogs(time.Time{}, time.Time{})
-}
-
-// TODO delete in Step 7: legacy markdown context reader until TSV injection lands.
-// LoadContext returns memory.md contents for system prompt injection.
-func (s *Store) LoadContext() (memoryText string, err error) {
-	memoryPath := filepath.Join(s.dir, "memory.md")
-	memoryText, err = readOptionalFile(memoryPath)
-	if err != nil {
-		return "", err
-	}
-	return memoryText, nil
-}
-
 func (s *Store) dailyDirPath() (string, error) {
 	if strings.TrimSpace(s.dir) == "" {
 		return "", errors.New("memory directory is required")
 	}
 	return filepath.Join(s.dir, config.DailyDirPath), nil
-}
-
-func readOptionalFile(path string) (string, error) {
-	content, err := store.ReadFile(path)
-	switch {
-	case err == nil:
-		return content, nil
-	case errors.Is(err, os.ErrNotExist):
-		return "", nil
-	default:
-		return "", fmt.Errorf("read %s: %w", path, err)
-	}
 }
 
 func (s *Store) loadDailyLog() ([]LogEntry, error) {

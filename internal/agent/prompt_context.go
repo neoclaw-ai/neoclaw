@@ -28,7 +28,6 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 	if store == nil {
 		return "", errors.New("memory store is required")
 	}
-	dailyLogLookback := time.Duration(contextCfg.DailyLogLookbackDays) * 24 * time.Hour
 
 	var promptBuilder strings.Builder
 	promptBuilder.WriteString(DefaultSystemPrompt)
@@ -59,16 +58,19 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 		logging.Logger().Warn("missing USER.md; continuing without user context", "path", userPath)
 	}
 
-	// TODO delete in Step 7: replace legacy markdown context load with ActiveFacts-based TSV injection.
-	memoryText, err := store.LoadContext()
-	if err != nil {
-		return "", err
+	activeFacts := store.ActiveFacts(now)
+	dates := lookbackDates(now, contextCfg.DailyLogLookbackDays)
+	dailyLogsByDate := make(map[string][]memory.LogEntry, len(dates))
+	hasDailyLogs := false
+	for _, date := range dates {
+		key := date.In(time.Local).Format("2006-01-02")
+		entries := store.DailyLogsByDate([]time.Time{date})
+		dailyLogsByDate[key] = entries
+		if len(entries) > 0 {
+			hasDailyLogs = true
+		}
 	}
-	// TODO delete in Step 7: replace rolling time-window read with DailyLogsByDate.
-	recentLogs, err := store.GetDailyLogs(now.Add(-dailyLogLookback), now)
-	if err != nil {
-		return "", err
-	}
+
 	includedFiles := map[string]int{}
 	if soulText != "" {
 		includedFiles[config.SoulFilePath] = estimateTokens(soulText, nil)
@@ -76,11 +78,7 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 	if userText != "" {
 		includedFiles[config.UserFilePath] = estimateTokens(userText, nil)
 	}
-	if memoryText != "" {
-		includedFiles[config.MemoryFilePath] = estimateTokens(memoryText, nil)
-	}
-
-	if soulText == "" && userText == "" && memoryText == "" && len(recentLogs) == 0 {
+	if soulText == "" && userText == "" && len(activeFacts) == 0 && !hasDailyLogs {
 		logging.Logger().Debug(
 			"built system prompt",
 			"included_files", includedFiles,
@@ -100,31 +98,46 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 		}
 	}
 	if userText != "" {
-		b.WriteString("\n[USER.md]\n")
+		b.WriteString("\n[User profile]\n")
 		b.WriteString(userText)
 		if !strings.HasSuffix(userText, "\n") {
 			b.WriteByte('\n')
 		}
 	}
-	if memoryText != "" {
-		b.WriteString("\n[Long-term memory]\n")
-		b.WriteString(memoryText)
-		if !strings.HasSuffix(memoryText, "\n") {
-			b.WriteByte('\n')
+	if len(activeFacts) > 0 {
+		var factsBlock strings.Builder
+		factsBlock.WriteString("\n[Persistent facts]\n")
+		factsBlock.WriteString("age\ttags\ttext\tkv\n")
+		for _, entry := range activeFacts {
+			factsBlock.WriteString(formatAge(now, entry.Timestamp))
+			factsBlock.WriteByte('\t')
+			factsBlock.WriteString(entry.FormatLLM())
+			factsBlock.WriteByte('\n')
 		}
+		block := factsBlock.String()
+		b.WriteString(block)
+		includedFiles[config.MemoryFilePath] = estimateTokens(block, nil)
 	}
-	if len(recentLogs) > 0 {
-		dailyContentByFile := map[string]string{}
-		b.WriteString("\n[Recent daily log]\n")
-		for _, entry := range recentLogs {
-			filename := entry.Timestamp.Format("2006-01-02") + ".md"
-			line := "- " + entry.Timestamp.Format(time.RFC3339) + ": " + entry.Text + "\n"
-			dailyContentByFile[filename] += line
-			b.WriteString(line)
+	for _, date := range dates {
+		dayKey := date.In(time.Local).Format("2006-01-02")
+		entries := dailyLogsByDate[dayKey]
+		if len(entries) == 0 {
+			continue
 		}
-		for filename, content := range dailyContentByFile {
-			includedFiles[filename] = estimateTokens(content, nil)
+		var dayBlock strings.Builder
+		dayBlock.WriteString("\n[Daily log — ")
+		dayBlock.WriteString(dayKey)
+		dayBlock.WriteString("]\n")
+		dayBlock.WriteString("time\ttags\ttext\tkv\n")
+		for _, entry := range entries {
+			dayBlock.WriteString(entry.Timestamp.In(time.Local).Format("15:04"))
+			dayBlock.WriteByte('\t')
+			dayBlock.WriteString(entry.FormatLLM())
+			dayBlock.WriteByte('\n')
 		}
+		block := dayBlock.String()
+		b.WriteString(block)
+		includedFiles[dayKey+".tsv"] = estimateTokens(block, nil)
 	}
 	systemPrompt := b.String()
 	logging.Logger().Debug(
@@ -133,6 +146,42 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 		"total_tokens", estimateTokens(systemPrompt, nil),
 	)
 	return systemPrompt, nil
+}
+
+// lookbackDates returns local calendar dates from most recent to oldest.
+func lookbackDates(now time.Time, days int) []time.Time {
+	if days <= 0 {
+		return nil
+	}
+	dates := make([]time.Time, 0, days)
+	base := now.In(time.Local)
+	for i := 0; i < days; i++ {
+		dates = append(dates, base.AddDate(0, 0, -i))
+	}
+	return dates
+}
+
+// formatAge formats the elapsed time using the largest supported unit.
+func formatAge(now, then time.Time) string {
+	if now.IsZero() {
+		now = time.Now()
+	}
+	age := now.Sub(then)
+	if age < 0 {
+		age = 0
+	}
+	switch {
+	case age < time.Hour:
+		return fmt.Sprintf("%dm", int(age/time.Minute))
+	case age < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(age/time.Hour))
+	case age < 30*24*time.Hour:
+		return fmt.Sprintf("%dd", int(age/(24*time.Hour)))
+	case age < 365*24*time.Hour:
+		return fmt.Sprintf("%dmo", int(age/(30*24*time.Hour)))
+	default:
+		return fmt.Sprintf("%dy", int(age/(365*24*time.Hour)))
+	}
 }
 
 // truncateStringByChars truncates s to at most maxChars Unicode code points,

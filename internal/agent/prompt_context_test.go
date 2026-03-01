@@ -11,62 +11,7 @@ import (
 	"github.com/neoclaw-ai/neoclaw/internal/memory"
 )
 
-func TestBuildSystemPromptIncludesSoulUserMemoryAndRecentDailyLogs(t *testing.T) {
-	agentDir := t.TempDir()
-	memoryDir := filepath.Join(agentDir, "memory")
-	if err := os.MkdirAll(filepath.Join(memoryDir, "daily"), 0o755); err != nil {
-		t.Fatalf("mkdir memory dirs: %v", err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(agentDir, "SOUL.md"),
-		[]byte("# Soul\n\n## Persona\nHelpful assistant\n"),
-		0o644,
-	); err != nil {
-		t.Fatalf("write soul: %v", err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(agentDir, "USER.md"),
-		[]byte("# User\n\n## Profile\nIlya\n"),
-		0o644,
-	); err != nil {
-		t.Fatalf("write user: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(memoryDir, "memory.md"), []byte("# Memory\n\n## Preferences\n- Vegetarian\n"), 0o644); err != nil {
-		t.Fatalf("write memory: %v", err)
-	}
-	store := mustNewMemoryStore(t, memoryDir)
-	now := time.Date(2026, 2, 17, 12, 0, 0, 0, time.Local)
-	if err := store.AppendDailyLog(memory.LogEntry{
-		Timestamp: now.Add(-1 * time.Hour),
-		Tags:      []string{"note"},
-		Text:      "Worked on API migration",
-		KV:        "-",
-	}); err != nil {
-		t.Fatalf("append recent daily log: %v", err)
-	}
-
-	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookbackDays: 1})
-	if err != nil {
-		t.Fatalf("build system prompt: %v", err)
-	}
-	if !strings.Contains(got, "memory_append") {
-		t.Fatalf("expected auto-remember instruction, got %q", got)
-	}
-	if !strings.Contains(got, "[SOUL.md]") || !strings.Contains(got, "Helpful assistant") {
-		t.Fatalf("expected SOUL context, got %q", got)
-	}
-	if !strings.Contains(got, "[USER.md]") || !strings.Contains(got, "Ilya") {
-		t.Fatalf("expected USER context, got %q", got)
-	}
-	if !strings.Contains(got, "[Long-term memory]") || !strings.Contains(got, "Vegetarian") {
-		t.Fatalf("expected long-term memory context, got %q", got)
-	}
-	if !strings.Contains(got, "[Recent daily log]") || !strings.Contains(got, "Worked on API migration") {
-		t.Fatalf("expected recent daily log context, got %q", got)
-	}
-}
-
-func TestBuildSystemPromptDailyLogLookbackWindow(t *testing.T) {
+func TestBuildSystemPromptIncludesPersistentFactsBlock(t *testing.T) {
 	agentDir := t.TempDir()
 	memoryDir := filepath.Join(agentDir, "memory")
 	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
@@ -74,32 +19,140 @@ func TestBuildSystemPromptDailyLogLookbackWindow(t *testing.T) {
 	}
 	store := mustNewMemoryStore(t, memoryDir)
 	now := time.Date(2026, 2, 17, 12, 0, 0, 0, time.Local)
-	if err := store.AppendDailyLog(memory.LogEntry{
-		Timestamp: now.Add(-23 * time.Hour),
-		Tags:      []string{"note"},
-		Text:      "inside lookback",
+	if err := store.AppendMemory(memory.LogEntry{
+		Timestamp: now.Add(-72 * time.Hour),
+		Tags:      []string{"location"},
+		Text:      "In SF",
 		KV:        "-",
 	}); err != nil {
-		t.Fatalf("append inside lookback: %v", err)
-	}
-	if err := store.AppendDailyLog(memory.LogEntry{
-		Timestamp: now.Add(-25 * time.Hour),
-		Tags:      []string{"note"},
-		Text:      "outside lookback",
-		KV:        "-",
-	}); err != nil {
-		t.Fatalf("append outside lookback: %v", err)
+		t.Fatalf("append memory fact: %v", err)
 	}
 
 	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookbackDays: 1})
 	if err != nil {
 		t.Fatalf("build system prompt: %v", err)
 	}
-	if !strings.Contains(got, "inside lookback") {
-		t.Fatalf("expected inside-lookback entry in prompt, got %q", got)
+	if !strings.Contains(got, "[Persistent facts]\nage\ttags\ttext\tkv\n3d\tlocation\tIn SF\t-") {
+		t.Fatalf("expected persistent facts block, got %q", got)
 	}
-	if strings.Contains(got, "outside lookback") {
-		t.Fatalf("did not expect outside-lookback entry in prompt, got %q", got)
+}
+
+func TestBuildSystemPromptIncludesDailyLogBlockWithTimeColumn(t *testing.T) {
+	agentDir := t.TempDir()
+	memoryDir := filepath.Join(agentDir, "memory")
+	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
+		t.Fatalf("mkdir memory dir: %v", err)
+	}
+	store := mustNewMemoryStore(t, memoryDir)
+	now := time.Date(2026, 2, 17, 15, 0, 0, 0, time.Local)
+	if err := store.AppendDailyLog(memory.LogEntry{
+		Timestamp: time.Date(2026, 2, 17, 14, 30, 0, 0, time.Local),
+		Tags:      []string{"event"},
+		Text:      "Worked on API migration",
+		KV:        "-",
+	}); err != nil {
+		t.Fatalf("append daily log: %v", err)
+	}
+
+	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookbackDays: 1})
+	if err != nil {
+		t.Fatalf("build system prompt: %v", err)
+	}
+	if !strings.Contains(got, "[Daily log — 2026-02-17]\ntime\ttags\ttext\tkv\n14:30\tevent\tWorked on API migration\t-") {
+		t.Fatalf("expected daily log block, got %q", got)
+	}
+}
+
+func TestBuildSystemPromptIncludesTodayAndYesterdayOnly(t *testing.T) {
+	agentDir := t.TempDir()
+	memoryDir := filepath.Join(agentDir, "memory")
+	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
+		t.Fatalf("mkdir memory dir: %v", err)
+	}
+	store := mustNewMemoryStore(t, memoryDir)
+	now := time.Date(2026, 2, 17, 15, 0, 0, 0, time.Local)
+	for _, entry := range []memory.LogEntry{
+		{
+			Timestamp: time.Date(2026, 2, 17, 10, 0, 0, 0, time.Local),
+			Tags:      []string{"note"},
+			Text:      "today",
+			KV:        "-",
+		},
+		{
+			Timestamp: time.Date(2026, 2, 16, 10, 0, 0, 0, time.Local),
+			Tags:      []string{"note"},
+			Text:      "yesterday",
+			KV:        "-",
+		},
+		{
+			Timestamp: time.Date(2026, 2, 15, 10, 0, 0, 0, time.Local),
+			Tags:      []string{"note"},
+			Text:      "older",
+			KV:        "-",
+		},
+	} {
+		if err := store.AppendDailyLog(entry); err != nil {
+			t.Fatalf("append daily log: %v", err)
+		}
+	}
+
+	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookbackDays: 2})
+	if err != nil {
+		t.Fatalf("build system prompt: %v", err)
+	}
+	if !strings.Contains(got, "[Daily log — 2026-02-17]") || !strings.Contains(got, "[Daily log — 2026-02-16]") {
+		t.Fatalf("expected today and yesterday blocks, got %q", got)
+	}
+	if strings.Contains(got, "[Daily log — 2026-02-15]") || strings.Contains(got, "\tolder\t") {
+		t.Fatalf("did not expect older daily log block, got %q", got)
+	}
+}
+
+func TestBuildSystemPromptInjectionOrder(t *testing.T) {
+	agentDir := t.TempDir()
+	memoryDir := filepath.Join(agentDir, "memory")
+	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
+		t.Fatalf("mkdir memory dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "SOUL.md"), []byte("Helpful assistant\n"), 0o644); err != nil {
+		t.Fatalf("write soul: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "USER.md"), []byte("Ilya\n"), 0o644); err != nil {
+		t.Fatalf("write user: %v", err)
+	}
+	store := mustNewMemoryStore(t, memoryDir)
+	now := time.Date(2026, 2, 17, 15, 0, 0, 0, time.Local)
+	if err := store.AppendMemory(memory.LogEntry{
+		Timestamp: now.Add(-24 * time.Hour),
+		Tags:      []string{"diet"},
+		Text:      "Vegetarian",
+		KV:        "-",
+	}); err != nil {
+		t.Fatalf("append memory fact: %v", err)
+	}
+	if err := store.AppendDailyLog(memory.LogEntry{
+		Timestamp: time.Date(2026, 2, 17, 14, 30, 0, 0, time.Local),
+		Tags:      []string{"event"},
+		Text:      "Worked on API migration",
+		KV:        "-",
+	}); err != nil {
+		t.Fatalf("append daily log: %v", err)
+	}
+
+	got, err := buildSystemPromptAt(agentDir, store, now, config.ContextConfig{DailyLogLookbackDays: 1})
+	if err != nil {
+		t.Fatalf("build system prompt: %v", err)
+	}
+
+	soulIndex := strings.Index(got, "[SOUL.md]")
+	userIndex := strings.Index(got, "[User profile]")
+	factsIndex := strings.Index(got, "[Persistent facts]")
+	dailyIndex := strings.Index(got, "[Daily log — 2026-02-17]")
+	if soulIndex == -1 || userIndex == -1 || factsIndex == -1 || dailyIndex == -1 {
+		t.Fatalf("expected all context blocks, got %q", got)
+	}
+	if !(soulIndex < userIndex && userIndex < factsIndex && factsIndex < dailyIndex) {
+		t.Fatalf("unexpected injection order, got %q", got)
 	}
 }
 
@@ -133,6 +186,63 @@ func TestBuildSystemPromptIncludesCurrentTimeAndDateResolutionInstruction(t *tes
 	}
 	if !strings.Contains(got, "Resolve relative date/time phrases") {
 		t.Fatalf("expected relative time instruction in prompt, got %q", got)
+	}
+}
+
+func TestFormatAgeFormatsEachRange(t *testing.T) {
+	now := time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC)
+
+	cases := []struct {
+		name string
+		then time.Time
+		want string
+	}{
+		{
+			name: "minutes",
+			then: now.Add(-45 * time.Minute),
+			want: "45m",
+		},
+		{
+			name: "hours",
+			then: now.Add(-23 * time.Hour),
+			want: "23h",
+		},
+		{
+			name: "days",
+			then: now.Add(-29 * 24 * time.Hour),
+			want: "29d",
+		},
+		{
+			name: "months",
+			then: now.Add(-11 * 30 * 24 * time.Hour),
+			want: "11mo",
+		},
+		{
+			name: "years",
+			then: now.Add(-3 * 365 * 24 * time.Hour),
+			want: "3y",
+		},
+		{
+			name: "future clamps to zero",
+			then: now.Add(2 * time.Hour),
+			want: "0m",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := formatAge(now, tc.then)
+			if got != tc.want {
+				t.Fatalf("expected %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestFormatAgeZeroNowUsesCurrentTime(t *testing.T) {
+	got := formatAge(time.Time{}, time.Now())
+	if got != "0m" {
+		t.Fatalf("expected %q, got %q", "0m", got)
 	}
 }
 

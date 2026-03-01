@@ -29,10 +29,7 @@ func TestDailyLogAppendToolExecute(t *testing.T) {
 		t.Fatalf("expected ok output, got %q", res.Output)
 	}
 
-	entries, err := store.GetAllDailyLogs()
-	if err != nil {
-		t.Fatalf("get all daily logs: %v", err)
-	}
+	entries := store.DailyLogsByDate([]time.Time{time.Now()})
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 daily log entry, got %d", len(entries))
 	}
