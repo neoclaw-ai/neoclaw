@@ -332,6 +332,32 @@ func TestDailyLogsByDateMatchesLocalCalendarDays(t *testing.T) {
 	}
 }
 
+func TestIsExpired(t *testing.T) {
+	now := time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC)
+	past := time.Date(2025, 11, 14, 0, 0, 0, 0, time.UTC).Unix()
+	future := time.Date(2036, 2, 17, 0, 0, 0, 0, time.UTC).Unix()
+
+	if isExpired(LogEntry{KV: "-"}, now) {
+		t.Fatal("expected no expires to be treated as active")
+	}
+
+	if isExpired(LogEntry{KV: "expires=not-a-number"}, now) {
+		t.Fatal("expected malformed expires to be treated as active")
+	}
+
+	if !isExpired(LogEntry{KV: "expires=" + strconv.FormatInt(past, 10)}, now) {
+		t.Fatal("expected past expires to be expired")
+	}
+
+	if isExpired(LogEntry{KV: "expires=" + strconv.FormatInt(future, 10)}, now) {
+		t.Fatal("expected future expires to be active")
+	}
+
+	if isExpired(LogEntry{KV: "-"}, time.Time{}) {
+		t.Fatal("expected zero now fallback to keep no-expires entry active")
+	}
+}
+
 func mustNewStore(t *testing.T, dir string) *Store {
 	t.Helper()
 

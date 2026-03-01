@@ -206,6 +206,69 @@ func TestParseExpiryTimeFormatsAndInvalid(t *testing.T) {
 	}
 }
 
+func TestParseTagsArg(t *testing.T) {
+	got, err := parseTagsArg(map[string]any{"tags": " Follow Up , api , follow up , Project X "}, "tags")
+	if err != nil {
+		t.Fatalf("parse tags: %v", err)
+	}
+	want := []string{"follow_up", "api", "project_x"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("expected %#v, got %#v", want, got)
+	}
+
+	if _, err := parseTagsArg(map[string]any{"tags": " ,  "}, "tags"); err == nil {
+		t.Fatal("expected error for empty normalized tags")
+	}
+}
+
+func TestOptionalRFC3339Arg(t *testing.T) {
+	def := time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC)
+
+	got, err := optionalRFC3339Arg(map[string]any{}, "from_time", def)
+	if err != nil {
+		t.Fatalf("missing key should use default: %v", err)
+	}
+	if !got.Equal(def) {
+		t.Fatalf("expected default %v, got %v", def, got)
+	}
+
+	got, err = optionalRFC3339Arg(map[string]any{"from_time": "   "}, "from_time", def)
+	if err != nil {
+		t.Fatalf("blank value should use default: %v", err)
+	}
+	if !got.Equal(def) {
+		t.Fatalf("expected default %v, got %v", def, got)
+	}
+
+	got, err = optionalRFC3339Arg(map[string]any{"from_time": "2026-02-16T00:00:00Z"}, "from_time", def)
+	if err != nil {
+		t.Fatalf("valid rfc3339 should parse: %v", err)
+	}
+	want := time.Date(2026, 2, 16, 0, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+
+	if _, err := optionalRFC3339Arg(map[string]any{"from_time": "not-a-time"}, "from_time", def); err == nil {
+		t.Fatal("expected error for invalid rfc3339")
+	}
+}
+
+func TestAppendKVToken(t *testing.T) {
+	if got := appendKVToken("-", "expires=1"); got != "expires=1" {
+		t.Fatalf("expected placeholder to be replaced, got %q", got)
+	}
+	if got := appendKVToken("", "expires=1"); got != "expires=1" {
+		t.Fatalf("expected empty kv to become token, got %q", got)
+	}
+	if got := appendKVToken("status=active", "expires=1"); got != "status=active expires=1" {
+		t.Fatalf("expected appended token, got %q", got)
+	}
+	if got := appendKVToken("status=active", "   "); got != "status=active" {
+		t.Fatalf("expected blank token to be ignored, got %q", got)
+	}
+}
+
 func mustNewMemoryStore(t *testing.T, dir string) *memory.Store {
 	t.Helper()
 

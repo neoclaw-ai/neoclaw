@@ -246,6 +246,39 @@ func TestFormatAgeZeroNowUsesCurrentTime(t *testing.T) {
 	}
 }
 
+func TestLookbackDates(t *testing.T) {
+	now := time.Date(2026, 2, 17, 15, 0, 0, 0, time.Local)
+
+	if got := lookbackDates(now, 0); got != nil {
+		t.Fatalf("expected nil for zero days, got %#v", got)
+	}
+
+	got := lookbackDates(now, 3)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 dates, got %d", len(got))
+	}
+	want := []string{"2026-02-17", "2026-02-16", "2026-02-15"}
+	for i, date := range got {
+		if gotDay := date.In(time.Local).Format("2006-01-02"); gotDay != want[i] {
+			t.Fatalf("expected day %q at index %d, got %q", want[i], i, gotDay)
+		}
+	}
+}
+
+func TestTruncateStringByChars(t *testing.T) {
+	if got, truncated := truncateStringByChars("hello", 0); got != "" || !truncated {
+		t.Fatalf("expected empty+truncated for maxChars=0, got %q %v", got, truncated)
+	}
+
+	if got, truncated := truncateStringByChars("hello", 5); got != "hello" || truncated {
+		t.Fatalf("expected unmodified string, got %q %v", got, truncated)
+	}
+
+	if got, truncated := truncateStringByChars("héllo🙂", 3); got != "hél" || !truncated {
+		t.Fatalf("expected unicode-safe truncation, got %q %v", got, truncated)
+	}
+}
+
 func mustNewMemoryStore(t *testing.T, dir string) *memory.Store {
 	t.Helper()
 
