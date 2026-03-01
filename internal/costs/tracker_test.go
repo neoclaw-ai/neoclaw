@@ -35,7 +35,12 @@ func TestEstimateAnthropicUSD(t *testing.T) {
 func TestTrackerAppendAndSpend(t *testing.T) {
 	t.Parallel()
 
-	path := filepath.Join(t.TempDir(), "costs.jsonl")
+	path := filepath.Join(t.TempDir(), "costs.tsv")
+	// Seed with header row like bootstrap does.
+	if err := os.WriteFile(path, []byte("ts\tprovider\tmodel\tinput_tokens\toutput_tokens\ttotal_tokens\tcost_usd\n"), 0o644); err != nil {
+		t.Fatalf("seed header: %v", err)
+	}
+
 	tracker := New(path)
 	now := time.Date(2026, 2, 19, 12, 0, 0, 0, time.Local)
 
@@ -78,10 +83,11 @@ func TestTrackerAppendAndSpend(t *testing.T) {
 func TestTrackerSpendSkipsMalformedLines(t *testing.T) {
 	t.Parallel()
 
-	path := filepath.Join(t.TempDir(), "costs.jsonl")
+	path := filepath.Join(t.TempDir(), "costs.tsv")
 	content := strings.Join([]string{
-		`{bad json}`,
-		`{"timestamp":"2026-02-19T12:00:00Z","provider":"anthropic","model":"claude-sonnet-4-6","input_tokens":1,"output_tokens":1,"total_tokens":2,"cost_usd":2.5}`,
+		"ts\tprovider\tmodel\tinput_tokens\toutput_tokens\ttotal_tokens\tcost_usd",
+		"not-a-timestamp\tanthropic\tclaude-sonnet-4-6\t1\t1\t2\t2.50",
+		"2026-02-19T12:00:00Z\tanthropic\tclaude-sonnet-4-6\t1\t1\t2\t2.50",
 		"",
 	}, "\n")
 

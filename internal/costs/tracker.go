@@ -1,13 +1,13 @@
-// Package costs tracks LLM usage and spend in a JSONL log.
+// Package costs tracks LLM usage and spend in a TSV log.
 package costs
 
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,13 +17,13 @@ import (
 
 // Record is one persisted usage entry.
 type Record struct {
-	Timestamp    time.Time `json:"timestamp"`
-	Provider     string    `json:"provider"`
-	Model        string    `json:"model"`
-	InputTokens  int       `json:"input_tokens"`
-	OutputTokens int       `json:"output_tokens"`
-	TotalTokens  int       `json:"total_tokens"`
-	CostUSD      float64   `json:"cost_usd"`
+	Timestamp    time.Time
+	Provider     string
+	Model        string
+	InputTokens  int
+	OutputTokens int
+	TotalTokens  int
+	CostUSD      float64
 }
 
 // Spend holds aggregated spend totals in USD.
@@ -38,12 +38,12 @@ type Tracker struct {
 	mu   sync.Mutex
 }
 
-// New returns a Tracker for the configured costs JSONL path.
+// New returns a Tracker for the configured costs TSV path.
 func New(path string) *Tracker {
 	return &Tracker{path: path}
 }
 
-// Append writes one usage record to the JSONL file.
+// Append writes one usage record as a TSV line.
 func (t *Tracker) Append(ctx context.Context, rec Record) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -57,12 +57,16 @@ func (t *Tracker) Append(ctx context.Context, rec Record) error {
 	if rec.Timestamp.IsZero() {
 		rec.Timestamp = time.Now()
 	}
-	encoded, err := json.Marshal(rec)
-	if err != nil {
-		return fmt.Errorf("marshal costs record: %w", err)
-	}
-	encoded = append(encoded, '\n')
-	if err := store.AppendFile(t.path, encoded); err != nil {
+	line := fmt.Sprintf("%s\t%s\t%s\t%d\t%d\t%d\t%.8f\n",
+		rec.Timestamp.Format(time.RFC3339),
+		rec.Provider,
+		rec.Model,
+		rec.InputTokens,
+		rec.OutputTokens,
+		rec.TotalTokens,
+		rec.CostUSD,
+	)
+	if err := store.AppendFile(t.path, []byte(line)); err != nil {
 		return fmt.Errorf("append costs record: %w", err)
 	}
 
@@ -99,20 +103,28 @@ func (t *Tracker) Spend(ctx context.Context, now time.Time) (Spend, error) {
 		if err := ctx.Err(); err != nil {
 			return Spend{}, err
 		}
-		line := scanner.Bytes()
-		if len(line) == 0 {
+		line := scanner.Text()
+		if line == "" || strings.HasPrefix(line, "ts\t") {
 			continue
 		}
-		var rec Record
-		if err := json.Unmarshal(line, &rec); err != nil {
+		fields := strings.Split(line, "\t")
+		if len(fields) < 7 {
 			continue
 		}
-		recLocal := rec.Timestamp.In(time.Local)
+		ts, err := time.Parse(time.RFC3339, fields[0])
+		if err != nil {
+			continue
+		}
+		costUSD, err := strconv.ParseFloat(fields[6], 64)
+		if err != nil {
+			continue
+		}
+		recLocal := ts.In(time.Local)
 		y, m, d := recLocal.Date()
 		if y == todayYear && m == todayMonth {
-			totals.MonthUSD += rec.CostUSD
+			totals.MonthUSD += costUSD
 			if d == todayDay {
-				totals.TodayUSD += rec.CostUSD
+				totals.TodayUSD += costUSD
 			}
 		}
 	}

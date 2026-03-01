@@ -80,7 +80,7 @@ func Initialize(cfg *config.Config) error {
 		{path: cfg.AllowedDomainsPath(), content: defaultAllowedDomainsJSON()},
 		{path: cfg.AllowedCommandsPath(), content: defaultAllowedCommandsJSON()},
 		{path: cfg.AllowedUsersPath(), content: defaultAllowedUsersJSON()},
-		{path: cfg.CostsPath(), content: ""},
+		{path: cfg.CostsPath(), content: "ts\tprovider\tmodel\tinput_tokens\toutput_tokens\ttotal_tokens\tcost_usd\n"},
 
 		{path: cfg.SoulPath(), content: defaultSoulMarkdown()},
 		{path: cfg.UserPath(), content: defaultUserMarkdown()},

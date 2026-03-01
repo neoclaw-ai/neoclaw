@@ -27,7 +27,7 @@ const (
 	AllowedDomainsFileName  = "allowed_domains.json"
 	AllowedCommandsFileName = "allowed_commands.json"
 	AllowedUsersFileName    = "allowed_users.json"
-	CostsFileName           = "costs.jsonl"
+	CostsFileName           = "costs.tsv"
 )
 
 func homeConfigPath(home string) string {
