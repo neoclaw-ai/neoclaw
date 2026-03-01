@@ -26,8 +26,4 @@ archives:
       {{- .Arch }}
 
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
+  disable: true
