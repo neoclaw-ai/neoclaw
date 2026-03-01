@@ -4,53 +4,87 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/neoclaw-ai/neoclaw/internal/memory"
 )
 
-// MemoryReadTool reads the long-term memory file.
-type MemoryReadTool struct {
+// DailyLogAppendTool appends structured entries to the daily log.
+type DailyLogAppendTool struct {
 	Store *memory.Store
 }
 
 // Name returns the tool name.
-func (t MemoryReadTool) Name() string {
-	return "memory_read"
+func (t DailyLogAppendTool) Name() string {
+	return "daily_log_append"
 }
 
 // Description returns the tool description for the model.
-func (t MemoryReadTool) Description() string {
-	return "Read the full long-term memory file (memory.md)"
+func (t DailyLogAppendTool) Description() string {
+	return "Append a structured entry to the daily log"
 }
 
-// Schema returns the JSON schema for memory_read args.
-func (t MemoryReadTool) Schema() map[string]any {
+// Schema returns the JSON schema for daily_log_append args.
+func (t DailyLogAppendTool) Schema() map[string]any {
 	return map[string]any{
-		"type":       "object",
-		"properties": map[string]any{},
+		"type": "object",
+		"properties": map[string]any{
+			"tags": map[string]any{
+				"type":        "string",
+				"description": "Comma-separated tags. First tag is the primary type.",
+			},
+			"text": map[string]any{
+				"type":        "string",
+				"description": "Daily log entry text",
+			},
+			"kv": map[string]any{
+				"type":        "string",
+				"description": "Optional key=value metadata string",
+			},
+		},
+		"required": []string{"tags", "text"},
 	}
 }
 
 // Permission declares default permission behavior for this tool.
-func (t MemoryReadTool) Permission() Permission {
+func (t DailyLogAppendTool) Permission() Permission {
 	return AutoApprove
 }
 
-// Execute reads memory.md and returns its contents.
-func (t MemoryReadTool) Execute(_ context.Context, _ map[string]any) (*ToolResult, error) {
+// Execute appends a structured entry into the daily log.
+func (t DailyLogAppendTool) Execute(_ context.Context, args map[string]any) (*ToolResult, error) {
 	if t.Store == nil {
 		return nil, errors.New("memory store is required")
 	}
-	text, err := t.Store.ReadMemory()
+	tags, err := parseTagsArg(args, "tags")
 	if err != nil {
 		return nil, err
 	}
-	return TruncateOutput(text)
+	if tags[0] == "summary" {
+		return nil, errors.New("daily_log_append cannot write summary entries")
+	}
+	text, err := stringArg(args, "text")
+	if err != nil {
+		return nil, err
+	}
+	kv, err := optionalStringArg(args, "kv", "-")
+	if err != nil {
+		return nil, err
+	}
+	if err := t.Store.AppendDailyLog(memory.LogEntry{
+		Tags: tags,
+		Text: text,
+		KV:   kv,
+	}); err != nil {
+		return nil, err
+	}
+	return &ToolResult{Output: "ok"}, nil
 }
 
-// MemoryAppendTool appends a fact to a memory section.
+// MemoryAppendTool appends structured facts to long-term memory.
 type MemoryAppendTool struct {
 	Store *memory.Store
 }
@@ -62,7 +96,7 @@ func (t MemoryAppendTool) Name() string {
 
 // Description returns the tool description for the model.
 func (t MemoryAppendTool) Description() string {
-	return "Add a fact to long-term memory"
+	return "Add a structured fact to long-term memory"
 }
 
 // Schema returns the JSON schema for memory_append args.
@@ -70,16 +104,24 @@ func (t MemoryAppendTool) Schema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"section": map[string]any{
+			"tags": map[string]any{
 				"type":        "string",
-				"description": "Examples: User, Preferences, People, Ongoing",
+				"description": "Comma-separated tags. First tag is the primary topic.",
 			},
-			"fact": map[string]any{
+			"text": map[string]any{
 				"type":        "string",
-				"description": "The fact to remember",
+				"description": "Fact text to remember",
+			},
+			"kv": map[string]any{
+				"type":        "string",
+				"description": "Optional key=value metadata string",
+			},
+			"expires": map[string]any{
+				"type":        "string",
+				"description": "Optional expiry like 2h, 3d, 1w, 2026-02-28, or 2026-02-28T15:00",
 			},
 		},
-		"required": []string{"section", "fact"},
+		"required": []string{"tags", "text"},
 	}
 }
 
@@ -88,136 +130,109 @@ func (t MemoryAppendTool) Permission() Permission {
 	return AutoApprove
 }
 
-// Execute appends a fact to the requested memory section.
+// Execute appends a structured fact to memory.tsv.
 func (t MemoryAppendTool) Execute(_ context.Context, args map[string]any) (*ToolResult, error) {
 	if t.Store == nil {
 		return nil, errors.New("memory store is required")
 	}
-	section, err := stringArg(args, "section")
+	tags, err := parseTagsArg(args, "tags")
 	if err != nil {
 		return nil, err
 	}
-	fact, err := stringArg(args, "fact")
+	text, err := stringArg(args, "text")
 	if err != nil {
 		return nil, err
 	}
-	if err := t.Store.AppendFact(section, fact); err != nil {
+	kv, err := optionalStringArg(args, "kv", "-")
+	if err != nil {
 		return nil, err
 	}
-	return &ToolResult{Output: "ok"}, nil
+	expires, err := optionalStringArg(args, "expires", "")
+	if err != nil {
+		return nil, err
+	}
+	if expires != "" {
+		expiresAt, err := parseExpiryTime(expires, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		kv = appendKVToken(kv, "expires="+strconv.FormatInt(expiresAt.Unix(), 10))
+	}
+	entry := memory.LogEntry{
+		Tags: tags,
+		Text: text,
+		KV:   kv,
+	}
+	if err := t.Store.AppendMemory(entry); err != nil {
+		return nil, err
+	}
+	return &ToolResult{Output: fmt.Sprintf("%s\t%s", strings.Join(entry.Tags, ","), entry.Text)}, nil
 }
 
-// MemoryRemoveTool removes matching facts from memory.
-type MemoryRemoveTool struct {
+// MemoryTagsTool lists first-tag counts across memory facts.
+type MemoryTagsTool struct {
 	Store *memory.Store
 }
 
 // Name returns the tool name.
-func (t MemoryRemoveTool) Name() string {
-	return "memory_remove"
+func (t MemoryTagsTool) Name() string {
+	return "memory_tags"
 }
 
 // Description returns the tool description for the model.
-func (t MemoryRemoveTool) Description() string {
-	return "Remove a fact from long-term memory"
+func (t MemoryTagsTool) Description() string {
+	return "List memory fact tags and how many entries each has"
 }
 
-// Schema returns the JSON schema for memory_remove args.
-func (t MemoryRemoveTool) Schema() map[string]any {
+// Schema returns the JSON schema for memory_tags args.
+func (t MemoryTagsTool) Schema() map[string]any {
 	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"fact": map[string]any{
-				"type":        "string",
-				"description": "Fact text to match and remove",
-			},
-		},
-		"required": []string{"fact"},
+		"type":       "object",
+		"properties": map[string]any{},
 	}
 }
 
 // Permission declares default permission behavior for this tool.
-func (t MemoryRemoveTool) Permission() Permission {
+func (t MemoryTagsTool) Permission() Permission {
 	return AutoApprove
 }
 
-// Execute removes all exact matching fact bullet lines from memory.md.
-func (t MemoryRemoveTool) Execute(_ context.Context, args map[string]any) (*ToolResult, error) {
+// Execute returns tag counts sorted by count descending, then tag ascending.
+func (t MemoryTagsTool) Execute(_ context.Context, _ map[string]any) (*ToolResult, error) {
 	if t.Store == nil {
 		return nil, errors.New("memory store is required")
 	}
-	fact, err := stringArg(args, "fact")
-	if err != nil {
-		return nil, err
+	counts := t.Store.FactTags()
+	if len(counts) == 0 {
+		return &ToolResult{Output: ""}, nil
 	}
-	removed, err := t.Store.RemoveFact(fact)
-	if err != nil {
-		return nil, err
+	tags := make([]string, 0, len(counts))
+	for tag := range counts {
+		tags = append(tags, tag)
 	}
-	if removed == 0 {
-		return &ToolResult{Output: "not found"}, nil
+	sort.Slice(tags, func(i, j int) bool {
+		left := counts[tags[i]]
+		right := counts[tags[j]]
+		if left != right {
+			return left > right
+		}
+		return tags[i] < tags[j]
+	})
+
+	var out strings.Builder
+	out.WriteString("tag\tcount")
+	for _, tag := range tags {
+		out.WriteByte('\n')
+		out.WriteString(tag)
+		out.WriteByte('\t')
+		out.WriteString(strconv.Itoa(counts[tag]))
 	}
-	return &ToolResult{Output: fmt.Sprintf("removed %d", removed)}, nil
+	return &ToolResult{Output: out.String()}, nil
 }
 
-// DailyLogTool appends entries to today's daily memory log.
-type DailyLogTool struct {
-	Store *memory.Store
-	Now   func() time.Time
-}
-
-// Name returns the tool name.
-func (t DailyLogTool) Name() string {
-	return "daily_log"
-}
-
-// Description returns the tool description for the model.
-func (t DailyLogTool) Description() string {
-	return "Append an entry to today's daily log"
-}
-
-// Schema returns the JSON schema for daily_log args.
-func (t DailyLogTool) Schema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"entry": map[string]any{
-				"type":        "string",
-				"description": "Daily log entry text",
-			},
-		},
-		"required": []string{"entry"},
-	}
-}
-
-// Permission declares default permission behavior for this tool.
-func (t DailyLogTool) Permission() Permission {
-	return AutoApprove
-}
-
-// Execute appends a timestamped line into today's log file.
-func (t DailyLogTool) Execute(_ context.Context, args map[string]any) (*ToolResult, error) {
-	if t.Store == nil {
-		return nil, errors.New("memory store is required")
-	}
-	entry, err := stringArg(args, "entry")
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now()
-	if t.Now != nil {
-		now = t.Now()
-	}
-	if err := t.Store.AppendDailyLog(now, entry); err != nil {
-		return nil, err
-	}
-	return &ToolResult{Output: "ok"}, nil
-}
-
-// SearchLogsTool searches daily log files for matching lines.
+// SearchLogsTool searches memory entries and daily logs using regex matching.
 type SearchLogsTool struct {
 	Store *memory.Store
-	Now   func() time.Time
 }
 
 // Name returns the tool name.
@@ -227,7 +242,7 @@ func (t SearchLogsTool) Name() string {
 
 // Description returns the tool description for the model.
 func (t SearchLogsTool) Description() string {
-	return "Search past daily logs using substring (default) or regex matching"
+	return "Search daily logs and memory facts using regex matching"
 }
 
 // Schema returns the JSON schema for search_logs args.
@@ -237,18 +252,13 @@ func (t SearchLogsTool) Schema() map[string]any {
 		"properties": map[string]any{
 			"query": map[string]any{
 				"type":        "string",
-				"description": "Search query text or regex pattern",
+				"description": "Regex pattern to search for",
 			},
-			"matchMode": map[string]any{
-				"type":        "string",
-				"description": "Optional match mode: substring (default) or regex",
-				"enum":        []string{memory.SearchModeSubstring, memory.SearchModeRegex},
-			},
-			"fromTime": map[string]any{
+			"from_time": map[string]any{
 				"type":        "string",
 				"description": "Optional RFC3339 timestamp lower bound (inclusive)",
 			},
-			"toTime": map[string]any{
+			"to_time": map[string]any{
 				"type":        "string",
 				"description": "Optional RFC3339 timestamp upper bound (inclusive, default: now)",
 			},
@@ -262,7 +272,7 @@ func (t SearchLogsTool) Permission() Permission {
 	return AutoApprove
 }
 
-// Execute searches logs over the requested day range and returns matching lines.
+// Execute searches logs and returns TSV output with a header row.
 func (t SearchLogsTool) Execute(_ context.Context, args map[string]any) (*ToolResult, error) {
 	if t.Store == nil {
 		return nil, errors.New("memory store is required")
@@ -271,31 +281,28 @@ func (t SearchLogsTool) Execute(_ context.Context, args map[string]any) (*ToolRe
 	if err != nil {
 		return nil, err
 	}
-
-	now := time.Now()
-	if t.Now != nil {
-		now = t.Now()
-	}
-	fromTime, err := optionalRFC3339Arg(args, "fromTime", time.Time{})
+	fromTime, err := optionalRFC3339Arg(args, "from_time", time.Time{})
 	if err != nil {
 		return nil, err
 	}
-	toTime, err := optionalRFC3339Arg(args, "toTime", now)
+	toTime, err := optionalRFC3339Arg(args, "to_time", time.Now())
 	if err != nil {
 		return nil, err
 	}
-	matchMode, err := optionalSearchMatchModeArg(args, "matchMode", memory.SearchModeSubstring)
+	entries, err := t.Store.Search(query, fromTime, toTime)
 	if err != nil {
 		return nil, err
 	}
 
-	text, err := t.Store.SearchLogs(query, fromTime, toTime, matchMode)
-	if err != nil {
-		return nil, err
+	lines := make([]string, 0, len(entries)+1)
+	lines = append(lines, "ts\ttags\ttext\tkv")
+	for _, entry := range entries {
+		lines = append(lines, strings.Join(entry.MarshalTSV(), "\t"))
 	}
-	return TruncateOutput(text)
+	return &ToolResult{Output: strings.Join(lines, "\n")}, nil
 }
 
+// optionalRFC3339Arg parses an optional RFC3339 timestamp argument or returns the default.
 func optionalRFC3339Arg(args map[string]any, key string, def time.Time) (time.Time, error) {
 	raw, ok := args[key]
 	if !ok {
@@ -316,8 +323,8 @@ func optionalRFC3339Arg(args map[string]any, key string, def time.Time) (time.Ti
 	return parsed, nil
 }
 
-// optionalSearchMatchModeArg parses an optional search match mode argument.
-func optionalSearchMatchModeArg(args map[string]any, key, def string) (string, error) {
+// optionalStringArg returns an optional string argument, treating blank values as the default.
+func optionalStringArg(args map[string]any, key, def string) (string, error) {
 	raw, ok := args[key]
 	if !ok {
 		return def, nil
@@ -326,14 +333,76 @@ func optionalSearchMatchModeArg(args map[string]any, key, def string) (string, e
 	if !ok {
 		return "", fmt.Errorf("argument %s must be a string", key)
 	}
-	s = strings.TrimSpace(strings.ToLower(s))
+	s = strings.TrimSpace(s)
 	if s == "" {
 		return def, nil
 	}
-	switch s {
-	case memory.SearchModeSubstring, memory.SearchModeRegex:
-		return s, nil
-	default:
-		return "", fmt.Errorf("argument %s must be one of: %s, %s", key, memory.SearchModeSubstring, memory.SearchModeRegex)
+	return s, nil
+}
+
+// parseTagsArg parses, trims, and normalizes a required comma-separated tags argument.
+func parseTagsArg(args map[string]any, key string) ([]string, error) {
+	raw, err := stringArg(args, key)
+	if err != nil {
+		return nil, err
 	}
+	parts := strings.Split(raw, ",")
+	tags := make([]string, 0, len(parts))
+	for _, part := range parts {
+		tags = append(tags, strings.TrimSpace(part))
+	}
+	tags = memory.NormalizeTags(tags)
+	if len(tags) == 0 {
+		return nil, fmt.Errorf("argument %s must include at least one tag", key)
+	}
+	return tags, nil
+}
+
+// parseExpiryTime converts a human-readable expiry string into an absolute time.
+func parseExpiryTime(input string, now time.Time) (time.Time, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return time.Time{}, errors.New("expires is required")
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	if duration, err := time.ParseDuration(input); err == nil {
+		return now.Add(duration), nil
+	}
+	if len(input) > 1 {
+		unit := input[len(input)-1]
+		valueText := strings.TrimSpace(input[:len(input)-1])
+		if unit == 'd' || unit == 'w' {
+			value, err := strconv.Atoi(valueText)
+			if err != nil {
+				return time.Time{}, fmt.Errorf("invalid expires value %q", input)
+			}
+			multiplier := 24 * time.Hour
+			if unit == 'w' {
+				multiplier = 7 * 24 * time.Hour
+			}
+			return now.Add(time.Duration(value) * multiplier), nil
+		}
+	}
+	if parsed, err := time.ParseInLocation("2006-01-02T15:04", input, time.Local); err == nil {
+		return parsed, nil
+	}
+	if parsed, err := time.ParseInLocation("2006-01-02", input, time.Local); err == nil {
+		return parsed, nil
+	}
+	return time.Time{}, fmt.Errorf("unsupported expires format %q", input)
+}
+
+// appendKVToken appends one key=value token to the KV string, handling empty placeholders.
+func appendKVToken(kv, token string) string {
+	kv = strings.TrimSpace(kv)
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return kv
+	}
+	if kv == "" || kv == "-" {
+		return token
+	}
+	return kv + " " + token
 }

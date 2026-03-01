@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -11,198 +13,127 @@ import (
 	"github.com/neoclaw-ai/neoclaw/internal/memory"
 )
 
-func TestMemoryAppendCreatesAndUpdatesSections(t *testing.T) {
+func TestDailyLogAppendToolExecute(t *testing.T) {
 	memoryDir := t.TempDir()
-	store := memory.New(memoryDir)
-	tool := MemoryAppendTool{Store: store}
+	store := mustNewMemoryStore(t, memoryDir)
+	tool := DailyLogAppendTool{Store: store}
 
-	_, err := tool.Execute(context.Background(), map[string]any{
-		"section": "Preferences",
-		"fact":    "Vegetarian",
+	res, err := tool.Execute(context.Background(), map[string]any{
+		"tags": "event,meeting",
+		"text": "Met with Sarah",
 	})
 	if err != nil {
-		t.Fatalf("append fact: %v", err)
+		t.Fatalf("daily log append: %v", err)
 	}
-	_, err = tool.Execute(context.Background(), map[string]any{
-		"section": "Preferences",
-		"fact":    "Prefers concise answers",
-	})
+	if res.Output != "ok" {
+		t.Fatalf("expected ok output, got %q", res.Output)
+	}
+
+	entries, err := store.GetAllDailyLogs()
 	if err != nil {
-		t.Fatalf("append second fact: %v", err)
+		t.Fatalf("get all daily logs: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 daily log entry, got %d", len(entries))
+	}
+	if got := strings.Join(entries[0].Tags, ","); got != "event,meeting" {
+		t.Fatalf("unexpected tags %q", got)
+	}
+	if entries[0].Text != "Met with Sarah" {
+		t.Fatalf("unexpected text %q", entries[0].Text)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(memoryDir, "memory.md"))
-	if err != nil {
-		t.Fatalf("read memory file: %v", err)
-	}
-	content := string(raw)
-	if !strings.Contains(content, "## Preferences") {
-		t.Fatalf("expected preferences section, got %q", content)
-	}
-	if !strings.Contains(content, "- Vegetarian") || !strings.Contains(content, "- Prefers concise answers") {
-		t.Fatalf("expected both facts in section, got %q", content)
-	}
-}
-
-func TestMemoryRemoveFindsAndDeletes(t *testing.T) {
-	memoryDir := t.TempDir()
-	path := filepath.Join(memoryDir, "memory.md")
-	initial := "# Memory\n\n## User\n- Name: Alex\n- Vegetarian\n"
-	if err := os.WriteFile(path, []byte(initial), 0o644); err != nil {
-		t.Fatalf("write initial memory: %v", err)
-	}
-
-	store := memory.New(memoryDir)
-	tool := MemoryRemoveTool{Store: store}
-	res, err := tool.Execute(context.Background(), map[string]any{"fact": "Vegetarian"})
-	if err != nil {
-		t.Fatalf("remove fact: %v", err)
-	}
-	if !strings.Contains(res.Output, "removed 1") {
-		t.Fatalf("expected removed count, got %q", res.Output)
-	}
-
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read memory file: %v", err)
-	}
-	if strings.Contains(string(raw), "Vegetarian") {
-		t.Fatalf("expected fact to be removed, got %q", string(raw))
-	}
-}
-
-func TestDailyLogCreatesDatedFile(t *testing.T) {
-	memoryDir := t.TempDir()
-	fixed := time.Date(2026, 2, 17, 10, 30, 0, 0, time.Local)
-	store := memory.New(memoryDir)
-	tool := DailyLogTool{
-		Store: store,
-		Now:   func() time.Time { return fixed },
-	}
-
-	_, err := tool.Execute(context.Background(), map[string]any{"entry": "Met with Sarah"})
-	if err != nil {
-		t.Fatalf("daily log: %v", err)
-	}
-
-	path := filepath.Join(memoryDir, "daily", "2026-02-17.md")
+	path := filepath.Join(memoryDir, "daily", entries[0].Timestamp.Format("2006-01-02")+".tsv")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read daily log: %v", err)
 	}
-	content := string(raw)
-	if !strings.Contains(content, "# 2026-02-17") {
-		t.Fatalf("expected daily log header, got %q", content)
-	}
-	if !strings.Contains(content, "- 10:30:00: Met with Sarah") {
-		t.Fatalf("expected timestamped entry, got %q", content)
+	if !strings.Contains(string(raw), "event,meeting\tMet with Sarah\t-") {
+		t.Fatalf("expected tsv row, got %q", string(raw))
 	}
 }
 
-func TestSearchLogsFindsAcrossMultipleDays(t *testing.T) {
+func TestDailyLogAppendToolRejectsSummaryTag(t *testing.T) {
 	memoryDir := t.TempDir()
-	dailyDir := filepath.Join(memoryDir, "daily")
-	if err := os.MkdirAll(dailyDir, 0o755); err != nil {
-		t.Fatalf("mkdir daily dir: %v", err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(dailyDir, "2026-02-17.md"),
-		[]byte("# 2026-02-17\n\n- 09:00:00: API migration work\n"),
-		0o644,
-	); err != nil {
-		t.Fatalf("write day 1: %v", err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(dailyDir, "2026-02-16.md"),
-		[]byte("# 2026-02-16\n\n- 11:00:00: Discussed migration timeline\n"),
-		0o644,
-	); err != nil {
-		t.Fatalf("write day 2: %v", err)
-	}
-
-	store := memory.New(memoryDir)
-	tool := SearchLogsTool{
-		Store: store,
-		Now:   func() time.Time { return time.Date(2026, 2, 17, 12, 0, 0, 0, time.Local) },
-	}
-	res, err := tool.Execute(context.Background(), map[string]any{
-		"query":    "migration",
-		"fromTime": time.Date(2026, 2, 16, 0, 0, 0, 0, time.Local).Format(time.RFC3339),
-	})
-	if err != nil {
-		t.Fatalf("search logs: %v", err)
-	}
-	if !strings.Contains(res.Output, "2026-02-17T09:00:00") || !strings.Contains(res.Output, "2026-02-16T11:00:00") {
-		t.Fatalf("expected matches from both days, got %q", res.Output)
-	}
-	if !strings.Contains(res.Output, "- 09:00:00: API migration work") || !strings.Contains(res.Output, "- 11:00:00: Discussed migration timeline") {
-		t.Fatalf("expected exact daily log lines, got %q", res.Output)
-	}
-}
-
-func TestSearchLogsRegexModeFindsMatches(t *testing.T) {
-	memoryDir := t.TempDir()
-	dailyDir := filepath.Join(memoryDir, "daily")
-	if err := os.MkdirAll(dailyDir, 0o755); err != nil {
-		t.Fatalf("mkdir daily dir: %v", err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(dailyDir, "2026-02-17.md"),
-		[]byte("# 2026-02-17\n\n- 09:00:00: API migration work\n"),
-		0o644,
-	); err != nil {
-		t.Fatalf("write day 1: %v", err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(dailyDir, "2026-02-16.md"),
-		[]byte("# 2026-02-16\n\n- 11:00:00: Discussed migration timeline\n"),
-		0o644,
-	); err != nil {
-		t.Fatalf("write day 2: %v", err)
-	}
-
-	store := memory.New(memoryDir)
-	tool := SearchLogsTool{
-		Store: store,
-		Now:   func() time.Time { return time.Date(2026, 2, 17, 12, 0, 0, 0, time.Local) },
-	}
-	res, err := tool.Execute(context.Background(), map[string]any{
-		"query":     "(migration work|migration timeline)",
-		"matchMode": "regex",
-		"fromTime":  time.Date(2026, 2, 16, 0, 0, 0, 0, time.Local).Format(time.RFC3339),
-	})
-	if err != nil {
-		t.Fatalf("search logs regex: %v", err)
-	}
-	if !strings.Contains(res.Output, "2026-02-17T09:00:00") || !strings.Contains(res.Output, "2026-02-16T11:00:00") {
-		t.Fatalf("expected regex matches from both days, got %q", res.Output)
-	}
-}
-
-func TestSearchLogsRegexModeInvalidPatternReturnsError(t *testing.T) {
-	memoryDir := t.TempDir()
-	store := memory.New(memoryDir)
-	tool := SearchLogsTool{Store: store}
+	store := mustNewMemoryStore(t, memoryDir)
+	tool := DailyLogAppendTool{Store: store}
 
 	_, err := tool.Execute(context.Background(), map[string]any{
-		"query":     "[",
-		"matchMode": "regex",
+		"tags": "summary,session",
+		"text": "Should fail",
 	})
-	if err == nil || !strings.Contains(err.Error(), "invalid regex pattern") {
-		t.Fatalf("expected invalid regex error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "cannot write summary") {
+		t.Fatalf("expected summary-tag rejection, got %v", err)
 	}
 }
 
-func TestSearchLogsRejectsUnknownMatchMode(t *testing.T) {
+func TestMemoryAppendToolAddsExpiresEpoch(t *testing.T) {
 	memoryDir := t.TempDir()
-	store := memory.New(memoryDir)
-	tool := SearchLogsTool{Store: store}
+	store := mustNewMemoryStore(t, memoryDir)
+	tool := MemoryAppendTool{Store: store}
 
-	_, err := tool.Execute(context.Background(), map[string]any{
-		"query":     "migration",
-		"matchMode": "glob",
+	start := time.Now()
+	res, err := tool.Execute(context.Background(), map[string]any{
+		"tags":    "location",
+		"text":    "In SF",
+		"expires": "2d",
 	})
-	if err == nil || !strings.Contains(err.Error(), "argument matchMode must be one of: substring, regex") {
-		t.Fatalf("expected invalid matchMode error, got %v", err)
+	end := time.Now()
+	if err != nil {
+		t.Fatalf("memory append: %v", err)
 	}
+	if !strings.Contains(res.Output, "location\tIn SF") {
+		t.Fatalf("unexpected output %q", res.Output)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(memoryDir, "memory.tsv"))
+	if err != nil {
+		t.Fatalf("read memory.tsv: %v", err)
+	}
+	matches := regexp.MustCompile(`expires=(\d+)`).FindStringSubmatch(string(raw))
+	if len(matches) != 2 {
+		t.Fatalf("expected expires token in %q", string(raw))
+	}
+	value, err := strconv.ParseInt(matches[1], 10, 64)
+	if err != nil {
+		t.Fatalf("parse expires epoch: %v", err)
+	}
+	min := start.Add(48 * time.Hour).Unix()
+	max := end.Add(48 * time.Hour).Unix()
+	if value < min || value > max {
+		t.Fatalf("expected expires in [%d, %d], got %d", min, max, value)
+	}
+}
+
+func TestMemoryTagsToolFormatsSortedCounts(t *testing.T) {
+	memoryDir := t.TempDir()
+	store := mustNewMemoryStore(t, memoryDir)
+	if err := store.AppendMemory(memory.LogEntry{Tags: []string{"location"}, Text: "In SF", KV: "-"}); err != nil {
+		t.Fatalf("append first memory fact: %v", err)
+	}
+	if err := store.AppendMemory(memory.LogEntry{Tags: []string{"diet"}, Text: "Vegetarian", KV: "-"}); err != nil {
+		t.Fatalf("append second memory fact: %v", err)
+	}
+	if err := store.AppendMemory(memory.LogEntry{Tags: []string{"location"}, Text: "In LA", KV: "-"}); err != nil {
+		t.Fatalf("append third memory fact: %v", err)
+	}
+
+	tool := MemoryTagsTool{Store: store}
+	res, err := tool.Execute(context.Background(), map[string]any{})
+	if err != nil {
+		t.Fatalf("memory tags: %v", err)
+	}
+	if res.Output != "tag\tcount\nlocation\t2\ndiet\t1" {
+		t.Fatalf("unexpected output %q", res.Output)
+	}
+}
+
+func mustNewMemoryStore(t *testing.T, dir string) *memory.Store {
+	t.Helper()
+
+	store, err := memory.New(dir)
+	if err != nil {
+		t.Fatalf("new memory store: %v", err)
+	}
+	return store
 }

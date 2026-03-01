@@ -47,7 +47,10 @@ func newCLICmd() *cobra.Command {
 				return err
 			}
 
-			memoryStore := memory.New(cfg.MemoryDir())
+			memoryStore, err := memory.New(cfg.MemoryDir())
+			if err != nil {
+				return err
+			}
 			channelWriters := map[string]io.Writer{"cli": cmd.OutOrStdout()}
 			schedulerService, err := newSchedulerService(cfg, channelWriters)
 			if err != nil {
@@ -161,10 +164,9 @@ func buildToolRegistry(
 			WorkspaceDir: cfg.WorkspaceDir(),
 			SecurityMode: cfg.Security.Mode,
 		},
-		tools.MemoryReadTool{Store: memoryStore},
 		tools.MemoryAppendTool{Store: memoryStore},
-		tools.MemoryRemoveTool{Store: memoryStore},
-		tools.DailyLogTool{Store: memoryStore},
+		tools.DailyLogAppendTool{Store: memoryStore},
+		tools.MemoryTagsTool{Store: memoryStore},
 		tools.SearchLogsTool{Store: memoryStore},
 		tools.JobListTool{Service: schedulerService},
 		tools.JobCreateTool{

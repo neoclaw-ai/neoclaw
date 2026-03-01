@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/neoclaw-ai/neoclaw/internal/config"
-	"github.com/neoclaw-ai/neoclaw/internal/memory"
 	"github.com/neoclaw-ai/neoclaw/internal/runtime"
 
 	"github.com/neoclaw-ai/neoclaw/internal/approval"
@@ -26,7 +25,7 @@ func TestAgentHandleMessageWritesResponse(t *testing.T) {
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "hello"}},
 	}
-	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), mustNewMemoryStore(t, t.TempDir()), config.ContextConfig{})
 	writer := &captureWriter{}
 
 	err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "hi"})
@@ -46,7 +45,7 @@ func TestAgentHandleMessageAccumulatesHistory(t *testing.T) {
 			{Content: "r2"},
 		},
 	}
-	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), mustNewMemoryStore(t, t.TempDir()), config.ContextConfig{})
 	writer := &captureWriter{}
 
 	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "one"}); err != nil {
@@ -69,7 +68,7 @@ func TestAgentHandleMessageProviderErrorIsFatal(t *testing.T) {
 	modelProvider := &recordingProvider{
 		err: errors.New("provider unavailable"),
 	}
-	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), mustNewMemoryStore(t, t.TempDir()), config.ContextConfig{})
 	writer := &captureWriter{}
 
 	err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "hi"})
@@ -86,7 +85,7 @@ func TestAgentHandleMessageCanceledContextIsFatal(t *testing.T) {
 	modelProvider := &recordingProvider{
 		requireLiveContext: true,
 	}
-	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), mustNewMemoryStore(t, t.TempDir()), config.ContextConfig{})
 	writer := &captureWriter{}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -112,7 +111,7 @@ func TestAgentWithSessionLoadsHistoryAndAppendsTurn(t *testing.T) {
 		t.Fatalf("seed session: %v", err)
 	}
 
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, memory.New(t.TempDir()), 4000, 10, 0, 0, time.Second, config.ContextConfig{})
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, mustNewMemoryStore(t, t.TempDir()), 4000, 10, 0, 0, time.Second, config.ContextConfig{})
 	writer := &captureWriter{}
 
 	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "next"}); err != nil {
@@ -157,7 +156,7 @@ func TestAgentResetResetsSession(t *testing.T) {
 		t.Fatalf("seed session: %v", err)
 	}
 
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, memory.New(t.TempDir()), 4000, 10, 0, 0, time.Second, config.ContextConfig{})
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, mustNewMemoryStore(t, t.TempDir()), 4000, 10, 0, 0, time.Second, config.ContextConfig{})
 	if err := ag.Reset(context.Background()); err != nil {
 		t.Fatalf("reset: %v", err)
 	}
@@ -201,7 +200,10 @@ func TestAgentResetWritesSummaryToDailyLog(t *testing.T) {
 	}
 
 	memoryDir := filepath.Join(t.TempDir(), "memory")
-	memoryStore := memory.New(memoryDir)
+	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
+		t.Fatalf("mkdir memory dir: %v", err)
+	}
+	memoryStore := mustNewMemoryStore(t, memoryDir)
 	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, memoryStore, 4000, 10, 0, 0, time.Second, config.ContextConfig{})
 	if err := ag.Reset(context.Background()); err != nil {
 		t.Fatalf("reset: %v", err)
@@ -209,16 +211,16 @@ func TestAgentResetWritesSummaryToDailyLog(t *testing.T) {
 
 	var dailyContent string
 	waitFor(t, 2*time.Second, func() bool {
-		path := filepath.Join(memoryDir, "daily", time.Now().Format("2006-01-02")+".md")
+		path := filepath.Join(memoryDir, "daily", time.Now().Format("2006-01-02")+".tsv")
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			return false
 		}
 		dailyContent = string(raw)
-		return strings.Contains(dailyContent, "Summary: session summary")
+		return strings.Contains(dailyContent, "summary\tsession summary\t-")
 	})
 
-	if !strings.Contains(dailyContent, "Summary: session summary") {
+	if !strings.Contains(dailyContent, "summary\tsession summary\t-") {
 		t.Fatalf("expected summary line in daily log, got %q", dailyContent)
 	}
 }
@@ -231,7 +233,10 @@ func TestAgentResetSkipsSummaryOnEmptyHistory(t *testing.T) {
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	sessionStore := session.New(sessionPath)
 	memoryDir := filepath.Join(t.TempDir(), "memory")
-	memoryStore := memory.New(memoryDir)
+	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
+		t.Fatalf("mkdir memory dir: %v", err)
+	}
+	memoryStore := mustNewMemoryStore(t, memoryDir)
 	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, memoryStore, 4000, 10, 0, 0, time.Second, config.ContextConfig{})
 	if err := ag.Reset(context.Background()); err != nil {
 		t.Fatalf("reset: %v", err)
@@ -250,7 +255,7 @@ func TestCompactHistoryIfNeededAddsSummaryMessage(t *testing.T) {
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "summary output"}},
 	}
-	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), mustNewMemoryStore(t, t.TempDir()), config.ContextConfig{})
 	ag.maxContextTokens = 10
 	ag.recentMessages = 2
 	messages := []provider.ChatMessage{
@@ -279,7 +284,7 @@ func TestCompactHistoryIfNeededFallbackRecentOnlyOnSummaryFailure(t *testing.T) 
 	modelProvider := &recordingProvider{
 		errs: []error{errors.New("summary failed")},
 	}
-	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), mustNewMemoryStore(t, t.TempDir()), config.ContextConfig{})
 	ag.maxContextTokens = 10
 	ag.recentMessages = 2
 	messages := []provider.ChatMessage{
@@ -305,7 +310,7 @@ func TestCompactHistoryIfNeeded_AdjustsBoundaryToIncludeToolTurn(t *testing.T) {
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "summary output"}},
 	}
-	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), mustNewMemoryStore(t, t.TempDir()), config.ContextConfig{})
 	ag.maxContextTokens = 10
 	ag.recentMessages = 2
 	messages := []provider.ChatMessage{
@@ -339,7 +344,7 @@ func TestCompactHistoryIfNeeded_SkipsOrphanToolResultAtBoundary(t *testing.T) {
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "summary output"}},
 	}
-	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
+	ag := New(modelProvider, tools.NewRegistry(), noopApprover{}, makeAgentDir(t), mustNewMemoryStore(t, t.TempDir()), config.ContextConfig{})
 	ag.maxContextTokens = 10
 	ag.recentMessages = 3
 	messages := []provider.ChatMessage{
@@ -381,7 +386,7 @@ func TestAgentSessionStoresTruncatedToolOutput(t *testing.T) {
 
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	sessionStore := session.New(sessionPath)
-	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, memory.New(t.TempDir()), 4000, 10, 0, 0, time.Second, config.ContextConfig{})
+	ag := NewWithSession(modelProvider, registry, noopApprover{}, makeAgentDir(t), sessionStore, mustNewMemoryStore(t, t.TempDir()), 4000, 10, 0, 0, time.Second, config.ContextConfig{})
 	writer := &captureWriter{}
 
 	if err := ag.HandleMessage(context.Background(), writer, &runtime.Message{Text: "run the tool"}); err != nil {
@@ -416,7 +421,7 @@ func TestAgentSpendLimitBlocksLLMCall(t *testing.T) {
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{{Content: "should not be called"}},
 	}
-	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), mustNewMemoryStore(t, t.TempDir()), config.ContextConfig{})
 	costPath := filepath.Join(t.TempDir(), "costs.jsonl")
 	tracker := costs.New(costPath)
 	if err := tracker.Append(context.Background(), costs.Record{
@@ -465,7 +470,7 @@ func TestAgentRecordsUsageForEachLLMCall(t *testing.T) {
 			},
 		},
 	}
-	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memory.New(t.TempDir()), config.ContextConfig{})
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), mustNewMemoryStore(t, t.TempDir()), config.ContextConfig{})
 	costPath := filepath.Join(t.TempDir(), "costs.jsonl")
 	tracker := costs.New(costPath)
 	ag.ConfigureCosts(tracker, "anthropic", "claude-sonnet-4-6", 0, 0)

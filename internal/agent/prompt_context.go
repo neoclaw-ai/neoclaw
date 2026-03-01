@@ -59,10 +59,12 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 		logging.Logger().Warn("missing USER.md; continuing without user context", "path", userPath)
 	}
 
+	// TODO delete in Step 7: replace legacy markdown context load with ActiveFacts-based TSV injection.
 	memoryText, err := store.LoadContext()
 	if err != nil {
 		return "", err
 	}
+	// TODO delete in Step 7: replace rolling time-window read with DailyLogsByDate.
 	recentLogs, err := store.GetDailyLogs(now.Add(-dailyLogLookback), now)
 	if err != nil {
 		return "", err

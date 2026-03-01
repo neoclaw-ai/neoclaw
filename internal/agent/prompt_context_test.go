@@ -34,9 +34,14 @@ func TestBuildSystemPromptIncludesSoulUserMemoryAndRecentDailyLogs(t *testing.T)
 	if err := os.WriteFile(filepath.Join(memoryDir, "memory.md"), []byte("# Memory\n\n## Preferences\n- Vegetarian\n"), 0o644); err != nil {
 		t.Fatalf("write memory: %v", err)
 	}
-	store := memory.New(memoryDir)
+	store := mustNewMemoryStore(t, memoryDir)
 	now := time.Date(2026, 2, 17, 12, 0, 0, 0, time.Local)
-	if err := store.AppendDailyLog(now.Add(-1*time.Hour), "Worked on API migration"); err != nil {
+	if err := store.AppendDailyLog(memory.LogEntry{
+		Timestamp: now.Add(-1 * time.Hour),
+		Tags:      []string{"note"},
+		Text:      "Worked on API migration",
+		KV:        "-",
+	}); err != nil {
 		t.Fatalf("append recent daily log: %v", err)
 	}
 
@@ -67,12 +72,22 @@ func TestBuildSystemPromptDailyLogLookbackWindow(t *testing.T) {
 	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
 		t.Fatalf("mkdir memory dir: %v", err)
 	}
-	store := memory.New(memoryDir)
+	store := mustNewMemoryStore(t, memoryDir)
 	now := time.Date(2026, 2, 17, 12, 0, 0, 0, time.Local)
-	if err := store.AppendDailyLog(now.Add(-23*time.Hour), "inside lookback"); err != nil {
+	if err := store.AppendDailyLog(memory.LogEntry{
+		Timestamp: now.Add(-23 * time.Hour),
+		Tags:      []string{"note"},
+		Text:      "inside lookback",
+		KV:        "-",
+	}); err != nil {
 		t.Fatalf("append inside lookback: %v", err)
 	}
-	if err := store.AppendDailyLog(now.Add(-25*time.Hour), "outside lookback"); err != nil {
+	if err := store.AppendDailyLog(memory.LogEntry{
+		Timestamp: now.Add(-25 * time.Hour),
+		Tags:      []string{"note"},
+		Text:      "outside lookback",
+		KV:        "-",
+	}); err != nil {
 		t.Fatalf("append outside lookback: %v", err)
 	}
 
@@ -105,7 +120,7 @@ func TestBuildSystemPromptIncludesCurrentTimeAndDateResolutionInstruction(t *tes
 	if err := os.MkdirAll(memoryDir, 0o755); err != nil {
 		t.Fatalf("mkdir memory dir: %v", err)
 	}
-	store := memory.New(memoryDir)
+	store := mustNewMemoryStore(t, memoryDir)
 	loc := time.FixedZone("America/Los_Angeles", -8*60*60)
 	now := time.Date(2026, 2, 24, 15, 4, 5, 0, loc)
 
@@ -119,4 +134,14 @@ func TestBuildSystemPromptIncludesCurrentTimeAndDateResolutionInstruction(t *tes
 	if !strings.Contains(got, "Resolve relative date/time phrases") {
 		t.Fatalf("expected relative time instruction in prompt, got %q", got)
 	}
+}
+
+func mustNewMemoryStore(t *testing.T, dir string) *memory.Store {
+	t.Helper()
+
+	store, err := memory.New(dir)
+	if err != nil {
+		t.Fatalf("new memory store: %v", err)
+	}
+	return store
 }

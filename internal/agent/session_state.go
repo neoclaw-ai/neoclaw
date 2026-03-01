@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/neoclaw-ai/neoclaw/internal/logging"
+	"github.com/neoclaw-ai/neoclaw/internal/memory"
 	"github.com/neoclaw-ai/neoclaw/internal/provider"
 )
 
@@ -86,7 +87,12 @@ func (a *Agent) runSessionSummary(ctx context.Context, timeout time.Duration, sn
 		logging.Logger().Warn("session reset summary is empty; skipping daily log append")
 		return
 	}
-	if err := a.memoryStore.AppendDailyLog(time.Now(), "Summary: "+summary); err != nil {
+	if err := a.memoryStore.AppendDailyLog(memory.LogEntry{
+		Timestamp: time.Now(),
+		Tags:      []string{"summary"},
+		Text:      summary,
+		KV:        "-",
+	}); err != nil {
 		logging.Logger().Warn("append session summary to daily log failed", "err", err)
 	}
 }

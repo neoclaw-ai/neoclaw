@@ -150,7 +150,10 @@ func startTelegram(
 		return nil, err
 	}
 
-	memoryStore := memory.New(cfg.MemoryDir())
+	memoryStore, err := memory.New(cfg.MemoryDir())
+	if err != nil {
+		return nil, err
+	}
 	registry, err := buildToolRegistry(cfg, out, memoryStore, listener, schedulerService, listener, listener.CurrentChannelID)
 	if err != nil {
 		return nil, err
