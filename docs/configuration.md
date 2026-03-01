@@ -18,7 +18,7 @@ provider        = "anthropic"
 api_key         = "sk-ant-..."
 model           = "claude-sonnet-4-6"
 max_tokens      = 8192
-request_timeout = "30s"
+request_timeout = "5m"
 ```
 
 | Key | Default | Description |
@@ -27,7 +27,7 @@ request_timeout = "30s"
 | `api_key` | *(required)* | API key. Supports `$ENV_VAR` expansion. |
 | `model` | `"claude-sonnet-4-6"` | Model name. See provider docs for valid values. |
 | `max_tokens` | `8192` | Maximum tokens the model may generate per response. |
-| `request_timeout` | `"30s"` | How long to wait for an API response before giving up. |
+| `request_timeout` | `"5m"` | How long to wait for an API response before giving up. |
 
 ### Provider: Anthropic
 
@@ -133,8 +133,8 @@ daily_limit = 5.0
 [context]
 max_tokens             = 10000
 recent_messages        = 12
-max_tool_calls         = 10
-tool_output_length     = 2500
+max_tool_calls         = 15
+tool_output_length     = 12000
 daily_log_lookback_days = 2
 ```
 
@@ -142,8 +142,8 @@ daily_log_lookback_days = 2
 |---|---|---|
 | `max_tokens` | `10000` | Token budget for conversation context. When history exceeds this, older messages are summarized. |
 | `recent_messages` | `12` | Number of recent messages always kept verbatim, regardless of `max_tokens`. |
-| `max_tool_calls` | `10` | Maximum tool-call iterations per message before the agent stops. |
-| `tool_output_length` | `2500` | Maximum characters of tool output stored inline in history. Larger outputs are saved to a temp file. |
+| `max_tool_calls` | `15` | Maximum tool-call iterations per message before the agent stops. |
+| `tool_output_length` | `12000` | Maximum characters of tool output stored inline in history. Larger outputs are saved to a temp file. |
 | `daily_log_lookback_days` | `2` | Number of calendar days of daily log entries injected into the system prompt. `2` means today + yesterday. |
 
 **Tuning for cost:** Lowering `max_tokens` reduces the amount of history sent with each request, which lowers per-request token cost at the expense of the bot remembering less context.
@@ -208,7 +208,7 @@ provider        = "anthropic"
 api_key         = "$ANTHROPIC_API_KEY"
 model           = "claude-sonnet-4-6"
 max_tokens      = 8192
-request_timeout = "30s"
+request_timeout = "5m"
 
 [channels.telegram]
 enabled = true
@@ -225,8 +225,8 @@ monthly_limit = 50.0
 [context]
 max_tokens         = 10000
 recent_messages    = 12
-max_tool_calls     = 10
-tool_output_length = 2500
+max_tool_calls     = 15
+tool_output_length = 12000
 daily_log_lookback_days = 2
 
 [web.search]

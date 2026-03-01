@@ -21,7 +21,7 @@ model = "claude-sonnet-4-6"
 max_tokens = 8192
 
 # How long to wait for an API response before giving up.
-request_timeout = "30s"
+request_timeout = "5m"
 
 # ── Telegram channel ──────────────────────────────────────────────────────────
 [channels.telegram]
@@ -67,11 +67,11 @@ max_tokens = 10000
 recent_messages = 12
 
 # Maximum number of tool-call iterations per message before the agent stops.
-max_tool_calls = 10
+max_tool_calls = 15
 
 # Maximum characters of tool output included inline in the conversation history.
 # Larger outputs are written to a temp file and only the first N chars are shown.
-tool_output_length = 2500
+tool_output_length = 12000
 
 # How many days of daily log entries are injected into the system prompt.
 daily_log_lookback_days = 2

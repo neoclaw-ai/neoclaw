@@ -12,7 +12,7 @@ import (
 	"github.com/neoclaw-ai/neoclaw/internal/provider"
 )
 
-const defaultInlineOutputChars = 2500
+const defaultInlineOutputChars = 12000
 
 // Permission classifies whether a tool can run automatically or needs user approval.
 type Permission int

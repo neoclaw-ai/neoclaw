@@ -14,8 +14,8 @@ import (
 	"github.com/neoclaw-ai/neoclaw/internal/tools"
 )
 
-const defaultMaxIterations = 10
-const defaultToolOutputLength = 2500
+const defaultMaxIterations = 15
+const defaultToolOutputLength = 12000
 
 // Run executes the agent loop until the model returns a final text response.
 func Run(

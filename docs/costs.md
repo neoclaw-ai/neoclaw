@@ -60,12 +60,10 @@ When the agent runs a tool — reading a file, running a command, fetching a URL
 
 ```toml
 [context]
-tool_output_length = 2500   # characters — default
+tool_output_length = 12000   # characters — default
 ```
 
 When a tool output exceeds this limit, the full output is saved to a temp file and only a truncated version is kept in history. Lowering this reduces how much tool output accumulates in the context window.
-
-For most tasks `2500` characters is sufficient. If the agent frequently needs to reference large outputs, you can raise it — but be aware of the cost impact.
 
 ---
 

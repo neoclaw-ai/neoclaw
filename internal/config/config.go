@@ -102,7 +102,7 @@ var defaultConfig = Config{
 			Provider:       "anthropic",
 			Model:          "claude-sonnet-4-6",
 			MaxTokens:      8192,
-			RequestTimeout: 30 * time.Second,
+			RequestTimeout: 5 * time.Minute,
 		},
 	},
 	Security: SecurityConfig{
@@ -116,8 +116,8 @@ var defaultConfig = Config{
 	Context: ContextConfig{
 		MaxTokens:            10000,
 		RecentMessages:       12,
-		MaxToolCalls:         10,
-		ToolOutputLength:     2500,
+		MaxToolCalls:         15,
+		ToolOutputLength:     12000,
 		DailyLogLookbackDays: 2,
 	},
 	Web: WebConfig{
@@ -143,7 +143,7 @@ var defaultUserConfig = Config{
 			APIKey:         "$ANTHROPIC_API_KEY",
 			Provider:       "anthropic",
 			Model:          "claude-sonnet-4-6",
-			RequestTimeout: 30 * time.Second,
+			RequestTimeout: 5 * time.Minute,
 		},
 	},
 	Costs: CostsConfig{
