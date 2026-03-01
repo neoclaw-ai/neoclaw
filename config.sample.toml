@@ -73,8 +73,8 @@ max_tool_calls = 10
 # Larger outputs are written to a temp file and only the first N chars are shown.
 tool_output_length = 2500
 
-# How far back recent daily log entries are injected into the system prompt.
-daily_log_lookback = "12h"
+# How many days of daily log entries are injected into the system prompt.
+daily_log_lookback_days = 2
 
 # ── Web search ────────────────────────────────────────────────────────────────
 [web.search]
