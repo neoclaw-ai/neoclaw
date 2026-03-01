@@ -1,4 +1,4 @@
-// Package memory manages long-term memory and daily log files for an agent, providing append, remove, and search operations over markdown files.
+// Package memory manages long-term memory and daily log files for an agent.
 package memory
 
 import (
@@ -35,12 +35,6 @@ const (
 type Store struct {
 	dir string
 	mu  sync.Mutex
-}
-
-// LogEntry is one timestamped daily log entry.
-type LogEntry struct {
-	Timestamp time.Time
-	Entry     string
 }
 
 // New creates a Store for the given memory directory.
@@ -176,7 +170,7 @@ func (s *Store) AppendDailyLog(now time.Time, entry string) error {
 		return fmt.Errorf("read daily log: %w", err)
 	}
 
-	line := formatDailyLogLine(LogEntry{Timestamp: now, Entry: entry}) + "\n"
+	line := formatDailyLogLine(LogEntry{Timestamp: now, Text: entry}) + "\n"
 	if err := store.AppendFile(path, []byte(line)); err != nil {
 		return fmt.Errorf("append daily log: %w", err)
 	}
@@ -419,7 +413,7 @@ func dailyLogFilename(ts time.Time) string {
 }
 
 func formatDailyLogLine(entry LogEntry) string {
-	return fmt.Sprintf("- %s: %s", entry.Timestamp.Format("15:04:05"), entry.Entry)
+	return fmt.Sprintf("- %s: %s", entry.Timestamp.Format("15:04:05"), entry.Text)
 }
 
 func parseDailyLogLine(day time.Time, line string) (LogEntry, bool) {
@@ -433,8 +427,8 @@ func parseDailyLogLine(day time.Time, line string) (LogEntry, bool) {
 		return LogEntry{}, false
 	}
 	timePart := strings.TrimSpace(rest[:sep])
-	entry := rest[sep+2:]
-	if strings.TrimSpace(entry) == "" {
+	text := rest[sep+2:]
+	if strings.TrimSpace(text) == "" {
 		return LogEntry{}, false
 	}
 	ts, err := time.ParseInLocation(
@@ -445,7 +439,7 @@ func parseDailyLogLine(day time.Time, line string) (LogEntry, bool) {
 	if err != nil {
 		return LogEntry{}, false
 	}
-	return LogEntry{Timestamp: ts, Entry: entry}, true
+	return LogEntry{Timestamp: ts, Text: text}, true
 }
 
 func normalizeTimeRange(fromTime, toTime time.Time) (time.Time, time.Time, error) {

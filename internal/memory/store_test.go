@@ -204,7 +204,7 @@ func TestGetDailyLogsSkipsMalformedLines(t *testing.T) {
 	if len(entries) != 2 {
 		t.Fatalf("expected 2 valid log entries, got %d", len(entries))
 	}
-	if entries[0].Entry != "valid entry" || entries[1].Entry != "another valid entry" {
+	if entries[0].Text != "valid entry" || entries[1].Text != "another valid entry" {
 		t.Fatalf("unexpected parsed entries: %#v", entries)
 	}
 }
@@ -235,7 +235,7 @@ func TestGetAllDailyLogsReturnsAllEntries(t *testing.T) {
 	if len(entries) != 2 {
 		t.Fatalf("expected 2 entries, got %d", len(entries))
 	}
-	if entries[0].Entry != "first" || entries[1].Entry != "second" {
+	if entries[0].Text != "first" || entries[1].Text != "second" {
 		t.Fatalf("unexpected entries order/content: %#v", entries)
 	}
 }

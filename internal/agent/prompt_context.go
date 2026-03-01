@@ -116,7 +116,7 @@ func buildSystemPromptAt(agentDir string, store *memory.Store, now time.Time, co
 		b.WriteString("\n[Recent daily log]\n")
 		for _, entry := range recentLogs {
 			filename := entry.Timestamp.Format("2006-01-02") + ".md"
-			line := "- " + entry.Timestamp.Format(time.RFC3339) + ": " + entry.Entry + "\n"
+			line := "- " + entry.Timestamp.Format(time.RFC3339) + ": " + entry.Text + "\n"
 			dailyContentByFile[filename] += line
 			b.WriteString(line)
 		}
