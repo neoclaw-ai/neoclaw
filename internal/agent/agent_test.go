@@ -143,8 +143,8 @@ func TestAgentResetResetsSession(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
 		responses: []*provider.ChatResponse{
-			{Content: "summary"},     // consumed by async summarize goroutine
-			{Content: "after reset"}, // consumed by post-reset HandleMessage
+			{Content: "summary\treset summary\t-"}, // consumed by async summarize goroutine
+			{Content: "after reset"},               // consumed by post-reset HandleMessage
 		},
 	}
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
@@ -188,7 +188,7 @@ func TestAgentResetResetsSession(t *testing.T) {
 func TestAgentResetWritesSummaryToDailyLog(t *testing.T) {
 	registry := tools.NewRegistry()
 	modelProvider := &recordingProvider{
-		responses: []*provider.ChatResponse{{Content: "session summary"}},
+		responses: []*provider.ChatResponse{{Content: "summary\tsession summary\t-"}},
 	}
 	sessionPath := filepath.Join(t.TempDir(), "sessions", "cli", "default.jsonl")
 	sessionStore := session.New(sessionPath)
@@ -222,6 +222,110 @@ func TestAgentResetWritesSummaryToDailyLog(t *testing.T) {
 
 	if !strings.Contains(dailyContent, "summary\tsession summary\t-") {
 		t.Fatalf("expected summary line in daily log, got %q", dailyContent)
+	}
+}
+
+func TestRunSessionSummaryAppendsStructuredEntries(t *testing.T) {
+	registry := tools.NewRegistry()
+	modelProvider := &recordingProvider{
+		responses: []*provider.ChatResponse{{
+			Content: strings.Join([]string{
+				"summary,code\tWrapped up memory refactor\t-",
+				"followup,code\tUpdate docs\tstatus=active",
+				"decision,code\tKeep TSV format\t-",
+			}, "\n"),
+		}},
+	}
+	memoryStore := mustNewMemoryStore(t, t.TempDir())
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memoryStore, config.ContextConfig{})
+
+	snapshot := []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "do the memory refactor"},
+		{Role: provider.RoleAssistant, Content: "done"},
+	}
+	ag.runSessionSummary(context.Background(), time.Second, snapshot)
+
+	entries := memoryStore.DailyLogsByDate([]time.Time{time.Now()})
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 summary entries, got %d", len(entries))
+	}
+	if got := strings.Join(entries[0].Tags, ","); got != "summary,code" {
+		t.Fatalf("unexpected first entry tags %q", got)
+	}
+	if entries[0].Text != "Wrapped up memory refactor" || entries[0].KV != "-" {
+		t.Fatalf("unexpected first entry %#v", entries[0])
+	}
+	if entries[1].Text != "Update docs" || entries[1].KV != "status=active" {
+		t.Fatalf("unexpected second entry %#v", entries[1])
+	}
+	if entries[2].Text != "Keep TSV format" {
+		t.Fatalf("unexpected third entry %#v", entries[2])
+	}
+	if len(modelProvider.requests) != 1 {
+		t.Fatalf("expected 1 provider request, got %d", len(modelProvider.requests))
+	}
+	if modelProvider.requests[0].SystemPrompt != sessionSummaryPrompt {
+		t.Fatalf("expected session summary prompt, got %q", modelProvider.requests[0].SystemPrompt)
+	}
+}
+
+func TestRunSessionSummaryDropsMalformedLines(t *testing.T) {
+	registry := tools.NewRegistry()
+	modelProvider := &recordingProvider{
+		responses: []*provider.ChatResponse{{
+			Content: strings.Join([]string{
+				"summary,code\tWrapped up memory refactor\t-",
+				"bad line",
+				"followup,code\tUpdate docs\tstatus=active",
+			}, "\n"),
+		}},
+	}
+	memoryStore := mustNewMemoryStore(t, t.TempDir())
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memoryStore, config.ContextConfig{})
+
+	ag.runSessionSummary(context.Background(), time.Second, []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "do the memory refactor"},
+	})
+
+	entries := memoryStore.DailyLogsByDate([]time.Time{time.Now()})
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 valid summary entries, got %d", len(entries))
+	}
+	if entries[0].Text != "Wrapped up memory refactor" || entries[1].Text != "Update docs" {
+		t.Fatalf("unexpected entries %#v", entries)
+	}
+}
+
+func TestRunSessionSummaryUsesNanosecondOffsets(t *testing.T) {
+	registry := tools.NewRegistry()
+	modelProvider := &recordingProvider{
+		responses: []*provider.ChatResponse{{
+			Content: strings.Join([]string{
+				"summary\tOne\t-",
+				"summary\tTwo\t-",
+				"summary\tThree\t-",
+			}, "\n"),
+		}},
+	}
+	memoryStore := mustNewMemoryStore(t, t.TempDir())
+	ag := New(modelProvider, registry, noopApprover{}, makeAgentDir(t), memoryStore, config.ContextConfig{})
+
+	ag.runSessionSummary(context.Background(), time.Second, []provider.ChatMessage{
+		{Role: provider.RoleUser, Content: "summarize"},
+	})
+
+	entries := memoryStore.DailyLogsByDate([]time.Time{time.Now()})
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 summary entries, got %d", len(entries))
+	}
+	if !entries[0].Timestamp.Before(entries[1].Timestamp) || !entries[1].Timestamp.Before(entries[2].Timestamp) {
+		t.Fatalf("expected strictly increasing timestamps, got %#v", entries)
+	}
+	if got := entries[1].Timestamp.Sub(entries[0].Timestamp); got != time.Nanosecond {
+		t.Fatalf("expected 1ns offset between first and second entries, got %s", got)
+	}
+	if got := entries[2].Timestamp.Sub(entries[1].Timestamp); got != time.Nanosecond {
+		t.Fatalf("expected 1ns offset between second and third entries, got %s", got)
 	}
 }
 
