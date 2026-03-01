@@ -36,7 +36,7 @@ func NewRootCmd() *cobra.Command {
 
 			// The config command only reads and prints merged config and should not
 			// trigger bootstrap/first-run onboarding behavior.
-			if cmd.Name() == "config" {
+			if cmd.Name() == "config" || cmd.Name() == "version" {
 				return nil
 			}
 
@@ -98,6 +98,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newStartCmd())
 	root.AddCommand(newCLICmd())
 	root.AddCommand(newPairCmd())
+	root.AddCommand(newVersionCmd())
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (debug level)")
 
 	return root

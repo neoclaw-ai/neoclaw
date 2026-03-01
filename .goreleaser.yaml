@@ -11,6 +11,9 @@ builds:
     binary: claw
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -X github.com/neoclaw-ai/neoclaw/internal/cli.Version={{ .Version }}
+      - -X github.com/neoclaw-ai/neoclaw/internal/cli.Commit={{ .ShortCommit }}
     goos:
       - linux
       - darwin
