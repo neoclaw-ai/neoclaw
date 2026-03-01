@@ -31,7 +31,7 @@ func TestSanitizeToolTurns_StripsAssistantToolCallsWithoutResults(t *testing.T) 
 			Role:    provider.RoleAssistant,
 			Content: "calling tool",
 			ToolCalls: []provider.ToolCall{
-				{ID: "toolu_1", Name: "memory_read", Arguments: `{}`},
+				{ID: "toolu_1", Name: "memory_append", Arguments: `{}`},
 			},
 		},
 		{Role: provider.RoleUser, Content: "next"},
@@ -84,7 +84,7 @@ func TestSanitizeToolTurns_PreservesValidTurnUnchanged(t *testing.T) {
 		{
 			Role: provider.RoleAssistant,
 			ToolCalls: []provider.ToolCall{
-				{ID: "toolu_1", Name: "memory_read", Arguments: `{}`},
+				{ID: "toolu_1", Name: "memory_append", Arguments: `{}`},
 			},
 		},
 		{Role: provider.RoleTool, ToolCallID: "toolu_1", Content: "ok"},
