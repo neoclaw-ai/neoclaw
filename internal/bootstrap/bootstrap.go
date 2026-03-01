@@ -85,7 +85,7 @@ func Initialize(cfg *config.Config) error {
 		{path: cfg.SoulPath(), content: defaultSoulMarkdown()},
 		{path: cfg.UserPath(), content: defaultUserMarkdown()},
 		{path: cfg.JobsPath(), content: "[]\n"},
-		{path: cfg.MemoryPath(), content: "# Memory\n"},
+		{path: cfg.MemoryPath(), content: "ts\ttags\ttext\tkv\n"},
 		{path: cfg.CLIContextPath(), content: ""},
 	}
 
