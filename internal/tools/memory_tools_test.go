@@ -128,6 +128,87 @@ func TestMemoryTagsToolFormatsSortedCounts(t *testing.T) {
 	}
 }
 
+func TestSearchLogsToolExecuteFormatsTSVAndAppliesTimeBounds(t *testing.T) {
+	memoryDir := t.TempDir()
+	store := mustNewMemoryStore(t, memoryDir)
+	if err := store.AppendDailyLog(memory.LogEntry{
+		Timestamp: time.Date(2026, 2, 16, 11, 0, 0, 0, time.UTC),
+		Tags:      []string{"event"},
+		Text:      "Discussed migration timeline",
+		KV:        "-",
+	}); err != nil {
+		t.Fatalf("append first daily log: %v", err)
+	}
+	if err := store.AppendDailyLog(memory.LogEntry{
+		Timestamp: time.Date(2026, 2, 17, 9, 0, 0, 0, time.UTC),
+		Tags:      []string{"event"},
+		Text:      "API migration work",
+		KV:        "-",
+	}); err != nil {
+		t.Fatalf("append second daily log: %v", err)
+	}
+
+	tool := SearchLogsTool{Store: store}
+	res, err := tool.Execute(context.Background(), map[string]any{
+		"query":     "migration (timeline|work)",
+		"from_time": "2026-02-16T00:00:00Z",
+		"to_time":   "2026-02-16T23:59:59Z",
+	})
+	if err != nil {
+		t.Fatalf("search logs: %v", err)
+	}
+
+	want := strings.Join([]string{
+		"ts\ttags\ttext\tkv",
+		"2026-02-16T11:00:00Z\tevent\tDiscussed migration timeline\t-",
+	}, "\n")
+	if res.Output != want {
+		t.Fatalf("expected %q, got %q", want, res.Output)
+	}
+}
+
+func TestParseExpiryTimeFormatsAndInvalid(t *testing.T) {
+	now := time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC)
+
+	got, err := parseExpiryTime("2h", now)
+	if err != nil {
+		t.Fatalf("parse 2h expiry: %v", err)
+	}
+	if !got.Equal(now.Add(2 * time.Hour)) {
+		t.Fatalf("expected %v, got %v", now.Add(2*time.Hour), got)
+	}
+
+	got, err = parseExpiryTime("1w", now)
+	if err != nil {
+		t.Fatalf("parse 1w expiry: %v", err)
+	}
+	if !got.Equal(now.Add(7 * 24 * time.Hour)) {
+		t.Fatalf("expected %v, got %v", now.Add(7*24*time.Hour), got)
+	}
+
+	got, err = parseExpiryTime("2026-02-28", now)
+	if err != nil {
+		t.Fatalf("parse date expiry: %v", err)
+	}
+	wantDate := time.Date(2026, 2, 28, 0, 0, 0, 0, time.Local)
+	if !got.Equal(wantDate) {
+		t.Fatalf("expected %v, got %v", wantDate, got)
+	}
+
+	got, err = parseExpiryTime("2026-02-28T15:00", now)
+	if err != nil {
+		t.Fatalf("parse datetime expiry: %v", err)
+	}
+	wantDateTime := time.Date(2026, 2, 28, 15, 0, 0, 0, time.Local)
+	if !got.Equal(wantDateTime) {
+		t.Fatalf("expected %v, got %v", wantDateTime, got)
+	}
+
+	if _, err := parseExpiryTime("not-a-date", now); err == nil {
+		t.Fatal("expected error for invalid expiry format")
+	}
+}
+
 func mustNewMemoryStore(t *testing.T, dir string) *memory.Store {
 	t.Helper()
 

@@ -91,6 +91,46 @@ func TestAppendDailyLogUsesProvidedTimestamp(t *testing.T) {
 	}
 }
 
+func TestAppendMemoryWritesTSVAndUpdatesCache(t *testing.T) {
+	store := mustNewStore(t, t.TempDir())
+	ts := time.Date(2026, 2, 17, 10, 30, 0, 123456789, time.UTC)
+
+	if err := store.AppendMemory(LogEntry{
+		Timestamp: ts,
+		Tags:      []string{"Location", "Travel"},
+		Text:      "In SF",
+		KV:        "",
+	}); err != nil {
+		t.Fatalf("append memory: %v", err)
+	}
+
+	if len(store.memoryFacts) != 1 {
+		t.Fatalf("expected 1 cached memory fact, got %d", len(store.memoryFacts))
+	}
+	entry := store.memoryFacts[0]
+	if !entry.Timestamp.Equal(ts) {
+		t.Fatalf("expected timestamp %v, got %v", ts, entry.Timestamp)
+	}
+	if got := entry.Tags; len(got) != 2 || got[0] != "location" || got[1] != "travel" {
+		t.Fatalf("expected normalized tags, got %#v", got)
+	}
+	if entry.KV != "-" {
+		t.Fatalf("expected normalized kv '-', got %q", entry.KV)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(store.dir, "memory.tsv"))
+	if err != nil {
+		t.Fatalf("read memory.tsv: %v", err)
+	}
+	content := string(raw)
+	if !strings.Contains(content, "ts\ttags\ttext\tkv") {
+		t.Fatalf("expected tsv header, got %q", content)
+	}
+	if !strings.Contains(content, ts.Format(time.RFC3339Nano)+"\tlocation,travel\tIn SF\t-") {
+		t.Fatalf("expected tsv row, got %q", content)
+	}
+}
+
 func TestNewLoadsPreexistingTSVFiles(t *testing.T) {
 	dir := t.TempDir()
 	writeTSVTestFile(t, filepath.Join(dir, "memory.tsv"), [][]string{
