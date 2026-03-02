@@ -8,6 +8,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
+	"github.com/neoclaw-ai/neoclaw/internal/logging"
 )
 
 const braveSearchEndpoint = "https://api.search.brave.com/res/v1/web/search"
@@ -147,7 +150,7 @@ func (t HTTPRequestTool) Name() string {
 
 // Description returns the tool description for the model.
 func (t HTTPRequestTool) Description() string {
-	return "Make an HTTP request and return URL, status, and body"
+	return "Make an HTTP request and return URL, status, and body. HTML responses are converted to markdown."
 }
 
 // Schema returns the JSON schema for http_request args.
@@ -252,8 +255,25 @@ func (t HTTPRequestTool) Execute(ctx context.Context, args map[string]any) (*Too
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
 
-	output := fmt.Sprintf("URL: %s\nStatus: %s\n\n%s", req.URL.String(), resp.Status, string(respBody))
+	bodyText := string(respBody)
+	contentType := resp.Header.Get("Content-Type")
+	if strings.Contains(contentType, "text/html") {
+		bodyText = htmlToMarkdown(bodyText)
+	}
+
+	output := fmt.Sprintf("URL: %s\nStatus: %s\n\n%s", req.URL.String(), resp.Status, bodyText)
 	return TruncateOutput(output)
+}
+
+// htmlToMarkdown converts an HTML string to Markdown. On error it logs and
+// returns the original HTML so the caller always gets usable output.
+func htmlToMarkdown(html string) string {
+	md, err := htmltomarkdown.ConvertString(html)
+	if err != nil {
+		logging.Logger().Info("html to markdown conversion failed, returning raw html", "err", err)
+		return html
+	}
+	return md
 }
 
 func parseHeaderArgs(args map[string]any) (map[string]string, error) {
