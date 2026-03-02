@@ -6,16 +6,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/neoclaw-ai/neoclaw/internal/config"
 	"github.com/neoclaw-ai/neoclaw/internal/logging"
-	"github.com/neoclaw-ai/neoclaw/internal/store"
 )
-
-const schedulerOutputJobIDArg = "job_id"
 
 // RunCommandTool executes shell commands within the configured workspace.
 type RunCommandTool struct {
@@ -121,14 +117,7 @@ func (t RunCommandTool) Execute(ctx context.Context, args map[string]any) (*Tool
 		}
 	}
 
-	fullOutputPath, err := t.WriteOutput(args, output)
-	if err != nil {
-		return nil, err
-	}
-	return &ToolResult{
-		Output:         output,
-		FullOutputPath: fullOutputPath,
-	}, nil
+	return &ToolResult{Output: output}, nil
 }
 
 // commandEnv returns subprocess environment with proxy settings for non-danger modes.
@@ -150,21 +139,6 @@ func (t RunCommandTool) commandEnv() []string {
 		"no_proxy=",
 	)
 	return env
-}
-
-// WriteOutput writes full command output to workspace/tmp and returns the file path.
-func (t RunCommandTool) WriteOutput(args map[string]any, output string) (string, error) {
-	tmpDir := filepath.Join(t.WorkspaceDir, config.TmpDirPath)
-	prefix := ""
-	if jobID, ok := args[schedulerOutputJobIDArg].(string); ok && strings.TrimSpace(jobID) != "" {
-		prefix = fmt.Sprintf("%s-", jobID)
-	}
-	filename := fmt.Sprintf("%stool-output-%d.txt", prefix, time.Now().UnixNano())
-	fullPath := filepath.Join(tmpDir, filename)
-	if err := store.WriteFile(fullPath, []byte(output)); err != nil {
-		return "", fmt.Errorf("write full output file: %w", err)
-	}
-	return fullPath, nil
 }
 
 // validateArgs validates command args and resolves working directory.

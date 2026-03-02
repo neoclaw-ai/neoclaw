@@ -25,9 +25,6 @@ func TestReadFile_ReadExistingFile(t *testing.T) {
 	if res.Output != "hello" {
 		t.Fatalf("expected hello, got %q", res.Output)
 	}
-	if res.Truncated {
-		t.Fatalf("expected non-truncated read")
-	}
 }
 
 func TestReadFile_BinaryFileErrors(t *testing.T) {
@@ -56,9 +53,6 @@ func TestReadFile_LargeFileReturnsFullContent(t *testing.T) {
 	res, err := tool.Execute(context.Background(), map[string]any{"path": "large.txt"})
 	if err != nil {
 		t.Fatalf("read file: %v", err)
-	}
-	if res.Truncated {
-		t.Fatalf("expected non-truncated read")
 	}
 	if res.Output != data {
 		t.Fatalf("expected full content, got %d bytes", len(res.Output))

@@ -5,14 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sort"
 
 	"github.com/neoclaw-ai/neoclaw/internal/config"
 	"github.com/neoclaw-ai/neoclaw/internal/provider"
 )
-
-const defaultInlineOutputChars = 12000
 
 // Permission classifies whether a tool can run automatically or needs user approval.
 type Permission int
@@ -53,46 +50,20 @@ type ApprovalPersister interface {
 
 // ToolResult is the normalized output returned by tools.
 type ToolResult struct {
-	Output         string
-	Truncated      bool
-	FullOutputPath string
+	Output string
 }
 
-// TruncateOutput stores very large output in a temp file and returns a compact result.
+// TruncateOutput truncates large output to the configured inline limit.
 func TruncateOutput(output string) (*ToolResult, error) {
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, fmt.Errorf("load config for tool output path: %w", err)
+		return nil, fmt.Errorf("load config: %w", err)
 	}
 	limit := cfg.Context.ToolOutputLength
-	if limit <= 0 {
-		limit = defaultInlineOutputChars
-	}
-
 	if len(output) <= limit {
 		return &ToolResult{Output: output}, nil
 	}
-
-	tmpDir := cfg.ToolTmpDir()
-	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
-		return nil, fmt.Errorf("create workspace directory for tool output: %w", err)
-	}
-
-	tempFile, err := os.CreateTemp(tmpDir, "neoclaw-tool-output-*.txt")
-	if err != nil {
-		return nil, fmt.Errorf("create temp output file: %w", err)
-	}
-	defer tempFile.Close()
-
-	if _, err := tempFile.WriteString(output); err != nil {
-		return nil, fmt.Errorf("write temp output file: %w", err)
-	}
-
-	return &ToolResult{
-		Output:         output[:limit],
-		Truncated:      true,
-		FullOutputPath: tempFile.Name(),
-	}, nil
+	return &ToolResult{Output: output[:limit]}, nil
 }
 
 // Registry stores tools by unique name.

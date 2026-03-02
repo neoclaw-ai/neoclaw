@@ -2,8 +2,6 @@ package tools
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -67,22 +65,12 @@ func TestTruncateOutput_NoTruncationForSmallOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
-	if res.Truncated {
-		t.Fatalf("expected non-truncated result")
-	}
-	if res.FullOutputPath != "" {
-		t.Fatalf("expected no full output path")
-	}
 	if res.Output != "hello" {
 		t.Fatalf("expected output hello, got %q", res.Output)
 	}
 }
 
-func TestTruncateOutput_StoresLargeOutputInTempFile(t *testing.T) {
-	dataDir := t.TempDir()
-	t.Setenv("NEOCLAW_HOME", dataDir)
-	tmpDir := filepath.Join(dataDir, "data", "agents", "default", "workspace", "tmp")
-
+func TestTruncateOutput_TruncatesLargeOutput(t *testing.T) {
 	long := make([]byte, 13000)
 	for i := range long {
 		long[i] = 'a'
@@ -92,25 +80,8 @@ func TestTruncateOutput_StoresLargeOutputInTempFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
-	if !res.Truncated {
-		t.Fatalf("expected truncated result")
-	}
 	if len(res.Output) != 12000 {
 		t.Fatalf("expected inline output to be 12000 chars, got %d", len(res.Output))
-	}
-	if res.FullOutputPath == "" {
-		t.Fatalf("expected full output path")
-	}
-	if filepath.Dir(res.FullOutputPath) != tmpDir {
-		t.Fatalf("expected full output path under %q, got %q", tmpDir, res.FullOutputPath)
-	}
-
-	full, err := os.ReadFile(res.FullOutputPath)
-	if err != nil {
-		t.Fatalf("read full output file: %v", err)
-	}
-	if string(full) != string(long) {
-		t.Fatalf("full output file mismatch")
 	}
 }
 

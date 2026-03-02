@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -103,46 +102,6 @@ func TestRunCommand_ContextCanceledStopsCommand(t *testing.T) {
 	}
 	if elapsed := time.Since(startedAt); elapsed > 2*time.Second {
 		t.Fatalf("expected fast cancellation, took %s", elapsed)
-	}
-}
-
-func TestRunCommand_TruncationMetadata(t *testing.T) {
-	workspace := t.TempDir()
-
-	tool := RunCommandTool{
-		WorkspaceDir: workspace,
-		Timeout:      5 * time.Minute,
-	}
-	res, err := tool.Execute(context.Background(), map[string]any{
-		"command": "bash -lc 'head -c 2101 /dev/zero | tr \"\\000\" a'",
-	})
-	if err != nil {
-		t.Fatalf("execute command: %v", err)
-	}
-	if res.FullOutputPath == "" {
-		t.Fatalf("expected full output path")
-	}
-	if res.Truncated {
-		t.Fatalf("expected non-truncated tool result")
-	}
-}
-
-func TestRunCommand_WriteOutputUsesSchedulerJobIDInFilename(t *testing.T) {
-	workspace := t.TempDir()
-	tool := RunCommandTool{WorkspaceDir: workspace}
-
-	path, err := tool.WriteOutput(map[string]any{
-		schedulerOutputJobIDArg: "job_123",
-	}, "ok")
-	if err != nil {
-		t.Fatalf("write output: %v", err)
-	}
-	if filepath.Dir(path) != filepath.Join(workspace, "tmp") {
-		t.Fatalf("expected output under workspace/tmp, got %q", path)
-	}
-	base := filepath.Base(path)
-	if !strings.HasPrefix(base, "job_123-tool-output-") || !strings.HasSuffix(base, ".txt") {
-		t.Fatalf("unexpected scheduler output filename %q", base)
 	}
 }
 

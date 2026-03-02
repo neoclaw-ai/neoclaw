@@ -13,7 +13,6 @@ const (
 	// Agent directory layout under NEOCLAW_HOME/data/agents/{agent}/.
 	AgentsDirPath      = "agents"
 	WorkspaceDirPath   = "workspace"
-	TmpDirPath         = "tmp"
 	MemoryDirPath      = "memory"
 	DailyDirPath       = "daily"
 	SessionsDirPath    = "sessions"
@@ -88,10 +87,6 @@ func (c *Config) AgentsDir() string {
 
 func (c *Config) WorkspaceDir() string {
 	return filepath.Join(c.AgentDir(), WorkspaceDirPath)
-}
-
-func (c *Config) ToolTmpDir() string {
-	return filepath.Join(c.WorkspaceDir(), TmpDirPath)
 }
 
 func (c *Config) MemoryDir() string {
