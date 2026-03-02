@@ -114,6 +114,7 @@ func (a *Agent) runSessionSummary(ctx context.Context, timeout time.Duration, sn
 	reader := csv.NewReader(strings.NewReader(summary))
 	reader.Comma = '\t'
 	reader.FieldsPerRecord = -1
+	reader.LazyQuotes = true
 
 	entryIndex := 0
 	for {
